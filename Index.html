@@ -783,7 +783,7 @@
         const LABELS_KEY = KEY_PREFIX + 'customLabels';
         const DEFAULT_LABELS = { employeeId: 'ID พนักงาน', surveyId: 'ID สำรวจ' };
         const PIN_COLORS = { selected: '#e5383b', pending: '#f59e0b', saved: '#1f5fd6', editing: '#7c3aed' };
-        const GET_TIMEOUT_MS = 30000;
+        const GET_TIMEOUT_MS = 90000;
         const POST_TIMEOUT_MS = 90000;
         const VERIFY_AFTER_TIMEOUT_MS = 90000;
         const RETRY_DELAYS_MS = [5000, 15000, 30000, 60000, 120000];
@@ -882,10 +882,23 @@
             finally { clearTimeout(timer); }
         }
 
-        async function apiGet(query) {
+        // Apps Script ตอบหน้า error ของ Google ("ไม่สามารถเปิดไฟล์ได้ในเวลานี้") เป็นพักๆ จึงลองอ่านซ้ำอัตโนมัติ
+        async function apiGet(query, { tries = 4 } = {}) {
             if (MOCK) return mockApi(query);
-            const res = await fetchWithTimeout(`${WEB_APP_URL}?${query}&t=${Date.now()}`);
-            return res.json();
+            let lastErr;
+            for (let attempt = 1; attempt <= tries; attempt++) {
+                try {
+                    const res = await fetchWithTimeout(`${WEB_APP_URL}?${query}&t=${Date.now()}`);
+                    const text = await res.text();
+                    try { return JSON.parse(text); }
+                    catch (e) { throw new Error("ระบบตอบกลับผิดพลาดชั่วคราว"); }
+                } catch (err) {
+                    lastErr = err;
+                    if (err.isTimeout || attempt >= tries) throw err; // หมดเวลาแปลว่าสัญญาณค้าง ลองซ้ำไม่ช่วย
+                    await new Promise(r => setTimeout(r, 700 * attempt));
+                }
+            }
+            throw lastErr;
         }
 
         async function apiPost(payload, { quiet = false } = {}) {
@@ -940,7 +953,7 @@
             Math.abs(parseFloat(r.Longitude) - parseFloat(item.Longitude)) < 0.00002;
 
         async function fetchServerRows(project) {
-            const result = await apiGet(`action=getData&project=${encodeURIComponent(project)}`);
+            const result = await apiGet(`action=getData&project=${encodeURIComponent(project)}`, { tries: 2 });
             if (!(result.success || result.status === 'success')) throw new Error(result.message || 'ตรวจสอบข้อมูลไม่สำเร็จ');
             return result.data || [];
         }
