@@ -1,1853 +1,1162 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Project Location Tracker</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
-    <meta name="theme-color" content="#f5f7fb">
+    <title>Location Tracker V11.3 (02.04.2026)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
     <style>
-        :root {
-            --bg: #f5f7fb;
-            --surface: #ffffff;
-            --surface-2: #eef2f8;
-            --line: #dde3ec;
-            --line-strong: #c5cedb;
-            --ink: #172033;
-            --ink-2: #435069;
-            --ink-3: #5b6780;
-
-            --accent: #1f5fd6;
-            --accent-hover: #1a50b6;
-            --accent-soft: #e6eefc;
-            --accent-ring: rgba(31, 95, 214, 0.28);
-
-            --pending: #9a4a06;
-            --pending-fill: #f59e0b;
-            --pending-soft: #fff4e0;
-            --danger: #c62f35;
-            --danger-hover: #a8272c;
-            --danger-soft: #fdecec;
-            --success: #1b7f4b;
-            --success-soft: #e5f5ec;
-            --streetview: #a35200;
-            --streetview-soft: #fff1e2;
-
-            --pin-selected: #e5383b;
-            --pin-pending: #f59e0b;
-            --pin-saved: #1f5fd6;
-            --pin-editing: #7c3aed;
-
-            --radius-sm: 8px;
-            --radius: 12px;
-            --radius-lg: 16px;
-            --shadow-1: 0 1px 2px rgba(23, 32, 51, 0.06);
-            --shadow-2: 0 6px 20px rgba(23, 32, 51, 0.12);
-            --shadow-3: 0 18px 48px rgba(23, 32, 51, 0.22);
-            --shadow-sheet: 0 -8px 28px rgba(23, 32, 51, 0.14);
-
-            --z-sticky: 1100;
-            --z-sheet-backdrop: 1140;
-            --z-sheet: 1150;
-            --z-modal: 1200;
-            --z-toast: 1300;
-
-            --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+        :root { 
+            --primary-blue: #007AFF; 
+            --primary-light: #F0F7FF;
+            --primary-hover: #0062CC;
+            --primary-deep: #003B80;
+            --primary-soft: rgba(0, 122, 255, 0.1);
+            --bg-fintech: #F8FAFF;
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --card-bg: #FFFFFF;
+            --card-shadow: 0 20px 40px -10px rgba(0, 122, 255, 0.08), 0 10px 20px -5px rgba(0, 0, 0, 0.02);
+            --border-soft: #F1F5F9;
+            --my-marker: #1a237e;
         }
 
-        *, *::before, *::after { box-sizing: border-box; }
-        [hidden] { display: none !important; }
-
-        html, body {
-            margin: 0;
-            min-height: 100%;
-            background: var(--bg);
-            color: var(--ink);
-            font-family: 'Sarabun', system-ui, -apple-system, 'Segoe UI', sans-serif;
-            font-size: 16px;
-            line-height: 1.5;
-            -webkit-font-smoothing: antialiased;
-            -webkit-tap-highlight-color: transparent;
+        body { 
+            font-family: "Myriad Pro", "Myriad", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: var(--bg-fintech);
+            min-height: 100vh;
+            color: var(--text-main);
+            background-image: radial-gradient(at 0% 0%, rgba(0, 122, 255, 0.03) 0px, transparent 50%),
+                              radial-gradient(at 100% 100%, rgba(0, 122, 255, 0.03) 0px, transparent 50%);
         }
-        body.tracker-open { overflow: hidden; }
-        button, input { font: inherit; color: inherit; }
-        button { cursor: pointer; }
-        a { color: inherit; }
-        h1, h2, h3 { margin: 0; line-height: 1.25; text-wrap: balance; }
-        p { margin: 0; }
-        .num { font-variant-numeric: tabular-nums; }
-        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-        :focus-visible { outline: 3px solid var(--accent-ring); outline-offset: 2px; }
+        .app-view { display: none; opacity: 0; transform: scale(0.98); }
+        .app-view.active { display: block; opacity: 1; transform: scale(1); transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
 
-        /* ---------- Views ---------- */
-        .app-view { display: none; }
-        .app-view.active { display: block; animation: viewIn 200ms var(--ease-out); }
-        @keyframes viewIn { from { opacity: 0; } to { opacity: 1; } }
+        .main-card { 
+            background-color: var(--card-bg); 
+            border-radius: 2.5rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid #E5E5EA;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
 
-        .page {
+        #map-container {
+            position: relative;
+            height: 420px;
             width: 100%;
-            max-width: 560px;
-            margin: 0 auto;
-            padding: max(20px, env(safe-area-inset-top)) 20px 40px;
-        }
-
-        .mock-banner {
-            background: #2b2140; color: #fff; font-size: 13px; text-align: center;
-            padding: 6px 12px; font-weight: 600;
-        }
-
-        /* ---------- Buttons ---------- */
-        .btn {
-            min-height: 48px;
-            padding: 0 18px;
-            border-radius: var(--radius);
-            border: 1px solid transparent;
-            font-size: 16px;
-            font-weight: 600;
-            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-            transition: background-color 150ms, border-color 150ms, color 150ms, transform 100ms;
-            white-space: nowrap;
-            text-decoration: none;
-        }
-        .btn:active:not(:disabled) { transform: scale(0.98); }
-        .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-        .btn-primary { background: var(--accent); color: #fff; }
-        .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-        .btn-secondary { background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
-        .btn-secondary:hover:not(:disabled) { background: var(--surface-2); }
-        .btn-danger { background: var(--danger); color: #fff; }
-        .btn-danger:hover:not(:disabled) { background: var(--danger-hover); }
-        .btn-violet { background: var(--pin-editing); color: #fff; }
-        .btn-violet:hover:not(:disabled) { background: #6a2fd0; }
-        .btn-sm { min-height: 40px; padding: 0 14px; font-size: 15px; border-radius: 10px; }
-
-        .icon-btn {
-            width: 44px; height: 44px; flex-shrink: 0;
-            display: inline-flex; align-items: center; justify-content: center;
-            border-radius: var(--radius);
-            border: 1px solid var(--line);
-            background: var(--surface);
-            color: var(--ink-2);
-            font-size: 17px;
-            text-decoration: none;
-            transition: background-color 150ms, color 150ms, border-color 150ms;
-        }
-        .icon-btn:hover { background: var(--surface-2); color: var(--ink); }
-        .icon-btn.ghost { border-color: transparent; background: transparent; }
-        .icon-btn.ghost:hover { background: var(--surface-2); }
-
-        /* ---------- Inputs ---------- */
-        .field-label { display: block; font-size: 13.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .input {
-            width: 100%;
-            height: 48px;
-            padding: 0 14px;
-            border: 1px solid var(--line-strong);
-            border-radius: var(--radius);
-            background: var(--surface);
-            font-size: 16px;
-            transition: border-color 150ms, box-shadow 150ms, background-color 150ms;
-        }
-        .input::placeholder { color: var(--ink-3); opacity: 1; }
-        .input:hover:not(:disabled) { border-color: #9aa6b8; }
-        .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
-        .input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(198, 47, 53, 0.18); }
-        .input:disabled { background: var(--surface-2); color: var(--ink); cursor: not-allowed; -webkit-text-fill-color: var(--ink); opacity: 1; }
-
-        /* ---------- Project selection ---------- */
-        .sel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 24px; }
-        .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
-        .brand-mark {
-            width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0;
-            background: var(--accent); color: #fff;
-            display: flex; align-items: center; justify-content: center; font-size: 22px;
-        }
-        .brand h1 { font-size: 22px; font-weight: 700; }
-        .brand p { color: var(--ink-2); font-size: 15px; }
-
-        .search-field { position: relative; margin-bottom: 18px; }
-        .search-field i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
-        .search-field .input { padding-left: 44px; height: 52px; border-radius: 14px; }
-
-        .list-head { padding: 0 4px 8px; }
-        .list-head span { font-size: 14px; color: var(--ink-2); font-weight: 600; }
-
-        .project-list {
-            background: var(--surface);
-            border: 1px solid var(--line);
-            border-radius: var(--radius-lg);
+            border-radius: 1.75rem;
             overflow: hidden;
-            box-shadow: var(--shadow-1);
-        }
-        .project-item {
-            width: 100%;
-            display: flex; align-items: center; gap: 14px;
-            padding: 12px 16px;
-            min-height: 64px;
-            background: none; border: 0; text-align: left;
-            border-top: 1px solid var(--line);
-            transition: background-color 150ms;
-        }
-        .project-item:first-child { border-top: 0; }
-        .project-item:hover { background: var(--surface-2); }
-        .project-item:active { background: var(--accent-soft); }
-        .project-icon {
-            width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
-            background: var(--accent-soft); color: var(--accent);
-            display: flex; align-items: center; justify-content: center;
-        }
-        .project-name { flex: 1; min-width: 0; font-weight: 600; font-size: 16px; line-height: 1.35; overflow-wrap: anywhere; }
-        .project-item .fa-chevron-right { color: var(--ink-3); font-size: 13px; }
-
-        .chip {
-            display: inline-flex; align-items: center; gap: 5px;
-            font-size: 13px; font-weight: 600; line-height: 1;
-            padding: 5px 8px; border-radius: 999px; white-space: nowrap;
-        }
-        .chip-pending { background: var(--pending-soft); color: var(--pending); }
-        .chip-failed { background: var(--danger-soft); color: var(--danger); }
-        .chip-sending { background: var(--accent-soft); color: var(--accent); }
-        .chip-muted { background: var(--surface-2); color: var(--ink-2); }
-
-        .state-box { padding: 36px 20px; text-align: center; color: var(--ink-2); }
-        .state-box i.state-icon { font-size: 26px; color: var(--ink-3); margin-bottom: 10px; display: block; }
-        .state-box strong { display: block; color: var(--ink); font-size: 16px; margin-bottom: 4px; overflow-wrap: anywhere; }
-        .state-box p { font-size: 15px; max-width: 36ch; margin: 0 auto; }
-        .state-box .btn { margin-top: 14px; }
-
-        .skeleton { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-top: 1px solid var(--line); }
-        .skeleton:first-child { border-top: 0; }
-        .sk { background: linear-gradient(90deg, var(--surface-2) 25%, #e3e8f1 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; border-radius: 6px; }
-        @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-
-        /* ---------- Admin menu ---------- */
-        .page-head { display: flex; align-items: center; gap: 10px; margin: 8px 0 20px; }
-        .page-head h2 { font-size: 20px; font-weight: 700; }
-        .menu-item .menu-text { flex: 1; min-width: 0; }
-        .menu-item .menu-text strong { display: block; font-size: 16px; }
-        .menu-item .menu-text small { display: block; color: var(--ink-2); font-size: 14px; }
-        .menu-icon-green { background: var(--success-soft); color: var(--success); }
-
-        /* ---------- Tracker (mobile first) ---------- */
-        #tracker-view.active {
-            position: fixed; inset: 0;
-            display: flex; flex-direction: column;
-            height: 100vh; height: 100dvh;
-            background: var(--bg);
-        }
-        .topbar {
-            position: relative; z-index: var(--z-sticky);
-            display: flex; align-items: center; gap: 6px;
-            padding: max(6px, env(safe-area-inset-top)) 6px 6px;
-            background: var(--bg);
-            border-bottom: 1px solid var(--line);
-            flex-shrink: 0;
-        }
-        .topbar-title { flex: 1; min-width: 0; text-align: center; }
-        .topbar-title h1 { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .topbar-title p { font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-        .map-area { position: relative; flex: 1; min-height: 64px; }
-        #map-container { position: absolute; inset: 0; isolation: isolate; background: var(--surface-2); }
-        #map { position: absolute; inset: 0; background: var(--surface-2); }
-
-        .side { display: contents; }
-
-        .capture-sheet {
-            position: relative; z-index: 2;
-            margin-top: -16px;
-            background: var(--surface);
-            border-radius: 20px 20px 0 0;
-            box-shadow: var(--shadow-sheet);
-            padding: 10px 14px max(12px, env(safe-area-inset-bottom));
-            display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px;
-            flex-shrink: 1; min-height: 0;
-            max-height: calc(100dvh - 120px);
-            overflow-y: auto; overscroll-behavior: contain;
-        }
-        .capture-sheet > * { min-width: 0; }
-
-        .sync-row { display: flex; align-items: center; gap: 10px; min-height: 40px; }
-        .sync-status { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 600; color: var(--ink-2); }
-        .sync-status .sync-icon {
-            width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
-            display: inline-flex; align-items: center; justify-content: center; font-size: 13px;
-            background: var(--surface-2); color: var(--ink-2);
-        }
-        .sync-status .sync-text { min-width: 0; line-height: 1.3; overflow-wrap: anywhere; }
-        .sync-status.ok .sync-icon { background: var(--success-soft); color: var(--success); }
-        .sync-status.ok { color: var(--success); }
-        .sync-status.sending .sync-icon { background: var(--accent-soft); color: var(--accent); }
-        .sync-status.sending { color: var(--accent); }
-        .sync-status.waiting .sync-icon { background: var(--pending-soft); color: var(--pending); }
-        .sync-status.waiting { color: var(--pending); }
-        .sync-status.error .sync-icon { background: var(--danger-soft); color: var(--danger); }
-        .sync-status.error { color: var(--danger); }
-        #uploadButton { flex-shrink: 0; }
-        #uploadButton.is-error { border-color: #f0b8ba; color: var(--danger); background: var(--danger-soft); }
-
-        .pick-status {
-            display: flex; align-items: center; gap: 10px;
-            padding: 6px 6px 6px 10px;
-            border-radius: var(--radius);
-            background: var(--surface-2);
-            min-height: 52px;
-            transition: background-color 150ms;
-        }
-        .pick-status .pick-icon {
-            width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
-            display: flex; align-items: center; justify-content: center; font-size: 14px;
-            background: var(--surface); color: var(--ink-2);
-        }
-        .pick-status .pick-body { flex: 1; min-width: 0; line-height: 1.3; }
-        .pick-status .pick-title { font-size: 13px; font-weight: 600; color: var(--ink-2); }
-        .pick-status .pick-coords { font-size: 15.5px; font-weight: 700; color: var(--ink); }
-        .pick-status .pick-hint { font-size: 14.5px; color: var(--ink-2); }
-        .pick-status.has-coords { background: #fff1f1; }
-        .pick-status.has-coords .pick-icon { background: var(--pin-selected); color: #fff; }
-        .pick-status.is-editing { background: #f4eefe; }
-        .pick-status.is-editing .pick-icon { background: var(--pin-editing); }
-        .pick-actions { display: flex; gap: 2px; }
-
-        .edit-banner {
-            display: flex; align-items: center; gap: 8px;
-            padding: 8px 12px; border-radius: 10px;
-            background: #f1eafe; color: #4c1d95; font-size: 14px; font-weight: 600; line-height: 1.35;
+            border: 1px solid #E5E5EA;
+            z-index: 10;
         }
 
-        .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .input-with-action { position: relative; }
-        .input-with-action .input { padding-right: 50px; }
-        .btn-lock-action {
-            position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
-            width: 44px; height: 44px; border-radius: 10px;
-            display: flex; align-items: center; justify-content: center;
-            border: 0; background: transparent; color: var(--ink-3); font-size: 14px;
-            transition: background-color 150ms, color 150ms;
-        }
-        .btn-lock-action:hover { background: var(--surface-2); color: var(--ink); }
-        .btn-lock-action.locked { color: var(--accent); }
+        #map, #dashboard-map { height: 100%; width: 100%; background: #ddd; }
 
-        .actions { display: flex; gap: 10px; }
-        .actions .btn-primary { flex: 1; min-height: 54px; font-size: 17px; }
-        .history-btn { min-height: 54px; padding: 0 14px; }
-        .history-btn .count {
-            min-width: 24px; height: 22px; padding: 0 6px; border-radius: 999px;
-            background: var(--surface-2); color: var(--ink-2); font-size: 13px; font-weight: 700;
-            display: inline-flex; align-items: center; justify-content: center;
-        }
-        .edit-actions { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
-        .edit-actions .btn { min-height: 54px; }
-
-        /* History panel: bottom sheet on mobile */
-        .sheet-backdrop {
-            position: fixed; inset: 0; z-index: var(--z-sheet-backdrop);
-            background: rgba(15, 22, 36, 0.45);
-            animation: fadeIn 180ms var(--ease-out);
-        }
-        .history-panel {
-            position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-sheet);
-            max-height: 85vh; max-height: 85dvh;
-            display: flex; flex-direction: column;
-            background: var(--surface);
-            border-radius: 20px 20px 0 0;
-            box-shadow: var(--shadow-3);
-            transform: translateY(105%);
-            visibility: hidden;
-            transition: transform 260ms var(--ease-out), visibility 0s linear 260ms;
-        }
-        .history-panel.is-open { transform: none; visibility: visible; transition: transform 260ms var(--ease-out); }
-        .sheet-grip { width: 40px; height: 4px; border-radius: 4px; background: var(--line-strong); margin: 8px auto 0; }
-        .history-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 16px; }
-        .history-head h2 { flex: 1; font-size: 18px; font-weight: 700; }
-        .history-head h2 span { color: var(--ink-2); font-weight: 600; font-size: 15px; margin-left: 4px; }
-        .legend {
-            display: flex; flex-wrap: wrap; gap: 2px 14px;
-            padding: 0 16px 10px; font-size: 13px; color: var(--ink-2);
-            border-bottom: 1px solid var(--line);
-        }
-        .legend span { display: inline-flex; align-items: center; gap: 6px; }
-        .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-        .history-list { overflow-y: auto; overscroll-behavior: contain; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
-
-        .history-row {
-            width: 100%;
-            display: flex; align-items: center; gap: 12px;
-            padding: 10px 12px 10px 16px;
-            min-height: 60px;
-            background: none; border: 0; border-top: 1px solid var(--line);
-            text-align: left;
-            transition: background-color 150ms;
-        }
-        .history-row:first-child { border-top: 0; }
-        .history-row:hover { background: var(--surface-2); }
-        .history-row:active { background: var(--accent-soft); }
-        .history-row.is-editing { background: #f7f2ff; }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-        .status-dot.saved { background: var(--pin-saved); }
-        .status-dot.pending { background: var(--pin-pending); }
-        .status-dot.failed { background: var(--danger); }
-        .history-text { flex: 1; min-width: 0; display: block; }
-        .history-id { display: block; font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .history-meta { display: block; font-size: 13.5px; color: var(--ink-2); overflow-wrap: anywhere; }
-        .history-row .fa-ellipsis { color: var(--ink-3); }
-
-        /* Row action sheet */
-        .action-list { display: grid; gap: 4px; margin: 6px 0 12px; }
-        .action-item {
-            display: flex; align-items: center; gap: 14px;
-            min-height: 52px; padding: 0 12px;
-            border: 0; border-radius: var(--radius); background: none;
-            font-size: 16px; font-weight: 600; text-align: left; text-decoration: none; color: var(--ink);
-            transition: background-color 150ms;
-        }
-        .action-item i { width: 22px; text-align: center; color: var(--ink-2); font-size: 17px; }
-        .action-item:hover { background: var(--surface-2); }
-        .action-item.danger { color: var(--danger); }
-        .action-item.danger i { color: var(--danger); }
-
-        /* ---------- Leaflet controls ---------- */
-        .leaflet-bar { border: 0 !important; box-shadow: var(--shadow-2) !important; border-radius: 10px !important; overflow: hidden; }
-        .leaflet-bar a { width: 44px !important; height: 44px !important; line-height: 44px !important; color: var(--ink) !important; }
-        .leaflet-control-layers { border: 0 !important; box-shadow: var(--shadow-2) !important; border-radius: 10px !important; }
-        .leaflet-control-layers-toggle { width: 44px !important; height: 44px !important; }
-        .leaflet-control-layers-expanded { padding: 8px 12px !important; font-family: inherit; font-size: 15px; }
-        .leaflet-bottom { margin-bottom: 18px; }
-        .leaflet-popup-content-wrapper { border-radius: var(--radius); box-shadow: var(--shadow-2); }
-        .leaflet-popup-content { margin: 12px 14px; font-family: 'Sarabun', sans-serif; font-size: 14px; }
-        .popup { display: grid; gap: 6px; min-width: 150px; text-align: center; }
-        .popup b { font-size: 15px; }
-        .popup .btn { min-height: 38px; font-size: 14px; margin-top: 2px; }
-        .btn-streetview { background: var(--streetview-soft); color: var(--streetview) !important; border-color: #f3cfa6; }
-        .btn-streetview:hover { background: #ffe3c4; }
-
-        .pin-icon { background: none; border: 0; }
-        .pin-icon svg { display: block; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25)); }
-
-        .leaflet-search-control { margin-top: 10px !important; margin-left: 10px !important; }
-        .leaflet-search-container {
-            display: flex; align-items: center; background: var(--surface); border-radius: var(--radius);
-            box-shadow: var(--shadow-2);
-            width: 44px; overflow: hidden;
-        }
-        .leaflet-search-container.expanded { width: 320px; max-width: calc(100vw - 90px); }
-        .leaflet-search-input {
-            border: none; padding: 0 4px; width: 100%; height: 44px;
-            font-size: 16px; outline: none; display: none; background: transparent;
-        }
-        .leaflet-search-input::placeholder { color: var(--ink-3); }
-        .leaflet-search-container.expanded .leaflet-search-input { display: block; }
-        .leaflet-search-btn, .leaflet-search-clear {
-            background: none; border: none; width: 44px; height: 44px; flex-shrink: 0;
-            display: flex; align-items: center; justify-content: center; font-size: 16px;
-        }
-        .leaflet-search-btn { color: var(--accent); }
-        .leaflet-search-clear { color: var(--ink-3); display: none; }
-        .leaflet-search-container.expanded .leaflet-search-clear { display: flex; }
-
-        .map-autocomplete-list {
-            background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-2);
-            max-height: min(300px, 32vh); overflow-y: auto; margin-top: 8px; display: none;
-            width: 320px; max-width: calc(100vw - 90px);
-        }
-        .autocomplete-item {
-            padding: 11px 14px; cursor: pointer; border-top: 1px solid var(--line);
-            text-align: left; display: flex; flex-direction: column; gap: 1px;
-        }
-        .autocomplete-item:first-child { border-top: 0; }
-        .autocomplete-item:hover, .autocomplete-item:focus-visible { background: var(--surface-2); outline: none; }
-        .autocomplete-item .main-name { font-weight: 600; font-size: 15px; color: var(--ink); }
-        .autocomplete-item .sub-name { font-size: 13px; color: var(--ink-2); }
-        .autocomplete-item .tag { font-size: 12.5px; font-weight: 700; color: var(--accent); display: inline-flex; gap: 5px; align-items: center; }
-        .searching-hint { padding: 14px; font-size: 14px; color: var(--ink-2); text-align: center; }
-
-        .leaflet-locate-control {
-            background: var(--surface); border: none; border-radius: var(--radius); box-shadow: var(--shadow-2);
-            width: 52px; height: 52px; display: flex; align-items: center; justify-content: center;
-            color: var(--accent); font-size: 21px;
-            margin-left: 12px !important;
-        }
-        .leaflet-locate-control:hover { background: var(--accent-soft); }
-        .leaflet-locate-control.is-busy i { animation: spin 900ms linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* ---------- Modals ---------- */
-        .modal-overlay {
-            position: fixed; inset: 0; z-index: var(--z-modal);
-            background: rgba(15, 22, 36, 0.55);
-            display: none; align-items: flex-end; justify-content: center;
-            padding: 12px;
-        }
-        .modal-overlay.is-open { display: flex; animation: fadeIn 180ms var(--ease-out); }
-        .modal-content {
-            background: var(--surface); border-radius: 20px; padding: 22px 18px 18px;
-            box-shadow: var(--shadow-3); width: 100%; max-width: 420px;
-            margin-bottom: env(safe-area-inset-bottom);
-            animation: sheetIn 240ms var(--ease-out);
-        }
-        .modal-content h3 { font-size: 19px; font-weight: 700; margin-bottom: 4px; overflow-wrap: anywhere; }
-        .modal-content .modal-desc { color: var(--ink-2); font-size: 15px; margin-bottom: 16px; overflow-wrap: anywhere; }
-        .modal-icon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 14px; }
-        .modal-icon.danger { background: var(--danger-soft); color: var(--danger); }
-        .modal-icon.neutral { background: var(--surface-2); color: var(--ink-2); }
-        .modal-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
-        .modal-form { display: grid; gap: 14px; }
-        .modal-form .modal-buttons { margin-top: 4px; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes sheetIn { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
-
-        /* ---------- Toast & loading ---------- */
-        #messageBox {
-            position: fixed; left: 50%; top: calc(max(6px, env(safe-area-inset-top)) + 60px); z-index: var(--z-toast);
-            transform: translate(-50%, -8px); opacity: 0; pointer-events: none;
-            display: flex; align-items: center; gap: 10px;
-            max-width: min(92vw, 460px); width: max-content;
-            padding: 11px 16px; border-radius: 14px;
-            background: var(--ink); color: #fff; font-size: 15px; font-weight: 600;
-            box-shadow: var(--shadow-3);
-            transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
-        }
-        #messageBox.show { opacity: 1; transform: translate(-50%, 0); }
-        #messageBox i { font-size: 17px; }
-        #messageBox.success i { color: #6ee7a8; }
-        #messageBox.error { background: #7f1d1d; }
-        #messageBox.error i { color: #fecaca; }
-        #messageBox.warning i { color: #fcd34d; }
-        #messageBox.info i { color: #93c5fd; }
-
-        #loadingSpinner {
-            position: fixed; left: 50%; top: calc(max(6px, env(safe-area-inset-top)) + 116px); z-index: var(--z-toast);
+        .map-hud {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
             transform: translateX(-50%);
-            display: none; align-items: center; gap: 10px;
-            padding: 10px 16px; border-radius: 999px;
-            background: var(--surface); color: var(--ink); font-size: 15px; font-weight: 600;
-            box-shadow: var(--shadow-3); border: 1px solid var(--line);
-        }
-        #loadingSpinner i { color: var(--accent); }
-
-        /* ---------- Desktop / tablet landscape ---------- */
-        @media (min-width: 960px) {
-            #tracker-view.active {
-                display: grid;
-                grid-template-columns: minmax(0, 1fr) 420px;
-                grid-template-rows: auto minmax(0, 1fr);
-            }
-            .topbar { grid-column: 1 / -1; padding: 8px 16px; }
-            .map-area { grid-row: 2; grid-column: 1; margin: 12px 0 12px 12px; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--line); }
-            .leaflet-bottom { margin-bottom: 0; }
-            .side { display: flex; flex-direction: column; grid-row: 2; grid-column: 2; min-height: 0; padding: 12px; gap: 12px; }
-            .capture-sheet { margin-top: 0; border-radius: var(--radius-lg); border: 1px solid var(--line); box-shadow: none; padding: 14px; }
-            .history-panel {
-                position: static; transform: none; visibility: visible; transition: none;
-                flex: 1; min-height: 0; max-height: none;
-                border-radius: var(--radius-lg); border: 1px solid var(--line); box-shadow: none;
-            }
-            .sheet-grip, #history-close, #historyButton, .sheet-backdrop { display: none !important; }
-            .modal-overlay { align-items: center; }
+            z-index: 1001;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid #E5E5EA;
+            border-radius: 2rem;
+            padding: 4px 14px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            width: auto;
+            max-width: 90%;
+            opacity: 0.9;
         }
 
-        @media (max-width: 340px) {
-            .fields { grid-template-columns: 1fr; }
+        .coords-text { font-family: 'Inter', monospace; font-size: 10px; font-weight: 700; color: var(--text-main); }
+        .coords-sep { margin: 0 8px; color: #E5E5EA; }
+        .coords-label { color: var(--primary-blue); font-size: 8px; text-transform: uppercase; margin-right: 3px; font-weight: 800; }
+
+        #currentLocationButton {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            z-index: 1002;
+            background-color: white; 
+            color: var(--primary-blue);
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
         }
 
-        @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+        .search-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1002;
+            display: flex;
+            align-items: center;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid #E5E5EA;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 34px;
+            height: 34px;
         }
+        .search-container.expanded { width: 240px; overflow: visible; }
+        #toggleSearchBtn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--primary-blue); flex-shrink: 0; cursor: pointer; }
+        .search-input-wrapper { display: flex; align-items: center; width: 100%; padding-right: 6px; opacity: 0; transition: opacity 0.3s; }
+        .search-container.expanded .search-input-wrapper { opacity: 1; }
+        #locationSearchInput { background: transparent; border: none; outline: none; font-size: 11px; font-weight: 600; color: var(--text-main); width: 100%; padding: 4px 8px; }
+        #searchLocationButton { background: var(--primary-blue); color: white; padding: 3px 10px; border-radius: 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; border: none; }
+
+        .btn-primary-action { background-color: rgba(0, 122, 255, 0.04); color: #007AFF; border: 1.5px solid rgba(0, 122, 255, 0.2); box-shadow: 0 12px 24px -6px rgba(0, 122, 255, 0.3); backdrop-filter: blur(4px); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .btn-primary-action:hover {
+            background-color: rgba(0, 122, 255, 0.1);
+            border-color: #007AFF;
+            transform: scale(1.05);
+            box-shadow: 0 15px 30px -5px rgba(0, 122, 255, 0.4);
+        }
+
+        .btn:active { transform: scale(0.94); }
+
+        /* FIXED UPLOAD BUTTON STYLES */
+        .btn-upload-minimal {
+            background-color: rgba(52, 199, 89, 0.1);
+            color: #34C759;
+            border: 1.5px solid rgba(52, 199, 89, 0.3);
+            box-shadow: 0 12px 24px -6px rgba(52, 199, 89, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-upload-minimal:hover { 
+            background-color: rgba(52, 199, 89, 0.2); 
+            border-color: #34C759; 
+            box-shadow: 0 15px 30px -5px rgba(52, 199, 89, 0.4);
+            transform: scale(1.05); /* Enlarge on hover */
+        }
+
+        .input-field { background-color: #F8FAFC; border: 1px solid #E5E5EA; border-radius: 1.25rem; padding: 0.85rem 1.2rem; width: 100%; transition: all 0.3s; font-size: 0.95rem; color: var(--text-main); font-weight: 500; }
+        .input-field:focus { outline: none; border-color: var(--primary-blue); background-color: var(--card-bg); box-shadow: 0 10px 15px -3px rgba(0, 122, 255, 0.1); }
+        
+        .table-scroll { max-height: 280px; overflow-y: auto; border-radius: 1.5rem; border: 1px solid #E5E5EA; background: var(--card-bg); }
+        .modal-overlay { position: fixed; inset: 0; background-color: rgba(15, 23, 42, 0.6); display: none; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(8px); }
+
+        .project-admin-item { transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), background-color 0.2s; }
+        .project-admin-item.dragging { opacity: 0.5; background-color: var(--primary-light); border: 2px dashed var(--primary-blue); z-index: 1000; }
+
+        #search-suggestions {
+            position: absolute;
+            top: 100%; left: 0; width: 100%; background: white; margin-top: 5px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-height: 250px; overflow-y: auto; z-index: 2000;
+        }
+        .suggestion-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f8fafc; display: flex; flex-direction: column; gap: 2px; }
+        .suggestion-item:hover { background: #f1f7ff; }
     </style>
 </head>
-<body>
-    <div id="mock-banner" class="mock-banner" hidden>โหมดทดสอบ · ข้อมูลจำลอง ไม่ส่งเข้า Google Sheet · รหัสผู้ดูแล 1234</div>
+<body class="p-3 md:p-6 flex justify-center items-start">
 
-    <div id="app-container">
+    <div id="app-container" class="w-full max-w-2xl text-primary-deep">
+        
+        <!-- View 1: Project Selection -->
+        <div id="project-selection-view" class="app-view active">
+            <div class="main-card p-8 md:p-12 relative overflow-hidden">
+                <div class="absolute -top-10 -right-10 w-40 h-40 bg-primary-light rounded-full blur-3xl opacity-60"></div>
+                <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-blue-100 rounded-full blur-3xl opacity-40"></div>
 
-        <!-- View 1: เลือกโครงการ -->
-        <main id="project-selection-view" class="app-view active">
-            <div class="page">
-                <header class="sel-head">
-                    <div class="brand">
-                        <span class="brand-mark" aria-hidden="true"><i class="fas fa-location-dot"></i></span>
-                        <div>
-                            <h1>ระบบบันทึกพิกัด</h1>
-                            <p>เลือกโครงการที่จะลงพื้นที่</p>
+                <header class="text-center mb-10 relative z-10">
+                    <div class="bg-white w-20 h-20 rounded-[2.25rem] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-100/50 border-2 border-[#E5E5EA]">
+                        <i class="fas fa-location-dot text-primary-blue text-4xl animate-location-icon"></i>
+                    </div>
+                    <div class="flex items-center justify-center gap-3 mb-2">
+                        <h1 class="text-3xl font-black text-slate-800 tracking-tight">Location Tracker</h1>
+                        <div class="flex gap-1">
+                            <button id="refresh-projects-btn" class="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-primary-blue hover:bg-primary-light rounded-xl transition-all" title="Refresh Projects">
+                                <i class="fas fa-arrows-rotate text-lg"></i>
+                            </button>
+                            <button id="manage-projects-btn" class="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-primary-blue hover:bg-primary-light rounded-xl transition-all" title="Admin Settings">
+                                <i class="fas fa-gear text-xl"></i>
+                            </button>
                         </div>
                     </div>
-                    <button id="manage-projects-btn" class="icon-btn" title="Admin settings" aria-label="Admin settings"><i class="fas fa-sliders"></i></button>
                 </header>
 
-                <div class="search-field">
-                    <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-                    <input id="project-search-input" type="search" placeholder="ค้นหาโครงการ" aria-label="ค้นหาโครงการ" class="input" autocomplete="off">
+                <div class="space-y-6 mb-8 relative z-10">
+                    <div class="relative group">
+                        <input id="project-search-input" type="text" placeholder="Search projects..." autocomplete="off"
+                               class="w-full pl-14 pr-4 py-5 bg-[#F8FAFC] border-2 border-transparent rounded-[1.75rem] focus:bg-white focus:border-primary-blue outline-none transition-all shadow-sm font-semibold text-slate-600">
+                        <i class="fas fa-search absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary-blue transition-colors text-lg"></i>
+                    </div>
+                    <div class="flex justify-between px-2 items-center text-[10px] font-black uppercase text-primary-blue">
+                        <span id="project-count">0 Active Projects</span>
+                    </div>
                 </div>
-
-                <div class="list-head">
-                    <span id="project-count" aria-live="polite">กำลังโหลดโครงการ…</span>
-                </div>
-                <div id="project-list" class="project-list" role="list"></div>
+                <div id="project-list" class="grid gap-5 relative z-10"></div>
             </div>
-        </main>
+        </div>
 
-        <!-- View: ผู้ดูแล -->
-        <main id="admin-menu-view" class="app-view">
-            <div class="page">
-                <header class="page-head">
-                    <button id="menu-back-to-selection-btn" class="icon-btn ghost" aria-label="Back"><i class="fas fa-chevron-left"></i></button>
-                    <h2>การควบคุมระบบ</h2>
+        <!-- View: Admin Console Menu -->
+        <div id="admin-menu-view" class="app-view">
+             <div class="main-card p-10 text-primary-deep">
+                <div class="flex justify-between items-center mb-10">
+                    <h2 class="text-2xl font-black text-slate-900">Admin Console</h2>
+                    <button id="menu-back-to-selection-btn" class="btn bg-[#F8FAFC] text-slate-500 px-6 py-3 rounded-2xl text-xs font-bold hover:bg-slate-100 uppercase tracking-widest">
+                        <i class="fas fa-arrow-left mr-2"></i> Exit
+                    </button>
+                </div>
+                <div class="grid gap-6">
+                    <button id="goto-manage-projects-btn" class="btn w-full btn-primary-action p-6 rounded-[2rem] flex items-center gap-5 text-white">
+                        <span class="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center shadow-sm"><i class="fas fa-folder text-xl text-primary-deep"></i></span>
+                        <div class="text-left"><p class="font-bold text-base text-slate-800">Projects</p><p class="text-[10px] uppercase tracking-widest text-slate-400">Configuration</p></div>
+                    </button>
+                    <button id="goto-dashboards-btn" class="btn w-full bg-slate-900 text-white p-6 rounded-[2rem] flex items-center gap-5">
+                        <span class="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white"><i class="fas fa-chart-bar text-xl"></i></span>
+                        <div class="text-left"><p class="font-bold text-base text-white text-left text-white">Analytics</p><p class="text-[10px] text-slate-400 uppercase tracking-widest text-white">Performance</p></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Manage Projects (Admin) -->
+        <div id="admin-view" class="app-view">
+            <div class="main-card p-10 text-slate-900">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-2xl font-black text-slate-900">Manage Projects</h2>
+                    <button id="back-to-menu-btn" class="btn text-primary-blue font-bold text-sm uppercase tracking-widest">Back</button>
+                </div>
+                <form id="add-project-form" class="flex gap-4 mb-10">
+                    <input id="new-project-name" type="text" class="input-field shadow-sm text-slate-800" placeholder="Add new project name..." autocomplete="off" required>
+                    <button type="submit" class="btn btn-primary-action px-8 py-3 rounded-2xl">Add</button>
+                </form>
+                <div id="admin-project-list" class="space-y-4 mb-8"></div>
+                <button id="save-project-order-btn" class="hidden btn bg-slate-900 text-white w-full py-5 rounded-[1.75rem] font-black uppercase tracking-widest shadow-xl">Confirm New Sequence</button>
+            </div>
+        </div>
+
+        <!-- View: Analytics Dashboard -->
+        <div id="dashboard-view" class="app-view">
+            <div class="main-card p-6 md:p-10 space-y-6 text-primary-deep">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-2xl font-black text-slate-900">Analytics</h2>
+                    <button id="dashboard-back-to-menu-btn" class="btn text-primary-blue font-black uppercase text-xs tracking-widest">Close</button>
+                </div>
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Select Project Insights</label>
+                    <select id="dashboard-project-selector" class="w-full p-4 bg-[#F8FAFC] border-2 border-transparent rounded-[1.5rem] outline-none font-bold text-slate-800 focus:border-primary-blue"></select>
+                </div>
+                
+                <div id="dashboard-content" class="hidden space-y-5">
+                    <div class="grid grid-cols-2 gap-4 px-1">
+                        <div class="bg-primary-blue/5 p-4 rounded-2xl border border-primary-blue/10 flex flex-col items-center">
+                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pins</span>
+                            <span id="kpi-total-checkins" class="text-3xl font-black text-primary-blue">0</span>
+                        </div>
+                        <div class="bg-primary-blue/5 p-4 rounded-2xl border border-primary-blue/10 flex flex-col items-center">
+                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Staff</span>
+                            <span id="kpi-total-staff" class="text-3xl font-black text-primary-blue">0</span>
+                        </div>
+                    </div>
+                    <div id="dashboard-map-container" class="h-[420px] rounded-2xl overflow-hidden border border-slate-200 mt-4"><div id="dashboard-map" class="h-full w-full"></div></div>
+                    
+                    <div class="space-y-3 pt-2">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 text-center text-slate-800">Records by Staff ID</h4>
+                        <div class="table-scroll border-none shadow-none">
+                            <table class="w-full border-collapse">
+                                <thead class="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                    <tr><th class="p-3 text-left font-bold text-slate-800">Staff ID</th><th class="p-3 text-right font-bold text-slate-800">Total Pins</th></tr>
+                                </thead>
+                                <tbody id="dashboard-summary-table" class="divide-y divide-slate-50 text-xs font-semibold text-slate-600"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div id="dashboard-empty-state" class="py-20 text-center space-y-4">
+                    <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-primary-blue opacity-50"><i class="fas fa-chart-pie text-2xl"></i></div>
+                    <p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Select a project above to view insights</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- View 3: Location Tracker (Main) -->
+        <div id="tracker-view" class="app-view">
+            <div class="main-card p-4 md:p-6 space-y-4 text-primary-deep">
+                <header class="flex justify-between items-center">
+                    <button id="home-button" class="btn bg-[#F8FAFC] p-3 rounded-2xl text-slate-500 hover:text-primary-blue hover:scale-110 transition-all shadow-sm"><i class="fas fa-house"></i></button>
+                    <div class="text-center flex-grow px-4"><h3 id="tracker-title" class="text-lg font-black text-slate-900 tracking-tight truncate">Project Name</h3></div>
+                    <button id="customizeLabelsBtn" class="btn bg-primary-soft p-3 rounded-2xl text-primary-blue shadow-sm"><i class="fas fa-sliders"></i></button>
                 </header>
-                <div class="project-list">
-                    <button id="goto-manage-projects-btn" class="project-item menu-item">
-                        <span class="project-icon" aria-hidden="true"><i class="fas fa-folder-tree"></i></span>
-                        <span class="menu-text"><strong>Manage projects</strong><small>สร้าง ลบ และเปลี่ยนชื่อโครงการ</small></span>
-                        <span class="chip chip-muted">Coming soon</span>
-                    </button>
-                    <button id="goto-dashboards-btn" class="project-item menu-item">
-                        <span class="project-icon menu-icon-green" aria-hidden="true"><i class="fas fa-chart-pie"></i></span>
-                        <span class="menu-text"><strong>Reports</strong><small>ภาพรวมจุดที่บันทึกของแต่ละโครงการ</small></span>
-                        <span class="chip chip-muted">Coming soon</span>
-                    </button>
+
+                <div id="map-container">
+                    <div id="map"></div>
+                    <div id="searchBox" class="search-container">
+                        <div id="toggleSearchBtn"><i class="fas fa-magnifying-glass"></i></div>
+                        <div class="search-input-wrapper relative">
+                            <input id="locationSearchInput" type="text" placeholder="Search address or history..." autocomplete="off">
+                            <button id="searchLocationButton">Find</button>
+                            <div id="search-suggestions" class="hidden"></div>
+                        </div>
+                    </div>
+                    <button id="currentLocationButton" title="Locate Now"><i class="fas fa-location-crosshairs text-xl"></i></button>
+                    <div class="map-hud">
+                        <div class="coords-text">
+                            <span class="coords-label">Lat</span><span id="lat">--.------</span>
+                            <span class="coords-sep">|</span>
+                            <span class="coords-label">Lng</span><span id="lng">--.------</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </main>
 
-        <!-- View 3: Tracker -->
-        <main id="tracker-view" class="app-view">
-            <header class="topbar">
-                <button id="home-button" class="icon-btn ghost" title="Back to projects" aria-label="Back to projects"><i class="fas fa-chevron-left"></i></button>
-                <div class="topbar-title">
-                    <h1 id="tracker-title">โครงการ</h1>
-                    <p id="tracker-subtitle" class="num">กำลังโหลด…</p>
+                <div id="address-display" class="bg-blue-50/50 px-5 py-3 rounded-2xl border border-blue-100/50 hidden">
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-map-pin text-primary-blue text-[10px] shrink-0"></i>
+                        <p id="current-address-text" class="text-[10px] font-bold text-slate-600 truncate">Locating...</p>
+                    </div>
                 </div>
-                <button id="customizeLabelsBtn" class="icon-btn ghost" title="Field labels" aria-label="Field labels"><i class="fas fa-gear"></i></button>
-            </header>
 
-            <div class="map-area">
-                <div id="map-container"><div id="map"></div></div>
-            </div>
-
-            <div class="side">
-                <section class="capture-sheet" aria-label="บันทึกพิกัด">
-                    <div class="sync-row">
-                        <div id="sync-status" class="sync-status" role="status" aria-live="polite">
-                            <span class="sync-icon" aria-hidden="true"><i class="fas fa-cloud"></i></span>
-                            <span id="sync-text" class="sync-text">บันทึกแล้วจะส่งเข้าระบบอัตโนมัติ</span>
-                        </div>
-                        <button id="uploadButton" class="btn btn-secondary btn-sm" hidden><i class="fas fa-cloud-arrow-up"></i><span id="uploadButtonText">Upload</span></button>
-                    </div>
-
-                    <div id="pick-status" class="pick-status" aria-live="polite">
-                        <span class="pick-icon" aria-hidden="true"><i class="fas fa-crosshairs"></i></span>
-                        <div class="pick-body">
-                            <p id="pick-title" class="pick-title" hidden>ตำแหน่งที่เลือก</p>
-                            <p id="pick-coords" class="pick-coords num" hidden><span id="lat">--</span>, <span id="lng">--</span></p>
-                            <p id="pick-hint" class="pick-hint">แตะแผนที่เพื่อปักหมุด หรือกด <i class="fas fa-crosshairs"></i></p>
-                        </div>
-                        <div id="pick-actions" class="pick-actions" hidden>
-                            <a id="pick-streetview" class="icon-btn ghost" target="_blank" rel="noopener" title="Street View" aria-label="Street View"><i class="fas fa-street-view"></i></a>
-                            <button id="pick-clear" type="button" class="icon-btn ghost" title="Clear" aria-label="Clear location"><i class="fas fa-xmark"></i></button>
-                        </div>
-                    </div>
-
-                    <div id="edit-banner" class="edit-banner" hidden>
-                        <i class="fas fa-pen" aria-hidden="true"></i>
-                        <span id="edit-banner-text">กำลังแก้ไข</span>
-                    </div>
-
-                    <div class="fields">
-                        <div class="input-row">
-                            <label id="employeeIdLabel" for="employeeIdInput" class="field-label">ID พนักงาน</label>
-                            <div class="input-with-action">
-                                <input id="employeeIdInput" type="text" inputmode="numeric" placeholder="ระบุรหัส" class="input" autocomplete="off">
-                                <button id="toggleEmpLockBtn" class="btn-lock-action" type="button" aria-label="Lock"><i class="fas fa-lock-open" id="empLockIcon"></i></button>
+                <div class="space-y-3">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1.5">
+                            <div class="flex justify-between items-center px-1 h-5">
+                                <label id="employeeIdLabel" class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Employee ID</label>
+                                <span id="eid-pin-count" class="text-[9px] font-black text-primary-blue bg-primary-blue/10 px-2 py-0.5 rounded-full hidden animate-pulse">0 PINS</span>
+                            </div>
+                            <div class="relative flex items-center">
+                                <input id="employeeIdInput" type="text" class="input-field py-3 pr-10" placeholder="ID" autocomplete="off">
+                                <button id="lockEmployeeIdBtn" class="absolute right-3 text-slate-300 hover:text-primary-blue transition-colors p-1" title="Toggle Lock"><i id="lockIcon" class="fas fa-lock-open text-xs"></i></button>
                             </div>
                         </div>
-                        <div class="input-row">
-                            <label id="surveyIdLabel" for="surveyIdInput" class="field-label">ID สำรวจ</label>
-                            <input id="surveyIdInput" type="text" inputmode="numeric" placeholder="ระบุรหัส" class="input" autocomplete="off" enterkeyhint="done">
+                        <div class="space-y-1.5">
+                            <div class="flex items-center px-1 h-5"><label id="surveyIdLabel" class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Survey ID</label></div>
+                            <input id="surveyIdInput" type="text" class="input-field py-3" placeholder="ID" autocomplete="off">
                         </div>
                     </div>
+                </div>
 
-                    <div id="normalActionButtons" class="actions">
-                        <button id="saveButton" class="btn btn-primary"><i class="fas fa-location-pin"></i> Save</button>
-                        <button id="historyButton" class="btn btn-secondary history-btn" aria-haspopup="dialog" aria-controls="history-panel">
-                            <i class="fas fa-list-ul"></i><span>History</span><span id="history-button-count" class="count num">0</span>
-                        </button>
-                    </div>
+                <div id="normalActionButtons" class="flex gap-3 pt-1 items-center">
+                    <button id="saveButton" class="btn btn-primary-action py-4 px-4 flex-grow text-sm uppercase font-black tracking-widest flex items-center justify-center gap-2 rounded-2xl shadow-lg shadow-blue-200"><i class="fas fa-circle-check"></i><span>SAVE RECORD</span></button>
+                    <!-- UPLOAD BUTTON WITH RESTORED STYLES -->
+                    <button id="uploadButton" class="btn btn-upload-minimal w-14 h-14 flex items-center justify-center rounded-2xl shrink-0">
+                        <i class="fas fa-cloud-arrow-up text-xl text-[#34C759]"></i>
+                    </button>
+                </div>
 
-                    <div id="editActionButtons" class="edit-actions" hidden>
-                        <button id="confirmEditButton" class="btn btn-violet"><i class="fas fa-check"></i> Update</button>
-                        <button id="cancelEditButton" class="btn btn-secondary">Cancel</button>
+                <div class="space-y-2 pt-4 text-primary-deep">
+                    <div class="flex items-center justify-between px-1 text-[10px] font-black uppercase text-slate-400">
+                        <h4>Recent Sessions</h4>
+                        <button id="exportCsvButton" class="btn bg-[#EFF6FF] text-[#2563EB] py-1.5 px-4 rounded-full hover:bg-blue-100 transition-colors shadow-sm"><i class="fas fa-file-csv mr-1"></i><span>Export CSV</span></button>
                     </div>
-                </section>
-
-                <div id="history-backdrop" class="sheet-backdrop" hidden></div>
-                <section id="history-panel" class="history-panel" aria-labelledby="history-heading">
-                    <div class="sheet-grip" aria-hidden="true"></div>
-                    <div class="history-head">
-                        <h2 id="history-heading">ประวัติการบันทึก<span id="history-count" class="num"></span></h2>
-                        <button id="exportCsvButton" class="btn btn-secondary btn-sm" title="Export CSV"><i class="fas fa-file-csv"></i> CSV</button>
-                        <button id="history-close" class="icon-btn ghost" aria-label="Close"><i class="fas fa-xmark"></i></button>
+                    <div class="table-scroll">
+                        <table class="w-full border-collapse">
+                            <thead class="bg-[#F8FAFC] border-b border-slate-100 text-[9px] text-primary-blue uppercase font-black">
+                                <tr><th class="p-3 text-left">No.</th><th id="tableHeaderEmployeeId" class="p-3 text-left">Staff</th><th id="tableHeaderSurveyId" class="p-3 text-left">ID</th><th class="p-3 text-left">Timestamp</th><th class="p-3 text-center">Del</th></tr>
+                            </thead>
+                            <tbody id="savedLocationsTableBody" class="divide-y divide-slate-100 text-[11px] font-semibold text-slate-600"></tbody>
+                        </table>
                     </div>
-                    <div class="legend" aria-label="คำอธิบายสีหมุด">
-                        <span><i style="background:var(--pin-selected)"></i>ที่เลือก</span>
-                        <span><i style="background:var(--pin-pending)"></i>รอส่ง</span>
-                        <span><i style="background:var(--pin-saved)"></i>อยู่ในระบบแล้ว</span>
-                        <span><i style="background:var(--pin-editing)"></i>กำลังแก้ไข</span>
-                    </div>
-                    <div id="saved-locations-container" class="history-list" role="list"></div>
-                </section>
+                </div>
             </div>
-        </main>
+        </div>
     </div>
 
     <!-- Modals -->
-    <div id="passwordModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="passwordTitle">
-        <div class="modal-content">
-            <div class="modal-icon neutral" aria-hidden="true"><i class="fas fa-lock"></i></div>
-            <h3 id="passwordTitle">ยืนยันตัวตนผู้ดูแล</h3>
-            <p class="modal-desc">ใส่รหัสผ่านเพื่อเข้าหน้าการควบคุมระบบ</p>
-            <form id="password-form" class="modal-form">
-                <label class="sr-only" for="password-input">รหัสผ่าน</label>
-                <input id="password-input" type="password" class="input" placeholder="รหัสผ่าน" required autocomplete="current-password">
-                <div class="modal-buttons">
-                    <button type="button" id="cancel-password-btn" class="btn btn-secondary">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Unlock</button>
+    <div id="confirmationModal" class="modal-overlay">
+        <div class="bg-white rounded-3xl p-6 w-[280px] shadow-2xl text-center border border-slate-100">
+            <div class="mb-4">
+                <div class="w-10 h-10 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-3"><i class="fas fa-trash-can text-sm"></i></div>
+                <h4 id="modalTitle" class="text-sm font-black text-slate-900 uppercase tracking-wide">Confirm Delete</h4>
+            </div>
+            <div class="mb-5"><p id="modalMessage" class="text-[10px] text-slate-400 font-bold px-2 uppercase tracking-tighter"></p></div>
+            <div class="flex gap-2">
+                <button id="confirmActionButton" class="btn bg-red-500 text-white flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm hover:bg-red-600 transition-colors">Yes, Delete</button>
+                <button id="cancelActionButton" class="btn bg-slate-50 text-slate-400 flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="passwordModal" class="modal-overlay">
+        <div class="bg-white rounded-[2.5rem] p-8 max-w-xs w-full shadow-2xl text-primary-deep border border-slate-50 transform scale-100 relative">
+            <!-- CLOSE BUTTON AT TOP RIGHT -->
+            <button type="button" id="close-password-modal" class="absolute top-6 right-6 text-slate-300 hover:text-red-500 transition-colors p-1" title="Close">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+            <div class="text-center mb-6">
+                <div class="relative w-16 h-16 mx-auto mb-4">
+                    <div class="absolute inset-0 bg-blue-500 rounded-2xl opacity-10 animate-pulse"></div>
+                    <div class="relative bg-gradient-to-br from-blue-500 to-primary-blue w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200"><i class="fas fa-unlock-keyhole text-white text-2xl"></i></div>
+                </div>
+                <h4 class="text-lg font-black text-slate-900 uppercase tracking-tight">Unlock Console</h4>
+                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Administrator Access Required</p>
+            </div>
+            <form id="password-form" class="space-y-5">
+                <div class="relative group">
+                    <input id="password-input" type="password" class="input-field text-center text-2xl font-black tracking-[0.5em] bg-slate-50 border-2 border-transparent focus:border-primary-blue focus:bg-white focus:ring-4 focus:ring-blue-50 placeholder:tracking-normal placeholder:text-slate-200 pr-12" placeholder="••••" required autocomplete="off">
+                    <button type="button" id="togglePasswordBtn" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-primary-blue transition-colors p-1"><i id="eyeIcon" class="fas fa-eye-slash text-sm"></i></button>
+                </div>
+                <div class="grid gap-3"><button type="submit" class="btn btn-primary-action py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] shadow-lg shadow-blue-100 active:scale-95 transition-all">Verify Key</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- RENAME MODAL FIXED SIZE -->
+    <div id="renameModal" class="modal-overlay">
+        <div class="bg-white rounded-[2.5rem] p-10 max-w-xs w-full shadow-2xl text-center border border-slate-100">
+            <h4 class="text-lg font-black mb-8 text-slate-900 uppercase">Rename Project</h4>
+            <form id="rename-form" class="space-y-6">
+                <input id="rename-input" type="text" class="input-field text-center font-bold text-slate-800" required autocomplete="off">
+                <div class="flex gap-4">
+                    <button type="submit" class="btn btn-primary-action flex-1 py-4 uppercase text-xs">Apply</button>
+                    <button type="button" id="cancel-rename-btn" class="btn bg-slate-50 text-slate-500 flex-1 py-4 uppercase text-xs">Cancel</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="confirmationModal" class="modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalMessage">
-        <div class="modal-content">
-            <div class="modal-icon danger" aria-hidden="true"><i class="fas fa-trash-can"></i></div>
-            <h3 id="modalTitle">ลบข้อมูลนี้?</h3>
-            <p id="modalMessage" class="modal-desc"></p>
-            <div class="modal-buttons">
-                <button id="cancelActionButton" class="btn btn-secondary">Cancel</button>
-                <button id="confirmActionButton" class="btn btn-danger">Delete</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="rowActionsModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="rowActionsTitle">
-        <div class="modal-content">
-            <h3 id="rowActionsTitle">รายการ</h3>
-            <p id="rowActionsMeta" class="modal-desc" style="margin-bottom:6px"></p>
-            <div class="action-list">
-                <button type="button" id="rowActionView" class="action-item"><i class="fas fa-location-crosshairs"></i>View on map</button>
-                <a id="rowActionMaps" class="action-item" target="_blank" rel="noopener"><i class="fas fa-map-location-dot"></i>Google Maps</a>
-                <a id="rowActionStreetView" class="action-item" target="_blank" rel="noopener"><i class="fas fa-street-view"></i>Street View</a>
-                <button type="button" id="rowActionEdit" class="action-item"><i class="fas fa-pen"></i>Edit</button>
-                <button type="button" id="rowActionDelete" class="action-item danger"><i class="fas fa-trash-can"></i>Delete</button>
-            </div>
-            <button type="button" id="rowActionCancel" class="btn btn-secondary" style="width:100%">Cancel</button>
-        </div>
-    </div>
-
-    <div id="customizeLabelsModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="customizeTitle">
-        <div class="modal-content">
-            <h3 id="customizeTitle">ตั้งชื่อช่องกรอก</h3>
-            <p class="modal-desc">เปลี่ยนชื่อที่แสดงบนเครื่องนี้ ข้อมูลที่ส่งเข้าระบบไม่เปลี่ยน</p>
-            <form id="customize-labels-form" class="modal-form">
-                <div>
-                    <label for="employeeIdLabelInput" class="field-label">ช่องที่ 1</label>
-                    <input id="employeeIdLabelInput" type="text" class="input" placeholder="ID พนักงาน" autocomplete="off">
-                </div>
-                <div>
-                    <label for="surveyIdLabelInput" class="field-label">ช่องที่ 2</label>
-                    <input id="surveyIdLabelInput" type="text" class="input" placeholder="ID สำรวจ" autocomplete="off">
-                </div>
-                <div class="modal-buttons">
-                    <button type="button" id="cancelCustomizeLabelsBtn" class="btn btn-secondary">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
-                </div>
+    <div id="customizeLabelsModal" class="modal-overlay">
+        <div class="bg-white rounded-[2.5rem] p-8 max-w-xs w-full shadow-2xl text-primary-deep border border-slate-50">
+            <h4 class="text-lg font-black text-slate-900 uppercase tracking-tight text-center mb-6">Customize Fields</h4>
+            <form id="customize-labels-form" class="space-y-5">
+                <div class="space-y-1.5"><label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Label</label><input id="custom-employee-label" type="text" class="input-field" placeholder="Default: Employee ID"></div>
+                <div class="space-y-1.5"><label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Secondary Label</label><input id="custom-survey-label" type="text" class="input-field" placeholder="Default: Survey ID"></div>
+                <div class="grid gap-3 pt-2"><button type="submit" class="btn btn-primary-action py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-100">Save Changes</button><button type="button" id="cancel-customize-btn" class="btn bg-white border border-slate-100 text-slate-400 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest">Cancel</button></div>
             </form>
         </div>
     </div>
 
-    <div id="messageBox" role="status" aria-live="polite"></div>
-    <div id="loadingSpinner" role="status" aria-live="polite"><i class="fas fa-circle-notch fa-spin"></i><span id="loadingText">กำลังประมวลผล…</span></div>
+    <div id="loadingSpinner" class="fixed inset-0 z-[10000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center hidden transition-opacity duration-300">
+        <div class="bg-white p-12 rounded-[3.5rem] shadow-2xl flex flex-col items-center gap-6 border border-white/20 min-w-[240px]">
+            <div id="spinner-animation" class="relative w-14 h-14">
+                <div class="absolute inset-0 border-[5px] border-slate-100 rounded-full"></div>
+                <div class="absolute inset-0 border-[5px] border-primary-blue border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <div id="spinner-success" class="hidden text-emerald-500 text-5xl animate-bounce-short">
+                <i class="fas fa-circle-check"></i>
+            </div>
+            <span id="loading-spinner-text" class="font-black text-primary-blue text-[10px] uppercase tracking-[0.4em]">Loading</span>
+        </div>
+    </div>
+    <div id="messageBox" class="fixed top-10 left-1/2 -translate-x-1/2 z-[10001] px-10 py-4 rounded-[2rem] shadow-2xl font-black transition-all transform opacity-0 pointer-events-none bg-white/90 backdrop-blur-lg border border-slate-50"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwZ5OAvjvi2vVbE1XGIF8-3m7nz0PzrBHw9kNWmiBhs_cay3vVCBCtOWaF9zquH7mHt/exec';
+        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyWJlVXi7eVd_W7E4lKKj3VW9RyqsN750HP0G8gk4nL6BacrOvRsEuOpXGNBHezaJCtkA/exec';
+        
+        let map, dashboardMap, permanentMarkers = L.featureGroup(), dashboardMarkers = L.featureGroup();
+        let currentLat = null, currentLng = null, currentAddress = "";
+        let savedLocations = [], pendingLocations = [], allProjects = [], currentProjectName = null;
+        let loadedProjects = new Set();
+        let isEmployeeIdLocked = false; 
+        let customLabels = JSON.parse(localStorage.getItem('customLabels')) || { employeeId: 'Employee ID', surveyId: 'Survey ID' };
+        
+        let isAdminAuthenticated = false;
+        let sessionHiddenProjects = [];
+        
+        let selectionMarker = null;
+        let confirmActionCallback = null;
+        let ui = {};
 
-        // เปิดด้วย ?mock=1 เพื่อทดสอบหน้าตาโดยไม่แตะ Google Sheet
-        const MOCK = new URLSearchParams(location.search).has('mock');
-        // โหมดทดสอบใช้ key แยก ไม่ปนกับข้อมูลใช้งานจริงบนเครื่องเดียวกัน
-        const KEY_PREFIX = MOCK ? 'mock::' : '';
-        const EMP_KEY = KEY_PREFIX + 'employeeId';
-        const LABELS_KEY = KEY_PREFIX + 'customLabels';
-        const DEFAULT_LABELS = { employeeId: 'ID พนักงาน', surveyId: 'ID สำรวจ' };
-        const PIN_COLORS = { selected: '#e5383b', pending: '#f59e0b', saved: '#1f5fd6', editing: '#7c3aed' };
-        const GET_TIMEOUT_MS = 90000;
-        const POST_TIMEOUT_MS = 90000;
-        const VERIFY_AFTER_TIMEOUT_MS = 90000;
-        const RETRY_DELAYS_MS = [5000, 15000, 30000, 60000, 120000];
-
-        let googleStreets = null, googleHybrid = null;
-
-        function readLabels() {
-            try { return { ...DEFAULT_LABELS, ...(JSON.parse(localStorage.getItem(LABELS_KEY)) || {}) }; }
-            catch (e) { return { ...DEFAULT_LABELS }; }
-        }
-
-        const state = {
-            map: null, currentMarker: null, permanentMarkers: null, permanentMarkersMap: {},
-            currentLat: null, currentLng: null, editingId: null,
-            savedLocations: [], pendingLocations: [], currentProjectName: null, allProjects: [],
-            isEmployeeIdLocked: !!localStorage.getItem(EMP_KEY),
-            customLabels: readLabels(),
-            historyStatus: 'idle', projectsStatus: 'idle', busy: false,
-            sending: false, sendingProject: null, queueAgain: false, retryTimer: null, retryIndex: 0,
-            actionRowId: null, holdId: null, fetchSeq: 0,
-            confirmActionCallback: null
-        };
-
-        const $ = (id) => document.getElementById(id);
-        const dom = {
-            views: document.querySelectorAll(".app-view"),
-            loading: $("loadingSpinner"),
-            message: $("messageBox"),
-            projectList: $("project-list"),
-            projectCount: $("project-count"),
-            trackerTitle: $("tracker-title"),
-            savedContainer: $("saved-locations-container"),
-            empIdInput: $("employeeIdInput"),
-            surveyIdInput: $("surveyIdInput"),
-            modals: { confirm: $("confirmationModal"), password: $("passwordModal"), customize: $("customizeLabelsModal"), rowActions: $("rowActionsModal") }
-        };
-
-        // --- UTILS ---
-        const on = (id, event, handler) => { const el = $(id); if (el) el.addEventListener(event, handler); };
-        const safeText = (val) => { const span = document.createElement('span'); span.textContent = val ?? ''; return span.innerHTML; };
-        const csvEscape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-        const getStreetViewLink = (lat, lng) => `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
-        const isValidCoord = (val) => (val !== null && val !== undefined && val !== '' && !isNaN(parseFloat(val)));
-        const safeUrl = (u, fallback = '#') => (/^https?:\/\//i.test(String(u || '')) ? String(u) : fallback);
-        const pendingKey = (project) => `${KEY_PREFIX}pendingLocations::${project}`;
-        const lastSyncKey = (project) => `${KEY_PREFIX}lastSync::${project}`;
-        const safeSet = (key, value) => { try { localStorage.setItem(key, value); return true; } catch (e) { return false; } };
-        const isDesktop = () => window.matchMedia('(min-width: 960px)').matches;
-        const findLoc = (id) => state.pendingLocations.find(l => String(l.ID) === String(id)) || state.savedLocations.find(l => String(l.ID) === String(id));
-
-        function setLoading(isLoading, text = "กำลังประมวลผล…") {
-            $("loadingText").textContent = text;
-            dom.loading.style.display = isLoading ? "flex" : "none";
-        }
-
-        let messageTimer = null;
         function showMessage(msg, type = "info") {
-            const icons = { success: 'fa-circle-check', error: 'fa-circle-exclamation', warning: 'fa-triangle-exclamation', info: 'fa-circle-info' };
-            dom.message.className = `show ${type}`;
-            dom.message.innerHTML = `<i class="fas ${icons[type] || icons.info}" aria-hidden="true"></i><span>${safeText(msg)}</span>`;
-            clearTimeout(messageTimer);
-            messageTimer = setTimeout(() => { dom.message.className = type; }, type === 'error' ? 5000 : 3000);
+            const msgBox = document.getElementById("messageBox");
+            if (!msgBox) return;
+            const icon = type === 'success' ? 'check-circle text-emerald-500' : (type === 'error' ? 'triangle-exclamation text-rose-500' : 'circle-info text-blue-500');
+            msgBox.innerHTML = `<div class="flex items-center gap-4"><i class="fas fa-${icon}"></i><span class="text-[11px] font-black uppercase text-slate-800">${msg}</span></div>`;
+            msgBox.style.opacity = "1"; msgBox.style.transform = "translateX(-50%) translateY(0)";
+            setTimeout(() => { msgBox.style.opacity = "0"; msgBox.style.transform = "translateX(-50%) translateY(-20px)"; }, 3500);
         }
 
-        function openModal(modal) {
-            modal._returnFocus = document.activeElement;
-            modal.classList.add("is-open");
-            const target = modal.querySelector("input, button, a");
-            setTimeout(() => target && target.focus(), 50);
-        }
-        function closeModal(modal, { restoreFocus = true } = {}) {
-            if (!modal.classList.contains("is-open")) return;
-            modal.classList.remove("is-open");
-            if (restoreFocus && modal._returnFocus && modal._returnFocus.focus) modal._returnFocus.focus();
+        function showConfirmation(title, message, onConfirm) {
+            const modal = document.getElementById("confirmationModal");
+            const titleEl = document.getElementById("modalTitle");
+            const msgEl = document.getElementById("modalMessage");
+            if (titleEl) titleEl.textContent = title;
+            if (msgEl) msgEl.innerHTML = message;
+            confirmActionCallback = onConfirm;
+            if (modal) modal.style.display = "flex";
         }
 
-        const isDuplicate = (empId, surId, excludeId = null) => {
-            const nEmp = String(empId).trim().toLowerCase();
-            const nSur = String(surId).trim().toLowerCase();
-            const all = [...state.savedLocations, ...state.pendingLocations];
-            return all.some(loc => {
-                if (excludeId && String(loc.ID) === String(excludeId)) return false;
-                return normId(loc.EmployeeID) === normId(empId) && normId(loc.SurveyID) === normId(surId);
+        window.showView = function(viewId) {
+            document.querySelectorAll(".app-view").forEach(v => { v.classList.remove("active"); v.style.display = "none"; });
+            const currentView = document.getElementById(viewId);
+            if (currentView) { 
+                currentView.style.display = "block"; 
+                setTimeout(() => currentView.classList.add("active"), 50); 
+            }
+            if (viewId === 'tracker-view' && map) setTimeout(() => map.invalidateSize(), 300);
+            if (viewId === 'dashboard-view') setTimeout(() => { initDashboardMap(); if(dashboardMap) dashboardMap.invalidateSize(); }, 300);
+            updateLabels();
+        };
+
+        window.setEmployeeLock = function(locked) {
+            isEmployeeIdLocked = locked;
+            const input = document.getElementById("employeeIdInput");
+            if (input) input.disabled = locked;
+            const icon = document.getElementById("lockIcon");
+            if (icon) icon.className = locked ? "fas fa-lock text-primary-blue" : "fas fa-lock-open text-slate-300";
+        }
+
+        window.renameProjectPrompt = function(oldName) {
+            const modal = document.getElementById("renameModal");
+            const input = document.getElementById("rename-input");
+            if (!modal || !input) return;
+            input.value = oldName;
+            modal.style.display = "flex";
+            const form = document.getElementById("rename-form");
+            form.onsubmit = async (e) => {
+                e.preventDefault();
+                const newName = input.value.trim();
+                if (!newName || newName === oldName) { modal.style.display = "none"; return; }
+                modal.style.display = "none";
+                ui.spinner.classList.remove("hidden");
+                try {
+                    const res = await fetch(WEB_APP_URL, { 
+                        method: "POST", 
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action: "renameProject", oldProjectName: oldName, newProjectName: newName }) 
+                    });
+                    const result = await res.json();
+                    if (result.success) { showMessage("Complete", "success"); fetchProjects(); }
+                } catch(err) { console.error(err); }
+                ui.spinner.classList.add("hidden");
+            };
+        };
+
+        window.deleteProjectPrompt = function(name) {
+            showConfirmation("Confirm Project Deletion", `Are you sure you want to delete "${name}"? This project will be hidden for all users immediately.`, async () => {
+                document.getElementById("confirmationModal").style.display = "none";
+                const trimmedName = String(name).trim();
+                sessionHiddenProjects.push(trimmedName);
+                
+                allProjects = allProjects.filter(p => p.trim() !== trimmedName);
+                renderProjects(allProjects);
+                renderAdminProjectList(allProjects);
+
+                ui.spinner.classList.remove("hidden");
+                try {
+                    const res = await fetch(WEB_APP_URL, { 
+                        method: "POST", 
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action: "hideProject", projectName: trimmedName })
+                    });
+                    const result = await res.json();
+                    if (result.success) { 
+                        showMessage("Project Deleted", "success"); 
+                        fetchProjects(); 
+                    }
+                } catch(e) { console.error(e); }
+                ui.spinner.classList.add("hidden");
             });
         };
 
-        // --- DATA ACCESS (Apps Script หรือข้อมูลจำลอง) ---
-        async function fetchWithTimeout(url, options = {}, timeoutMs = GET_TIMEOUT_MS) {
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-            try { return await fetch(url, { ...options, signal: ctrl.signal }); }
-            catch (err) {
-                if (err.name === 'AbortError') { const e = new Error("หมดเวลาเชื่อมต่อ สัญญาณอาจอ่อน"); e.isTimeout = true; throw e; }
-                throw err;
-            }
-            finally { clearTimeout(timer); }
+        // FIXED MARKER ICON: INITIAL PIN IS RED
+        function getMarkerIcon(color) {
+            const iconUrl = (color === 'yellow') ? 
+                'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png' : 
+                (color === 'red') ?
+                'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png' :
+                (color === '#1a237e') ? 
+                'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-black.png' : 
+                'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png';
+            return new L.Icon({ iconUrl: iconUrl, shadowUrl: '', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [0, 0] });
         }
 
-        // Apps Script ตอบหน้า error ของ Google ("ไม่สามารถเปิดไฟล์ได้ในเวลานี้") เป็นพักๆ จึงลองอ่านซ้ำอัตโนมัติ
-        async function apiGet(query, { tries = 4 } = {}) {
-            if (MOCK) return mockApi(query);
-            let lastErr;
-            for (let attempt = 1; attempt <= tries; attempt++) {
-                try {
-                    const res = await fetchWithTimeout(`${WEB_APP_URL}?${query}&t=${Date.now()}`);
-                    const text = await res.text();
-                    try { return JSON.parse(text); }
-                    catch (e) { throw new Error("ระบบตอบกลับผิดพลาดชั่วคราว"); }
-                } catch (err) {
-                    lastErr = err;
-                    if (err.isTimeout || attempt >= tries) throw err; // หมดเวลาแปลว่าสัญญาณค้าง ลองซ้ำไม่ช่วย
-                    await new Promise(r => setTimeout(r, 700 * attempt));
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.project-admin-item:not(.dragging)')];
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                if (offset < 0 && offset > closest.offset) return { offset: offset, element: child };
+                else return closest;
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        function updateLabels() {
+            document.querySelectorAll('#employeeIdLabel, #tableHeaderEmployeeId').forEach(el => el.textContent = customLabels.employeeId);
+            document.querySelectorAll('#surveyIdLabel, #tableHeaderSurveyId').forEach(el => el.textContent = customLabels.surveyId);
+            if (ui.employeeId) ui.employeeId.placeholder = customLabels.employeeId;
+        }
+
+        function initDashboardMap() {
+            if (!dashboardMap) {
+                dashboardMap = L.map("dashboard-map", { zoomControl: true }).setView([13.75, 100.5], 6);
+                L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(dashboardMap);
+                dashboardMarkers.addTo(dashboardMap);
+            }
+        }
+
+        async function fetchProjects() {
+            const btn = document.getElementById("refresh-projects-btn");
+            if (btn) btn.classList.add("animate-spin", "text-primary-blue");
+
+            const cachedProjects = localStorage.getItem('cache_projects');
+            if (cachedProjects) {
+                allProjects = JSON.parse(cachedProjects);
+                renderProjects(allProjects);
+                renderAdminProjectList(allProjects);
+            }
+
+            try {
+                const res = await fetch(`${WEB_APP_URL}?action=getProjects&t=${Date.now()}`);
+                const result = await res.json();
+                const rawData = result.data || [];
+                
+                // Enhanced filtering: Ignore any project marked as hidden or starts with [HIDDEN]
+                const newProjects = rawData.filter(p => {
+                    const name = (typeof p === 'object' && p !== null) ? p.name : String(p);
+                    const isVisible = (typeof p === 'object' && p !== null) ? (p.isVisible !== false && p.hidden !== true) : true;
+                    const hasHiddenPrefix = name.startsWith("[HIDDEN]");
+                    return isVisible && !hasHiddenPrefix && !sessionHiddenProjects.includes(name.trim());
+                }).map(p => (typeof p === 'object' && p !== null) ? p.name : String(p));
+
+                if (JSON.stringify(newProjects) !== JSON.stringify(allProjects)) {
+                    allProjects = newProjects;
+                    localStorage.setItem('cache_projects', JSON.stringify(allProjects));
+                    renderProjects(allProjects);
+                    renderAdminProjectList(allProjects);
                 }
+                if (btn) showMessage("Projects updated", "success");
+            } catch(e) { 
+                console.error(e); 
+                if(!allProjects.length) showMessage("Connection Error", "error"); 
+            } finally {
+                if (btn) setTimeout(() => btn.classList.remove("animate-spin", "text-primary-blue"), 500);
             }
-            throw lastErr;
         }
 
-        async function apiPost(payload, { quiet = false } = {}) {
-            if (!quiet) setLoading(true);
-            try {
-                let result;
-                if (MOCK) result = await mockApi(null, payload);
-                else {
-                    const res = await fetchWithTimeout(WEB_APP_URL, { method: "POST", mode: "cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) }, POST_TIMEOUT_MS);
-                    result = await res.json();
-                }
-                if (!result.success && result.status !== 'success') { const e = new Error(result.message || "การดำเนินการล้มเหลว"); e.isServerReject = true; throw e; }
-                return result;
-            } catch (err) { if (!quiet) showMessage(err.message, "error"); throw err; }
-            finally { if (!quiet) setLoading(false); }
-        }
-
-        // --- OUTBOX: บันทึกเก็บในเครื่องก่อน แล้วส่งเข้าระบบอัตโนมัติ ---
-        function loadPending(project) {
-            try {
-                const list = JSON.parse(localStorage.getItem(pendingKey(project)));
-                if (!Array.isArray(list)) return [];
-                return list.map(p => {
-                    const item = { ...p, isPending: true, sendState: p.sendState || 'queued', attempts: p.attempts || 0 };
-                    // ถ้าหน้าเว็บถูกปิดระหว่างส่ง ให้ตรวจกับระบบก่อนส่งซ้ำ
-                    if (item.sendState === 'sending' && state.sendingProject !== project) { item.sendState = 'failed'; item.attempts = Math.max(1, item.attempts); item.lastTimeoutAt = item.lastAttemptAt || Date.now(); }
-                    return item;
-                });
-            } catch (e) { return []; }
-        }
-        function writePending(project, list) {
-            try {
-                if (list.length) localStorage.setItem(pendingKey(project), JSON.stringify(list));
-                else localStorage.removeItem(pendingKey(project));
-                return true;
-            } catch (e) { showMessage("เก็บข้อมูลในเครื่องไม่สำเร็จ พื้นที่อาจเต็ม อย่าปิดหน้านี้จนกว่าจะส่งเสร็จ", "error"); return false; }
-        }
-        function savePending() { return state.currentProjectName ? writePending(state.currentProjectName, state.pendingLocations) : true; }
-        function mutatePending(project, fn) {
-            const isCurrent = project === state.currentProjectName;
-            const list = fn(isCurrent ? state.pendingLocations : loadPending(project));
-            if (isCurrent) state.pendingLocations = list;
-            return writePending(project, list);
-        }
-        function getLastSync(project) { const v = Number(localStorage.getItem(lastSyncKey(project))); return v ? new Date(v) : null; }
-
-        // Sheets อาจแปลง "00123" เป็นตัวเลข 123 จึงเทียบรหัสที่เป็นตัวเลขล้วนแบบตัวเลข
-        const normId = (v) => { const s = String(v ?? '').trim().toLowerCase(); return /^\d+$/.test(s) ? String(Number(s)) : s; };
-        const sameRecord = (r, item) =>
-            normId(r.EmployeeID) === normId(item.EmployeeID) && normId(r.SurveyID) === normId(item.SurveyID) &&
-            Math.abs(parseFloat(r.Latitude) - parseFloat(item.Latitude)) < 0.00002 &&
-            Math.abs(parseFloat(r.Longitude) - parseFloat(item.Longitude)) < 0.00002;
-
-        async function fetchServerRows(project) {
-            const result = await apiGet(`action=getData&project=${encodeURIComponent(project)}`, { tries: 2 });
-            if (!(result.success || result.status === 'success')) throw new Error(result.message || 'ตรวจสอบข้อมูลไม่สำเร็จ');
-            return result.data || [];
-        }
-        async function findOnServer(project, item, rows = null) {
-            return (rows || await fetchServerRows(project)).find(r => sameRecord(r, item)) || null;
-        }
-
-        // รายการที่เคยส่งไม่สำเร็จ อาจเข้าระบบไปแล้วแต่คำตอบหาย ต้องเช็กก่อนแก้ไข/ลบในเครื่อง
-        async function resolveUncertain(item) {
-            if (!item || !item.isPending || !item.attempts) return false;
-            const project = state.currentProjectName;
-            setLoading(true, "กำลังตรวจสอบกับระบบ…");
-            state.resolving = true;
-            try {
-                const found = await findOnServer(project, item.sentData || item);
-                if (!found) return false;
-                mutatePending(project, list => list.filter(p => p.ID !== item.ID));
-                await fetchLocations(project, { quiet: true });
-                showMessage("รายการนี้อยู่ในระบบแล้ว แก้ไขหรือลบจากประวัติได้เลย", "info");
-                return true;
-            } catch (err) {
-                showMessage(`ตรวจสอบกับระบบไม่สำเร็จ: ${err.message}`, "error");
-                return null;
-            } finally { state.resolving = false; setLoading(false); }
-        }
-
-        function scheduleRetry(minDelay = 0) {
-            clearTimeout(state.retryTimer);
-            const delay = Math.max(minDelay, RETRY_DELAYS_MS[Math.min(state.retryIndex, RETRY_DELAYS_MS.length - 1)]);
-            state.retryIndex++;
-            state.retryTimer = setTimeout(processQueue, delay);
-        }
-
-        function sendable(p) {
-            return String(p.ID) !== String(state.editingId) && String(p.ID) !== String(state.holdId);
-        }
-
-        async function processQueue({ manual = false } = {}) {
-            const project = state.currentProjectName;
-            if (!project) return;
-            if (state.sending) { state.queueAgain = true; return; }
-            clearTimeout(state.retryTimer);
-            if (!navigator.onLine && !MOCK) { renderSyncStatus(); if (manual) showMessage("ไม่มีสัญญาณอินเทอร์เน็ต ข้อมูลยังเก็บไว้ในเครื่อง", "warning"); return; }
-            if (!state.pendingLocations.some(sendable)) { renderSyncStatus(); return; }
-
-            state.sending = true;
-            state.sendingProject = project;
-            state.queueAgain = false;
-            const tried = new Set();
-            let sent = 0, failure = null, serverRows = null;
-            while (project === state.currentProjectName) {
-                const item = state.pendingLocations.find(p => sendable(p) && !tried.has(p.ID));
-                if (!item) break;
-                tried.add(item.ID);
-                // หลัง timeout ต้องรอให้คำขอเดิมฝั่งระบบทำงานเสร็จก่อน ไม่งั้นตรวจซ้ำไม่เจอแล้วส่งซ้ำ
-                if (item.lastTimeoutAt && Date.now() - item.lastTimeoutAt < VERIFY_AFTER_TIMEOUT_MS) { failure = failure || new Error(item.lastError || 'รอตรวจสอบ'); continue; }
-                const payloadData = { name: item.EmployeeID, surveyId: item.SurveyID, lat: item.Latitude, lng: item.Longitude };
-                mutatePending(project, list => list.map(p => p.ID === item.ID ? { ...p, sendState: 'sending', lastAttemptAt: Date.now() } : p));
-                renderAllData();
-                try {
-                    if (item.attempts > 0 && !serverRows) serverRows = await fetchServerRows(project);
-                    const already = item.attempts > 0 && await findOnServer(project, item, serverRows);
-                    if (!already) await apiPost({ action: "add", project, data: payloadData }, { quiet: true });
-                    mutatePending(project, list => list.filter(p => p.ID !== item.ID));
-                    if (project === state.currentProjectName) state.fetchSeq++; // ข้อมูลที่กำลังโหลดอยู่อ่านมาก่อนรายการนี้ ห้ามทับ
-                    // แสดงในประวัติทันที (และใช้กันบันทึกซ้ำ) จนกว่าจะโหลดข้อมูลจากระบบใหม่
-                    if (!already && project === state.currentProjectName) {
-                        state.savedLocations = [...state.savedLocations, { ID: `sent_${item.ID}`, EmployeeID: item.EmployeeID, SurveyID: item.SurveyID, Latitude: item.Latitude, Longitude: item.Longitude, Timestamp: item.Timestamp, GoogleMapsLink: item.GoogleMapsLink, isProvisional: true }];
-                    }
-                    sent++;
-                } catch (err) {
-                    failure = err;
-                    mutatePending(project, list => list.map(p => p.ID === item.ID ? {
-                        ...p, sendState: 'failed', attempts: (p.attempts || 0) + 1, lastError: err.message,
-                        lastTimeoutAt: err.isServerReject ? p.lastTimeoutAt : Date.now(),
-                        sentData: p.sentData || { EmployeeID: item.EmployeeID, SurveyID: item.SurveyID, Latitude: item.Latitude, Longitude: item.Longitude }
-                    } : p));
-                    if (!err.isServerReject) break; // สัญญาณมีปัญหา หยุดรอบนี้ก่อน ค่อยลองใหม่ตามเวลา
-                }
-            }
-            // ถ้าออกจากโครงการระหว่างส่ง รายการที่ค้างสถานะ "กำลังส่ง" ต้องกลับเป็นรอตรวจสอบ
-            mutatePending(project, list => list.map(p => p.sendState === 'sending' ? { ...p, sendState: 'failed', attempts: Math.max(1, p.attempts || 0) } : p));
-            state.sending = false;
-            state.sendingProject = null;
-
-            if (sent) {
-                try { localStorage.setItem(lastSyncKey(project), String(Date.now())); } catch (e) {}
-                state.retryIndex = 0;
-            }
-            if (project !== state.currentProjectName) {
-                // ผู้ใช้เปิดโครงการอื่นระหว่างส่ง: เริ่มส่งของโครงการนั้นต่อ
-                if (state.currentProjectName) processQueue();
+        function renderProjects(list) {
+            const listEl = document.getElementById("project-list");
+            if (!listEl) return;
+            listEl.innerHTML = "";
+            document.getElementById("project-count").textContent = `${list.length} Projects Found`;
+            if (list.length === 0) {
+                listEl.innerHTML = `<div class="col-span-full py-12 text-center text-slate-400">No matching projects found</div>`;
                 return;
             }
-            if (sent) await fetchLocations(project, { quiet: true });
-            if (failure) {
-                const waitTimeout = state.pendingLocations.some(p => p.lastTimeoutAt && Date.now() - p.lastTimeoutAt < VERIFY_AFTER_TIMEOUT_MS);
-                scheduleRetry(waitTimeout ? VERIFY_AFTER_TIMEOUT_MS : 0);
-                if (manual) showMessage(`ส่งไม่สำเร็จ: ${failure.message}`, "error");
-            } else if (state.queueAgain || state.pendingLocations.some(sendable)) {
-                processQueue(); // มีรายการใหม่เข้ามาระหว่างส่ง
-            }
-            renderAllData();
-        }
-
-        function renderSyncStatus() {
-            const box = $("sync-status"), text = $("sync-text"), icon = box.querySelector('.sync-icon i');
-            const btn = $("uploadButton"), btnText = $("uploadButtonText");
-            const pending = state.pendingLocations;
-            const n = pending.length;
-            const failed = pending.some(p => p.sendState === 'failed');
-            const offline = !navigator.onLine && !MOCK;
-            let cls = 'idle', ico = 'fa-cloud', msg = 'บันทึกแล้วจะส่งเข้าระบบอัตโนมัติ';
-
-            const sendingHere = state.sending && state.sendingProject === state.currentProjectName;
-            if (sendingHere && n) { cls = 'sending'; ico = 'fa-circle-notch fa-spin'; msg = `กำลังส่งเข้าระบบ ${n} รายการ…`; }
-            else if (n && offline) { cls = 'waiting'; ico = 'fa-wifi'; msg = `ไม่มีสัญญาณ · รอส่ง ${n} รายการ`; }
-            else if (n && failed) { cls = 'error'; ico = 'fa-triangle-exclamation'; msg = `ส่งไม่สำเร็จ · รอส่ง ${n} รายการ`; }
-            else if (n) { cls = 'waiting'; ico = 'fa-clock'; msg = `รอส่ง ${n} รายการ`; }
-            else {
-                const last = state.currentProjectName && getLastSync(state.currentProjectName);
-                if (last) { cls = 'ok'; ico = 'fa-check'; msg = `ส่งเข้าระบบครบแล้ว · ${formatTime(last)}`; }
-            }
-            box.className = `sync-status ${cls}`;
-            icon.className = `fas ${ico}`;
-            text.textContent = msg;
-            box.title = failed ? (pending.find(p => p.lastError)?.lastError || '') : '';
-
-            btn.hidden = !n || sendingHere;
-            btn.classList.toggle('is-error', failed);
-            btnText.textContent = failed ? 'Retry' : `Upload (${n})`;
-        }
-
-        // --- MAP & GEOLOCATION ---
-        function pinIcon(color) {
-            return L.divIcon({
-                className: 'pin-icon',
-                html: `<svg width="28" height="40" viewBox="0 0 28 40" aria-hidden="true"><path d="M14 1.5C7.1 1.5 1.5 7 1.5 13.9c0 9.3 12.5 24.6 12.5 24.6s12.5-15.3 12.5-24.6C26.5 7 20.9 1.5 14 1.5z" fill="${color}" stroke="#fff" stroke-width="2"/><circle cx="14" cy="14" r="4.6" fill="#fff"/></svg>`,
-                iconSize: [28, 40], iconAnchor: [14, 39], popupAnchor: [0, -34]
+            list.forEach(p => {
+                const card = document.createElement("div");
+                card.className = "group p-5 bg-white border border-slate-200 rounded-[1.75rem] flex justify-between items-center cursor-pointer hover:border-slate-800 hover:shadow-xl hover:scale-[1.05] transition-all duration-300 active:scale-95";
+                card.innerHTML = `<div class="flex items-center gap-5"><div class="w-11 h-11 rounded-[1.25rem] bg-slate-50 group-hover:bg-slate-800 flex items-center justify-center transition-all duration-300 shadow-sm"><i class="fas fa-folder-open text-slate-600 group-hover:text-white transition-all duration-300"></i></div><span class="font-extrabold text-slate-800 text-sm tracking-tight">${p}</span></div><i class="fas fa-chevron-right text-slate-200 group-hover:text-slate-800 transition-colors text-xs"></i>`;
+                card.onclick = () => { currentProjectName = p; document.getElementById("tracker-title").textContent = p; window.showView("tracker-view"); initMap(); refreshData(); };
+                listEl.appendChild(card);
             });
         }
 
-        function initLeafletResources() {
-            if (typeof L === 'undefined') return false;
-            googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'], attribution: 'Map &copy; Google' });
-            googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'], attribution: 'Map &copy; Google' });
-            state.permanentMarkers = L.layerGroup();
-            return true;
+        function renderAdminProjectList(projects) {
+            const adminList = document.getElementById("admin-project-list");
+            if (!adminList) return;
+            adminList.innerHTML = "";
+            projects.forEach(p => {
+                const row = document.createElement("div");
+                row.className = "flex justify-between items-center p-5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 cursor-grab project-admin-item text-slate-800 hover:scale-[1.05] transition-transform";
+                row.draggable = true;
+                row.dataset.projectName = p;
+                row.innerHTML = `<div class="flex items-center gap-3 pointer-events-none"><i class="fas fa-grip-vertical text-slate-200"></i><i class="fas fa-folder text-primary-blue"></i><span class="font-bold text-slate-800 text-sm">${p}</span></div>`;
+                const acts = document.createElement("div");
+                acts.className = "flex gap-2 relative z-20";
+                const ren = document.createElement("button");
+                ren.className = "w-10 h-10 bg-slate-50 text-slate-400 rounded-xl hover:bg-primary-blue hover:text-white transition-all flex items-center justify-center";
+                ren.innerHTML = `<i class="fas fa-pencil-alt text-xs"></i>`;
+                ren.onclick = (e) => { e.stopPropagation(); window.renameProjectPrompt(p); };
+                const del = document.createElement("button");
+                del.className = "w-10 h-10 bg-slate-50 text-slate-400 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center";
+                del.innerHTML = `<i class="fas fa-trash text-xs"></i>`;
+                del.onclick = (e) => { e.stopPropagation(); window.deleteProjectPrompt(p); };
+                acts.appendChild(ren); acts.appendChild(del);
+                row.appendChild(acts);
+                row.addEventListener('dragstart', () => { setTimeout(() => row.classList.add('dragging'), 0); });
+                row.addEventListener('dragend', () => { row.classList.remove('dragging'); document.getElementById('save-project-order-btn').classList.remove('hidden'); });
+                adminList.appendChild(row);
+            });
+        }
+
+        async function updateDashboard(projectName) {
+            if (!projectName) {
+                document.getElementById("dashboard-content").classList.add("hidden");
+                document.getElementById("dashboard-empty-state").classList.remove("hidden");
+                return;
+            }
+            if (ui.spinner) ui.spinner.classList.remove("hidden");
+            document.getElementById("dashboard-empty-state").classList.add("hidden");
+            document.getElementById("dashboard-content").classList.remove("hidden");
+            try {
+                const res = await fetch(`${WEB_APP_URL}?action=getData&project=${encodeURIComponent(projectName)}`);
+                const result = await res.json();
+                const data = result.data || [];
+                document.getElementById("kpi-total-checkins").textContent = data.length;
+                dashboardMarkers.clearLayers();
+                if (ui.dashboardSummaryTable) ui.dashboardSummaryTable.innerHTML = "";
+                const summary = {};
+                data.forEach(loc => {
+                    if (loc.Latitude && loc.Longitude) {
+                        const marker = L.marker([loc.Latitude, loc.Longitude], { icon: getMarkerIcon('#007AFF') });
+                        marker.bindPopup(`<b>Staff:</b> ${loc.EmployeeID}<br><b>Survey:</b> ${loc.SurveyID || '-'}`);
+                        marker.addTo(dashboardMarkers);
+                        summary[loc.EmployeeID] = (summary[loc.EmployeeID] || 0) + 1;
+                    }
+                });
+                document.getElementById("kpi-total-staff").textContent = Object.keys(summary).length;
+                if (ui.dashboardSummaryTable) {
+                    Object.keys(summary).sort((a,b) => summary[b] - summary[a]).forEach(eid => {
+                        const row = document.createElement("tr");
+                        row.innerHTML = `<td class="p-3 text-left font-mono font-bold text-slate-800">${eid}</td><td class="p-3 text-right"><span class="text-primary-blue font-black tracking-tight">${summary[eid]}</span></td>`;
+                        ui.dashboardSummaryTable.appendChild(row);
+                    });
+                }
+                if (data.length > 0 && dashboardMap) {
+                    setTimeout(() => { dashboardMap.invalidateSize(); dashboardMap.fitBounds(dashboardMarkers.getBounds().pad(0.1)); }, 200);
+                }
+            } catch(e) { console.error(e); }
+            if (ui.spinner) ui.spinner.classList.add("hidden");
+        }
+
+        async function refreshData(forceSpinner = false) {
+            if (!currentProjectName) return;
+            const isFirstLoad = !loadedProjects.has(currentProjectName);
+            
+            // Only show full-screen spinner on first project entry in session
+            if (isFirstLoad || forceSpinner) {
+                const spinnerAnim = document.getElementById("spinner-animation");
+                const spinnerSuccess = document.getElementById("spinner-success");
+                const spinnerText = document.getElementById("loading-spinner-text");
+                
+                if (spinnerAnim) spinnerAnim.classList.remove("hidden");
+                if (spinnerSuccess) spinnerSuccess.classList.add("hidden");
+                if (spinnerText) {
+                    spinnerText.textContent = "Loading";
+                    spinnerText.className = "font-black text-primary-blue text-[10px] uppercase tracking-[0.4em]";
+                }
+                if (ui.spinner) ui.spinner.classList.remove("hidden");
+                loadedProjects.add(currentProjectName);
+            }
+            
+            // 1. Load from Cache (Instant UI + Map Pins)
+            const cacheKey = `cache_data_${currentProjectName}`;
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                savedLocations = JSON.parse(cached);
+                renderTable();
+                if (savedLocations.length > 0 && map) {
+                    setTimeout(() => { 
+                        map.invalidateSize(); 
+                        if (permanentMarkers.getLayers().length > 0) {
+                            map.fitBounds(permanentMarkers.getBounds().pad(0.2)); 
+                        }
+                    }, 150);
+                }
+            }
+
+            // 2. Sync with Google Sheets
+            try {
+                const res = await fetch(`${WEB_APP_URL}?action=getData&project=${encodeURIComponent(currentProjectName)}&t=${Date.now()}`);
+                const result = await res.json();
+                const newData = result.data || [];
+                
+                if (JSON.stringify(newData) !== JSON.stringify(savedLocations)) {
+                    savedLocations = newData;
+                    localStorage.setItem(cacheKey, JSON.stringify(savedLocations));
+                    renderTable();
+                    if (savedLocations.length > 0 && map) {
+                        map.invalidateSize();
+                        if (permanentMarkers.getLayers().length > 0) {
+                            map.fitBounds(permanentMarkers.getBounds().pad(0.2));
+                        }
+                    }
+                }
+
+                // If spinner was active, show success state before closing
+                if (isFirstLoad || forceSpinner) {
+                    const spinnerAnim = document.getElementById("spinner-animation");
+                    const spinnerSuccess = document.getElementById("spinner-success");
+                    const spinnerText = document.getElementById("loading-spinner-text");
+                    
+                    if (spinnerAnim) spinnerAnim.classList.add("hidden");
+                    if (spinnerSuccess) spinnerSuccess.classList.remove("hidden");
+                    if (spinnerText) {
+                        spinnerText.textContent = "Complete";
+                        spinnerText.className = "font-black text-emerald-500 text-[10px] uppercase tracking-[0.4em]";
+                    }
+                    await new Promise(r => setTimeout(r, 800));
+                }
+
+            } catch(e) { 
+                console.error(e);
+                if (!savedLocations.length) showMessage("Sync failed", "error");
+            } finally {
+                if (ui.spinner) ui.spinner.classList.add("hidden");
+            }
+        }
+
+        async function updateAddress(lat, lng) {
+            const addrEl = document.getElementById("address-display");
+            const addrText = document.getElementById("current-address-text");
+            addrEl.classList.remove("hidden");
+            addrText.textContent = "Locating...";
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=th`);
+                const data = await res.json();
+                currentAddress = data.display_name || "Unknown address";
+                addrText.textContent = currentAddress;
+            } catch (e) { addrText.textContent = "Address not found"; }
+        }
+
+        // FIXED DISPLAY: INITIAL PIN MUST BE RED
+        function updateDisplay(lat, lng) {
+            currentLat = lat; currentLng = lng;
+            document.getElementById("lat").textContent = lat.toFixed(6);
+            document.getElementById("lng").textContent = lng.toFixed(6);
+            if (!selectionMarker) {
+                selectionMarker = L.marker([lat, lng], { icon: getMarkerIcon('red') }).addTo(map);
+            } else { selectionMarker.setLatLng([lat, lng]); }
+            updateAddress(lat, lng);
         }
 
         function initMap() {
-            if (state.map || !googleStreets) return;
-            state.map = L.map("map", { layers: [googleStreets], zoomControl: false }).setView([13.75, 100.5], 10);
-            L.control.zoom({ position: 'bottomright', zoomInTitle: 'Zoom in', zoomOutTitle: 'Zoom out' }).addTo(state.map);
-            L.control.layers({ "ถนน": googleStreets, "ดาวเทียม": googleHybrid }, null, { position: 'topright' }).addTo(state.map);
+            if (!map) {
+                map = L.map("map", { zoomControl: false }).setView([13.75, 100.5], 13);
+                L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
+                permanentMarkers.addTo(map);
+                map.on("click", (e) => updateDisplay(e.latlng.lat, e.latlng.lng));
+            }
+        }
 
-            const SearchControl = L.Control.extend({
-                options: { position: 'topleft' },
-                onAdd: function () {
-                    const container = L.DomUtil.create('div', 'leaflet-search-control');
-                    container.innerHTML = `
-                        <div class="leaflet-search-container">
-                            <button type="button" class="leaflet-search-btn" title="Search" aria-label="Search"><i class="fas fa-magnifying-glass"></i></button>
-                            <input type="search" class="leaflet-search-input" placeholder="ค้นหาซอย ถนน หรือรหัส" aria-label="ค้นหาซอย ถนน หรือรหัส" autocomplete="off">
-                            <button type="button" class="leaflet-search-clear" title="Clear" aria-label="Clear"><i class="fas fa-xmark"></i></button>
-                        </div>
-                        <div class="map-autocomplete-list"></div>
-                    `;
-                    const wrapper = container.querySelector('.leaflet-search-container');
-                    const input = container.querySelector('.leaflet-search-input');
-                    const btn = container.querySelector('.leaflet-search-btn');
-                    const clearBtn = container.querySelector('.leaflet-search-clear');
-                    const list = container.querySelector('.map-autocomplete-list');
-                    let searchTimeout = null;
-
-                    L.DomEvent.on(btn, 'click', () => {
-                        wrapper.classList.add('expanded');
-                        setTimeout(() => input.focus(), 50);
-                    });
-
-                    L.DomEvent.on(input, 'input', () => {
-                        const q = input.value;
-                        clearTimeout(searchTimeout);
-                        if (q.trim().length >= 2) {
-                            list.innerHTML = '<div class="searching-hint"><i class="fas fa-circle-notch fa-spin"></i> กำลังค้นหา…</div>';
-                            list.style.display = 'block';
-                            searchTimeout = setTimeout(() => searchMapLocation(q, list, input), 600);
-                        } else list.style.display = 'none';
-                    });
-
-                    L.DomEvent.on(input, 'keydown', (e) => {
-                        if (e.key === 'Escape') { input.value = ""; list.style.display = 'none'; wrapper.classList.remove('expanded'); }
-                    });
-
-                    L.DomEvent.on(clearBtn, 'click', () => {
-                        if (input.value) { input.value = ""; list.style.display = 'none'; input.focus(); }
-                        else { wrapper.classList.remove('expanded'); list.style.display = 'none'; }
-                    });
-
-                    L.DomEvent.disableClickPropagation(container);
-                    L.DomEvent.disableScrollPropagation(container);
-                    return container;
+        function renderTable() {
+            const all = [...savedLocations, ...pendingLocations].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp));
+            ui.savedTable.innerHTML = "";
+            permanentMarkers.clearLayers();
+            const currentEID = ui.employeeId ? ui.employeeId.value.trim() : "";
+            if (currentEID !== "") {
+                const count = all.filter(l => l.EmployeeID === currentEID).length;
+                if (document.getElementById("eid-pin-count")) {
+                    document.getElementById("eid-pin-count").textContent = `${count} PINS`;
+                    document.getElementById("eid-pin-count").classList.remove("hidden");
                 }
-            });
-            state.map.addControl(new SearchControl());
-
-            const LocateControl = L.Control.extend({
-                options: { position: 'bottomleft' },
-                onAdd: function () {
-                    const button = L.DomUtil.create('button', 'leaflet-locate-control');
-                    button.type = 'button';
-                    button.id = 'locate-button';
-                    button.title = 'My location';
-                    button.setAttribute('aria-label', 'My location');
-                    button.innerHTML = '<i class="fas fa-crosshairs"></i>';
-                    L.DomEvent.on(button, 'click', (e) => {
-                        L.DomEvent.stopPropagation(e);
-                        handleGetLocation();
-                    });
-                    L.DomEvent.disableClickPropagation(button);
-                    return button;
+            } else if (document.getElementById("eid-pin-count")) document.getElementById("eid-pin-count").classList.add("hidden");
+            
+            all.forEach((loc, i) => {
+                const isP = loc.isPending, isMe = currentEID !== "" && loc.EmployeeID === currentEID;
+                let markerColor = isP ? 'yellow' : (isMe ? '#1a237e' : '#007AFF');
+                const marker = L.marker([loc.Latitude, loc.Longitude], { icon: getMarkerIcon(markerColor), zIndexOffset: isMe ? 2000 : (isP ? 1000 : 0) }).addTo(permanentMarkers);
+                const row = document.createElement("tr");
+                row.className = isMe ? "bg-blue-50/50" : (isP ? "bg-red-50/20" : "hover:bg-slate-50 transition-colors");
+                const ts = new Date(loc.Timestamp).toLocaleString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+                row.innerHTML = `<td class="p-3 text-slate-400 font-mono text-[9px]">${all.length - i}</td><td class="p-3 font-black text-[10px] ${isMe ? 'text-primary-blue' : 'text-slate-900'}">${loc.EmployeeID}${isP ? ' ⏳' : ''}</td><td class="p-3 text-slate-500 font-bold text-[10px]">${loc.SurveyID || '-'}</td><td class="p-3 text-slate-400 font-bold text-[9px]">${ts}</td><td class="p-3 text-center"></td>`;
+                if (isP) {
+                    const delBtn = document.createElement("button"); delBtn.className = "text-slate-200 hover:text-red-500 transition-all flex items-center justify-center mx-auto"; delBtn.innerHTML = `<i class="fas fa-trash-alt"></i>`;
+                    delBtn.onclick = (e) => { 
+                        e.stopPropagation(); 
+                        showConfirmation("Confirm Delete", "Are you sure you want to delete this pending record?", () => {
+                            pendingLocations = pendingLocations.filter(l => String(l.ID) !== String(loc.ID));
+                            document.getElementById("confirmationModal").style.display = "none";
+                            renderTable();
+                            showMessage("Record deleted", "success");
+                        });
+                    };
+                    row.cells[4].appendChild(delBtn);
                 }
+                row.onclick = () => { map.setView([loc.Latitude, loc.Longitude], 18); };
+                ui.savedTable.appendChild(row);
             });
-            state.map.addControl(new LocateControl());
-            state.permanentMarkers.addTo(state.map);
-            state.map.on("click", e => updateMarker(e.latlng.lat, e.latlng.lng));
-        }
-
-        async function handleGetLocation() {
-            const btn = $("locate-button");
-            if (!navigator.geolocation) return showMessage("อุปกรณ์นี้ไม่รองรับการระบุตำแหน่ง", "error");
-            if (btn) btn.classList.add('is-busy');
-            setLoading(true, "กำลังหาตำแหน่งปัจจุบัน…");
-            navigator.geolocation.getCurrentPosition(p => {
-                updateMarker(p.coords.latitude, p.coords.longitude);
-                state.map.setView([p.coords.latitude, p.coords.longitude], 18);
-                const acc = Math.round(p.coords.accuracy || 0);
-                showMessage(acc ? `ระบุตำแหน่งแล้ว (คลาดเคลื่อนประมาณ ${acc} ม.)` : "ระบุตำแหน่งปัจจุบันแล้ว", "success");
-                setLoading(false);
-                if (btn) btn.classList.remove('is-busy');
-            }, (err) => {
-                let msg = "เปิด GPS และอนุญาตการเข้าถึงตำแหน่งก่อนใช้งาน";
-                if (err.code === 1) msg = "กรุณาอนุญาต (Allow) การเข้าถึงตำแหน่งในเบราว์เซอร์";
-                if (err.code === 3) msg = "สัญญาณ GPS อ่อน ลองขยับไปที่โล่งแล้วกดใหม่";
-                showMessage(msg, "error");
-                setLoading(false);
-                if (btn) btn.classList.remove('is-busy');
-            }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-        }
-
-        async function searchMapLocation(q, listElement, inputElement) {
-            const query = q.toLowerCase();
-            const allData = [...state.savedLocations, ...state.pendingLocations];
-            const fragment = document.createDocumentFragment();
-
-            const addItem = (html, onPick) => {
-                const div = document.createElement("div");
-                div.className = "autocomplete-item";
-                div.tabIndex = 0;
-                div.innerHTML = html;
-                const pick = (e) => { L.DomEvent.stopPropagation(e); onPick(); listElement.style.display = 'none'; };
-                L.DomEvent.on(div, 'click', pick);
-                L.DomEvent.on(div, 'keydown', (e) => { if (e.key === 'Enter') pick(e); });
-                fragment.appendChild(div);
-            };
-
-            // 1. ค้นจากข้อมูลที่บันทึกไว้ (ID พนักงาน หรือ ID สำรวจ)
-            allData.filter(d => String(d.EmployeeID).toLowerCase().includes(query) || String(d.SurveyID || '').toLowerCase().includes(query)).slice(0, 4).forEach(item => {
-                addItem(`<span class="tag"><i class="fas fa-clock-rotate-left"></i> พิกัดเดิม</span><span class="main-name">${safeText(state.customLabels.surveyId)} ${safeText(item.SurveyID || '-')}</span><span class="sub-name">${safeText(state.customLabels.employeeId)} ${safeText(item.EmployeeID)}</span>`, () => {
-                    updateMarker(item.Latitude, item.Longitude);
-                    state.map.setView([item.Latitude, item.Longitude], 18);
-                });
-            });
-
-            // 2. ค้นที่อยู่ละเอียดจาก Nominatim
-            try {
-                const center = state.map.getCenter();
-                const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&accept-language=th&limit=8&lat=${center.lat}&lon=${center.lng}&addressdetails=1&zoom=18&countrycodes=th`;
-                const res = await fetch(url);
-                const data = await res.json();
-                (data || []).forEach(item => {
-                    const main = item.display_name.split(',')[0];
-                    const sub = item.display_name.split(',').slice(1, 4).join(',');
-                    addItem(`<span class="main-name">${safeText(main)}</span><span class="sub-name">${safeText(sub)}</span>`, () => {
-                        updateMarker(parseFloat(item.lat), parseFloat(item.lon));
-                        state.map.setView([item.lat, item.lon], 18);
-                        inputElement.value = main;
-                    });
-                });
-            } catch (err) {}
-            if (inputElement.value !== q) return; // ผู้ใช้พิมพ์ต่อไปแล้ว ผลนี้เก่า
-            listElement.innerHTML = "";
-            if (fragment.children.length === 0) listElement.innerHTML = '<div class="searching-hint">ไม่พบสถานที่หรือรหัสนี้</div>';
-            else listElement.appendChild(fragment);
-        }
-
-        function updateMarker(lat, lng) {
-            lat = parseFloat(lat); lng = parseFloat(lng);
-            const svUrl = getStreetViewLink(lat, lng);
-            const popupContent = `<div class="popup"><b>${state.editingId ? 'ตำแหน่งที่แก้ไข' : 'ตำแหน่งที่เลือก'}</b><a href="${svUrl}" target="_blank" rel="noopener" class="btn btn-streetview"><i class="fas fa-street-view"></i> Street View</a></div>`;
-            const icon = pinIcon(state.editingId ? PIN_COLORS.editing : PIN_COLORS.selected);
-            if (state.currentMarker) state.currentMarker.setLatLng([lat, lng]).setIcon(icon).setPopupContent(popupContent);
-            else {
-                state.currentMarker = L.marker([lat, lng], { icon, draggable: true, zIndexOffset: 3000, title: 'ลากเพื่อปรับตำแหน่ง' }).addTo(state.map);
-                state.currentMarker.bindPopup(popupContent);
-                state.currentMarker.on("dragend", e => updateMarker(e.target.getLatLng().lat, e.target.getLatLng().lng));
-            }
-            state.currentLat = lat; state.currentLng = lng;
-            renderPickStatus();
-        }
-
-        function clearMarker() {
-            if (state.currentMarker) { state.map.removeLayer(state.currentMarker); state.currentMarker = null; }
-            state.currentLat = null; state.currentLng = null;
-            renderPickStatus();
-        }
-
-        function renderPickStatus() {
-            const has = state.currentLat !== null;
-            const box = $("pick-status");
-            box.classList.toggle("has-coords", has);
-            box.classList.toggle("is-editing", has && !!state.editingId);
-            $("pick-title").textContent = state.editingId ? "ตำแหน่งของรายการที่แก้ไข" : "ตำแหน่งที่เลือก";
-            $("pick-title").hidden = !has;
-            $("pick-coords").hidden = !has;
-            $("pick-hint").hidden = has;
-            $("pick-actions").hidden = !has;
-            $("lat").textContent = has ? state.currentLat.toFixed(5) : "--";
-            $("lng").textContent = has ? state.currentLng.toFixed(5) : "--";
-            if (has) $("pick-streetview").href = getStreetViewLink(state.currentLat, state.currentLng);
-        }
-
-        function fitMapToMarkers() {
-            if (!state.map) return;
-            const markers = [];
-            state.permanentMarkers.eachLayer(layer => { if (layer instanceof L.Marker) markers.push(layer.getLatLng()); });
-            if (markers.length > 0) {
-                const bounds = L.latLngBounds(markers);
-                state.map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
-            }
-        }
-
-        // --- FIELD LOCK LOGIC ---
-        function applyEmployeeIdState() {
-            const storedId = localStorage.getItem(EMP_KEY);
-            if (storedId) dom.empIdInput.value = storedId;
-            const btn = $('toggleEmpLockBtn');
-            const icon = $('empLockIcon');
-            if (state.isEmployeeIdLocked) {
-                dom.empIdInput.disabled = true; btn.classList.add('locked'); icon.className = 'fas fa-lock';
-                btn.setAttribute('aria-label', 'Unlock'); btn.title = 'Unlock';
-            } else {
-                dom.empIdInput.disabled = false; btn.classList.remove('locked'); icon.className = 'fas fa-lock-open';
-                btn.setAttribute('aria-label', 'Lock'); btn.title = 'Lock';
-            }
-        }
-
-        function toggleEmployeeIdLock() {
-            if (state.editingId) return;
-            const val = dom.empIdInput.value.trim();
-            if (!state.isEmployeeIdLocked && !val) { dom.empIdInput.focus(); return showMessage(`ใส่${state.customLabels.employeeId}ก่อนล็อก`, "warning"); }
-            state.isEmployeeIdLocked = !state.isEmployeeIdLocked;
-            if (state.isEmployeeIdLocked) safeSet(EMP_KEY, val);
-            applyEmployeeIdState();
-            showMessage(state.isEmployeeIdLocked ? "ล็อกรหัสแล้ว" : "ปลดล็อกแล้ว แก้ไขรหัสได้", "info");
-            if (!state.isEmployeeIdLocked) dom.empIdInput.focus();
-        }
-
-        function updateAllLabels() {
-            const eLabel = $('employeeIdLabel'), sLabel = $('surveyIdLabel');
-            if (eLabel) eLabel.textContent = state.customLabels.employeeId;
-            if (sLabel) sLabel.textContent = state.customLabels.surveyId;
-            if (dom.empIdInput) dom.empIdInput.placeholder = "ระบุ " + state.customLabels.employeeId;
-            if (dom.surveyIdInput) dom.surveyIdInput.placeholder = "ระบุ " + state.customLabels.surveyId;
-        }
-
-        function showView(viewId) {
-            dom.views.forEach(v => v.classList.remove("active"));
-            const target = $(viewId);
-            if (target) target.classList.add("active");
-            document.body.classList.toggle("tracker-open", viewId === 'tracker-view');
-            if (viewId !== 'tracker-view') closeHistory();
-            if (state.map) setTimeout(() => state.map.invalidateSize(), 60);
-            updateAllLabels();
-            if (viewId === 'tracker-view') applyEmployeeIdState();
-            window.scrollTo(0, 0);
-        }
-
-        async function fetchLocations(projectName, { quiet = false } = {}) {
-            const seq = ++state.fetchSeq;
-            if (!quiet) { state.historyStatus = 'loading'; renderAllData(); }
-            try {
-                const result = await apiGet(`action=getData&project=${encodeURIComponent(projectName)}`);
-                if (projectName !== state.currentProjectName || seq !== state.fetchSeq) return;
-                if (result.success || result.status === 'success') {
-                    state.savedLocations = result.data || [];
-                    state.historyStatus = 'ready';
-                    renderAllData();
-                    if (!quiet) fitMapToMarkers();
-                } else throw new Error(result.message || 'load failed');
-            } catch (e) {
-                if (projectName !== state.currentProjectName || seq !== state.fetchSeq) return;
-                if (!quiet || !state.savedLocations.length || state.historyStatus === 'loading') state.historyStatus = 'error';
-                renderAllData();
-                if (!quiet) showMessage("โหลดประวัติไม่สำเร็จ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่", "error");
-            }
-        }
-
-        function formatTime(ts) {
-            if (!ts) return '--:--';
-            const d = new Date(ts);
-            if (isNaN(d)) return '--:--';
-            const time = d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-            if (d.toDateString() === new Date().toDateString()) return time;
-            return `${d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} ${time}`;
-        }
-
-        function statusChip(loc) {
-            if (!loc.isPending) return '';
-            if (loc.sendState === 'sending') return '<span class="chip chip-sending"><i class="fas fa-circle-notch fa-spin"></i> กำลังส่ง</span>';
-            if (loc.sendState === 'failed') return '<span class="chip chip-failed"><i class="fas fa-triangle-exclamation"></i> ส่งไม่สำเร็จ</span>';
-            return '<span class="chip chip-pending"><i class="fas fa-clock"></i> รอส่ง</span>';
-        }
-
-        function renderAllData() {
-            const all = [...state.savedLocations, ...state.pendingLocations];
-            if (state.permanentMarkers) state.permanentMarkers.clearLayers();
-            state.permanentMarkersMap = {};
-
-            all.forEach(loc => {
-                if (state.editingId && String(loc.ID) === String(state.editingId)) return; // หมุดสีม่วงแทนตัวนี้
-                const lat = parseFloat(loc.Latitude), lng = parseFloat(loc.Longitude);
-                if (isValidCoord(lat) && isValidCoord(lng) && state.permanentMarkers) {
-                    const icon = pinIcon(loc.isPending ? PIN_COLORS.pending : PIN_COLORS.saved);
-                    const marker = L.marker([lat, lng], { icon, zIndexOffset: loc.isPending ? 1000 : 0 }).addTo(state.permanentMarkers);
-                    marker.on('click', () => { updateMarker(lat, lng); showMessage("เลือกพิกัดจากหมุดนี้แล้ว"); });
-                    const svUrl = getStreetViewLink(lat, lng);
-                    marker.bindPopup(`<div class="popup"><b>${safeText(state.customLabels.surveyId)} ${safeText(loc.SurveyID || '-')}</b><span>${safeText(state.customLabels.employeeId)} ${safeText(loc.EmployeeID)}</span><a href="${svUrl}" target="_blank" rel="noopener" class="btn btn-streetview"><i class="fas fa-street-view"></i> Street View</a></div>`);
-                    state.permanentMarkersMap[loc.ID] = marker;
-                }
-            });
-
-            renderCounts(all);
-            renderSyncStatus();
-            dom.savedContainer.innerHTML = "";
-
-            if (state.historyStatus === 'loading' && all.length === 0) {
-                dom.savedContainer.innerHTML = Array.from({ length: 3 }, () =>
-                    `<div class="skeleton"><div class="sk" style="width:10px;height:10px;border-radius:50%"></div><div style="flex:1;display:grid;gap:6px"><div class="sk" style="height:14px;width:45%"></div><div class="sk" style="height:11px;width:70%"></div></div></div>`).join('');
-                return;
-            }
-            if (state.historyStatus === 'error' && all.length === 0) {
-                dom.savedContainer.innerHTML = `<div class="state-box"><i class="fas fa-wifi state-icon"></i><strong>โหลดประวัติไม่สำเร็จ</strong><p>ตรวจสอบอินเทอร์เน็ต แล้วลองใหม่อีกครั้ง</p><button type="button" class="btn btn-secondary btn-sm" id="retry-history"><i class="fas fa-rotate-right"></i> Retry</button></div>`;
-                on("retry-history", "click", () => fetchLocations(state.currentProjectName));
-                return;
-            }
-            if (all.length === 0) {
-                dom.savedContainer.innerHTML = `<div class="state-box"><i class="fas fa-map-location-dot state-icon"></i><strong>ยังไม่มีการบันทึกในโครงการนี้</strong><p>แตะบนแผนที่เพื่อปักหมุด ใส่รหัส แล้วกด Save</p></div>`;
-                return;
-            }
-
-            const sorted = all.slice().sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp));
-            sorted.forEach((loc) => {
-                const row = document.createElement("button");
-                row.type = "button";
-                const isEditing = state.editingId && String(loc.ID) === String(state.editingId);
-                row.className = "history-row" + (isEditing ? " is-editing" : "");
-                row.setAttribute('role', 'listitem');
-                const dot = !loc.isPending ? 'saved' : (loc.sendState === 'failed' ? 'failed' : 'pending');
-                row.innerHTML = `
-                    <span class="status-dot ${dot}" aria-hidden="true"></span>
-                    <span class="history-text">
-                        <span class="history-id">${safeText(state.customLabels.surveyId)} ${safeText(loc.SurveyID || '-')}</span>
-                        <span class="history-meta num">${safeText(state.customLabels.employeeId)} ${safeText(loc.EmployeeID)} · ${formatTime(loc.Timestamp)}</span>
-                    </span>
-                    ${statusChip(loc)}
-                    <i class="fas fa-ellipsis" aria-hidden="true"></i>`;
-                row.onclick = () => openRowActions(loc.ID);
-                dom.savedContainer.appendChild(row);
-            });
-        }
-
-        function renderCounts(all) {
-            const pending = state.pendingLocations.length;
-            $("history-count").textContent = all.length ? ` (${all.length})` : '';
-            $("history-button-count").textContent = all.length;
-            const sub = $("tracker-subtitle");
-            const prefix = MOCK ? 'โหมดทดสอบ · ' : '';
-            if (state.historyStatus === 'loading' && !state.savedLocations.length) sub.textContent = prefix + (pending ? `กำลังโหลด… · รอส่ง ${pending}` : 'กำลังโหลด…');
-            else sub.textContent = prefix + `ในระบบ ${state.savedLocations.length}` + (pending ? ` · รอส่ง ${pending}` : '');
-        }
-
-        // --- HISTORY SHEET & ROW ACTIONS ---
-        function openHistory() {
-            $("history-panel").classList.add("is-open");
-            $("history-backdrop").hidden = false;
-            setTimeout(() => $("history-close").focus(), 60);
-        }
-        function closeHistory() {
-            const panel = $("history-panel");
-            if (!panel.classList.contains("is-open")) return;
-            panel.classList.remove("is-open");
-            $("history-backdrop").hidden = true;
-        }
-
-        function openRowActions(id) {
-            const loc = findLoc(id);
-            if (!loc) return;
-            if (state.resolving) return showMessage("กำลังตรวจสอบกับระบบ รอสักครู่", "info");
-            state.actionRowId = id;
-            if (loc.isPending && loc.sendState !== 'sending') state.holdId = id;
-            const statusText = !loc.isPending ? 'อยู่ในระบบแล้ว' : (loc.sendState === 'sending' ? 'กำลังส่ง' : (loc.sendState === 'failed' ? `ส่งไม่สำเร็จ (${loc.lastError || 'ไม่ทราบสาเหตุ'})` : 'รอส่ง'));
-            $("rowActionsTitle").textContent = `${state.customLabels.surveyId} ${loc.SurveyID || '-'}`;
-            $("rowActionsMeta").textContent = `${state.customLabels.employeeId} ${loc.EmployeeID} · ${formatTime(loc.Timestamp)} · ${statusText}`;
-            $("rowActionMaps").href = safeUrl(loc.GoogleMapsLink, `https://maps.google.com/?q=${loc.Latitude},${loc.Longitude}`);
-            $("rowActionStreetView").href = getStreetViewLink(loc.Latitude, loc.Longitude);
-            openModal(dom.modals.rowActions);
-        }
-
-        function viewOnMap(id) {
-            const loc = findLoc(id);
-            if (!loc || !state.map) return;
-            const lat = parseFloat(loc.Latitude), lng = parseFloat(loc.Longitude);
-            if (!isValidCoord(lat) || !isValidCoord(lng)) return;
-            closeHistory();
-            state.map.setView([lat, lng], 18);
-            const m = state.permanentMarkersMap[loc.ID];
-            if (m) setTimeout(() => m.openPopup(), 250);
-        }
-
-        function inTimeoutWindow(loc) { return loc && loc.lastTimeoutAt && Date.now() - loc.lastTimeoutAt < VERIFY_AFTER_TIMEOUT_MS; }
-
-        async function startEdit(id) {
-            let loc = findLoc(id);
-            if (!loc) return;
-            const stop = (msg) => { releaseHold(id); if (msg) showMessage(msg, "info"); };
-            if (loc.isPending && loc.sendState === 'sending') return stop("รายการนี้กำลังส่งเข้าระบบ รอสักครู่แล้วค่อยแก้ไข");
-            if (loc.isProvisional) { fetchLocations(state.currentProjectName, { quiet: true }); return stop("กำลังโหลดข้อมูลล่าสุดจากระบบ ลองอีกครั้งในไม่กี่วินาที"); }
-            if (inTimeoutWindow(loc)) return stop("รายการนี้อาจกำลังเข้าระบบ รอประมาณ 1–2 นาทีแล้วลองใหม่");
-            if (loc.isPending && loc.attempts) {
-                state.holdId = id;
-                const resolved = await resolveUncertain(loc);
-                if (resolved !== false) return stop();
-                loc = findLoc(id);
-                if (!loc) return stop();
-                // ระหว่างรอตรวจสอบ สถานะอาจเปลี่ยน ตรวจซ้ำอีกครั้ง
-                if (loc.isPending && loc.sendState === 'sending') return stop("รายการนี้กำลังส่งเข้าระบบ รอสักครู่แล้วค่อยแก้ไข");
-                if (!loc.isPending || loc.isProvisional) return stop("รายการนี้ส่งเข้าระบบแล้ว เลือกจากประวัติอีกครั้งเพื่อแก้ไข");
-                if (inTimeoutWindow(loc)) return stop("รายการนี้อาจกำลังเข้าระบบ รอประมาณ 1–2 นาทีแล้วลองใหม่");
-            }
-            if (String(state.holdId) === String(id)) state.holdId = null; // ระหว่างแก้ไข ใช้ editingId กันไม่ให้ส่งแทน
-            if (state.editingId) cancelEdit();
-            state.editingId = id;
-            closeHistory();
-            renderAllData(); // ซ่อนหมุดเดิมของรายการนี้
-            updateMarker(parseFloat(loc.Latitude), parseFloat(loc.Longitude));
-            if (state.map) state.map.setView([parseFloat(loc.Latitude), parseFloat(loc.Longitude)], 18);
-            dom.empIdInput.disabled = false; dom.empIdInput.value = loc.EmployeeID; dom.surveyIdInput.value = loc.SurveyID || '';
-            $('toggleEmpLockBtn').classList.remove('locked'); $('empLockIcon').className = 'fas fa-lock-open';
-            clearInvalid();
-            $("editActionButtons").hidden = false;
-            $("normalActionButtons").hidden = true;
-            $("edit-banner").hidden = false;
-            $("edit-banner-text").textContent = `กำลังแก้ไข ${state.customLabels.surveyId} ${loc.SurveyID || '-'} · แตะแผนที่หรือลากหมุดสีม่วงเพื่อย้าย`;
-        }
-
-        async function deleteLocation(id, name) {
-            const loc = findLoc(id);
-            if (!loc) return;
-            const isPending = !!loc.isPending;
-            const stop = (msg) => { releaseHold(id); if (msg) showMessage(msg, "info"); };
-            if (loc.isProvisional) { fetchLocations(state.currentProjectName, { quiet: true }); return stop("กำลังโหลดข้อมูลล่าสุดจากระบบ ลองอีกครั้งในไม่กี่วินาที"); }
-            if (isPending && loc.sendState === 'sending') return stop("รายการนี้กำลังส่งเข้าระบบ รอสักครู่แล้วค่อยลบ");
-            if (isPending && inTimeoutWindow(loc)) return stop("รายการนี้อาจกำลังเข้าระบบ รอประมาณ 1–2 นาทีแล้วลองใหม่");
-            if (isPending && loc.attempts) {
-                state.holdId = id;
-                const resolved = await resolveUncertain(loc);
-                if (resolved !== false) return stop();
-            }
-            if (isPending) state.holdId = id;
-            $("modalTitle").textContent = "ลบข้อมูลนี้?";
-            $("modalMessage").textContent = isPending
-                ? `“${name}” ยังไม่ได้ส่งเข้าระบบ จะถูกลบออกจากเครื่องนี้`
-                : `“${name}” จะถูกลบออกจากระบบ และย้อนกลับไม่ได้`;
-            state.confirmActionCallback = async () => {
-                closeModal(dom.modals.confirm);
-                try {
-                    if (isPending) {
-                        const current = state.pendingLocations.find(p => String(p.ID) === String(id));
-                        if (!current) { await fetchLocations(state.currentProjectName, { quiet: true }); return showMessage("รายการนี้ส่งเข้าระบบไปแล้ว ถ้าต้องการลบให้เลือกจากประวัติอีกครั้ง", "info"); }
-                        if (current.sendState === 'sending') return showMessage("รายการนี้กำลังส่งเข้าระบบ รอสักครู่แล้วค่อยลบ", "info");
-                        state.pendingLocations = state.pendingLocations.filter(p => String(p.ID) !== String(id));
-                        savePending();
-                        if (String(state.editingId) === String(id)) cancelEdit(); else renderAllData();
-                    } else {
-                        await apiPost({ action: "delete", project: state.currentProjectName, id: id });
-                        if (String(state.editingId) === String(id)) cancelEdit();
-                        await fetchLocations(state.currentProjectName);
-                    }
-                    showMessage("ลบแล้ว", "success");
-                } catch (err) {} finally { releaseHold(id); }
-            };
-            openModal(dom.modals.confirm);
-        }
-
-        function releaseHold(id) {
-            if (!state.holdId) return;
-            if (id !== undefined && String(state.holdId) !== String(id)) return;
-            state.holdId = null;
-            processQueue();
-        }
-
-        function clearInvalid() { [dom.empIdInput, dom.surveyIdInput].forEach(el => el.removeAttribute('aria-invalid')); }
-
-        function markInvalid(input, message) {
-            input.setAttribute('aria-invalid', 'true');
-            input.focus();
-            showMessage(message, "warning");
-        }
-
-        function setupListeners() {
-            on("toggleEmpLockBtn", "click", toggleEmployeeIdLock);
-            on("employeeIdInput", "blur", () => {
-                const val = dom.empIdInput.value.trim();
-                if (val && !state.isEmployeeIdLocked && !state.editingId) {
-                    state.isEmployeeIdLocked = true;
-                    safeSet(EMP_KEY, val);
-                    applyEmployeeIdState();
-                    showMessage("ล็อกรหัสพนักงานอัตโนมัติแล้ว");
-                }
-            });
-            ["employeeIdInput", "surveyIdInput"].forEach(id => on(id, "input", (e) => e.target.removeAttribute('aria-invalid')));
-            on("surveyIdInput", "keydown", (e) => { if (e.key === 'Enter') { e.preventDefault(); $(state.editingId ? "confirmEditButton" : "saveButton").click(); } });
-
-            on("saveButton", "click", async () => {
-                if (state.busy) return;
-                if (state.currentLat === null) return showMessage("ยังไม่ได้เลือกตำแหน่ง แตะบนแผนที่ก่อนบันทึก", "warning");
-                const empId = dom.empIdInput.value.trim(), surId = dom.surveyIdInput.value.trim();
-                if (!empId) return markInvalid(dom.empIdInput, `กรุณาใส่${state.customLabels.employeeId}`);
-                if (isDuplicate(empId, surId, state.editingId)) return markInvalid(dom.surveyIdInput, `${empId} + ${surId || '(ว่าง)'} บันทึกไปแล้ว`);
-                clearInvalid();
-                if (state.editingId) {
-                    state.busy = true;
-                    try {
-                        const editing = findLoc(state.editingId);
-                        if (editing && editing.isPending) {
-                            const idx = state.pendingLocations.findIndex(l => String(l.ID) === String(state.editingId));
-                            if (idx > -1) { state.pendingLocations[idx] = { ...state.pendingLocations[idx], EmployeeID: empId, SurveyID: surId, Latitude: state.currentLat, Longitude: state.currentLng, GoogleMapsLink: `https://maps.google.com/?q=${state.currentLat},${state.currentLng}` }; }
-                            savePending();
-                            cancelEdit();
-                            showMessage("อัปเดตรายการที่รอส่งแล้ว", "success");
-                            processQueue();
-                        } else {
-                            await apiPost({ action: "update", id: state.editingId, project: state.currentProjectName, data: { name: empId, surveyId: surId, lat: state.currentLat, lng: state.currentLng } });
-                            cancelEdit();
-                            await fetchLocations(state.currentProjectName, { quiet: true });
-                            showMessage("อัปเดตการแก้ไขแล้ว", "success");
-                        }
-                    } catch (e) {} finally { state.busy = false; }
-                } else {
-                    state.pendingLocations.push({ ID: `pending_${Date.now()}`, EmployeeID: empId, SurveyID: surId, Latitude: state.currentLat, Longitude: state.currentLng, Timestamp: new Date().toISOString(), GoogleMapsLink: `https://maps.google.com/?q=${state.currentLat},${state.currentLng}`, isPending: true, sendState: 'queued', attempts: 0 });
-                    const stored = savePending();
-                    if (!state.isEmployeeIdLocked) { state.isEmployeeIdLocked = true; safeSet(EMP_KEY, empId); applyEmployeeIdState(); }
-                    dom.surveyIdInput.value = ""; clearMarker(); renderAllData();
-                    if (stored) showMessage(`บันทึก ${surId || empId} แล้ว กำลังส่งเข้าระบบ`, "success");
-                    state.retryIndex = 0;
-                    processQueue();
-                }
-            });
-            on("confirmEditButton", "click", () => $("saveButton").click());
-            on("cancelEditButton", "click", cancelEdit);
-            on("pick-clear", "click", () => { if (state.editingId) return cancelEdit(); clearMarker(); });
-
-            on("uploadButton", "click", () => {
-                if (!state.pendingLocations.length) return showMessage("ไม่มีข้อมูลรอส่ง", "info");
-                state.retryIndex = 0;
-                processQueue({ manual: true });
-            });
-
-            on("historyButton", "click", openHistory);
-            on("history-close", "click", closeHistory);
-            on("history-backdrop", "click", closeHistory);
-
-            on("rowActionView", "click", () => { closeModal(dom.modals.rowActions, { restoreFocus: false }); releaseHold(); viewOnMap(state.actionRowId); });
-            on("rowActionEdit", "click", () => { closeModal(dom.modals.rowActions, { restoreFocus: false }); startEdit(state.actionRowId); });
-            on("rowActionDelete", "click", () => {
-                const loc = findLoc(state.actionRowId);
-                closeModal(dom.modals.rowActions, { restoreFocus: false });
-                if (loc) deleteLocation(loc.ID, `${state.customLabels.surveyId} ${loc.SurveyID || '-'} (${loc.EmployeeID})`);
-            });
-            ["rowActionMaps", "rowActionStreetView"].forEach(id => on(id, "click", () => { closeModal(dom.modals.rowActions, { restoreFocus: false }); releaseHold(); }));
-            on("rowActionCancel", "click", () => { closeModal(dom.modals.rowActions); releaseHold(); });
-
-            on("exportCsvButton", "click", () => {
-                const data = [...state.savedLocations, ...state.pendingLocations]; if (!data.length) return showMessage("ไม่มีข้อมูลให้ส่งออก", "warning");
-                let csv = "﻿User ID,Survey ID,Lat,Lng,Timestamp\n";
-                data.forEach(d => csv += `${csvEscape(d.EmployeeID)},${csvEscape(d.SurveyID)},${d.Latitude},${d.Longitude},${csvEscape(d.Timestamp)}\n`);
-                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })); a.download = `Export_${state.currentProjectName}.csv`; a.click();
-                showMessage(`ส่งออก ${data.length} รายการแล้ว`, "success");
-            });
-
-            on("home-button", "click", () => {
-                if (state.editingId) cancelEdit();
-                clearTimeout(state.retryTimer);
-                showView("project-selection-view");
-                loadSelectionView();
-            });
-
-            on("project-search-input", "input", () => renderSelection(state.allProjects));
-
-            on("password-form", "submit", async (e) => {
-                e.preventDefault();
-                try {
-                    const res = await apiPost({ action: "verifyPassword", password: $("password-input").value });
-                    if (res.success || res.status === 'success') { closeModal(dom.modals.password); $("password-input").value = ""; showView("admin-menu-view"); }
-                } catch (err) { $("password-input").select(); }
-            });
-
-            window.addEventListener("online", () => { renderSyncStatus(); state.retryIndex = 0; processQueue(); });
-            window.addEventListener("offline", renderSyncStatus);
-            window.addEventListener("storage", (e) => {
-                if (!state.currentProjectName || e.key !== pendingKey(state.currentProjectName) || state.sending) return;
-                state.pendingLocations = loadPending(state.currentProjectName);
-                renderAllData();
-            });
-            document.addEventListener("visibilitychange", () => { if (document.visibilityState === 'visible') processQueue(); });
-            window.addEventListener("beforeunload", (e) => { if (state.sending) { e.preventDefault(); e.returnValue = ''; } });
-        }
-
-        function cancelEdit() {
-            state.editingId = null;
-            clearMarker();
-            dom.surveyIdInput.value = "";
-            clearInvalid();
-            applyEmployeeIdState();
-            $("editActionButtons").hidden = true;
-            $("normalActionButtons").hidden = false;
-            $("edit-banner").hidden = true;
-            renderAllData();
-            processQueue(); // รายการที่ถูกข้ามระหว่างแก้ไข
-        }
-
-        async function loadSelectionView() {
-            state.projectsStatus = 'loading';
-            if (!state.allProjects.length) renderSelection([]);
-            try {
-                const result = await apiGet(`action=getProjects`);
-                state.allProjects = (result.data || []).map(p => (typeof p === 'object' && p !== null) ? String(p.name) : String(p));
-                state.projectsStatus = 'ready';
-            } catch (err) {
-                state.projectsStatus = 'error';
-            }
-            renderSelection(state.allProjects);
-        }
-
-        function openProject(p) {
-            state.currentProjectName = p;
-            state.savedLocations = [];
-            state.pendingLocations = loadPending(p);
-            state.editingId = null;
-            state.retryIndex = 0;
-            dom.trackerTitle.textContent = p;
-            showView("tracker-view");
-            initMap();
-            clearMarker();
-            fetchLocations(p);
-            processQueue();
-        }
-
-        function renderSelection(projects) {
-            const q = $("project-search-input").value.trim().toLowerCase();
-            const filtered = projects.filter(p => p.toLowerCase().includes(q));
-            dom.projectList.innerHTML = "";
-
-            if (state.projectsStatus === 'loading' && !projects.length) {
-                dom.projectCount.textContent = "กำลังโหลดโครงการ…";
-                dom.projectList.innerHTML = Array.from({ length: 4 }, () =>
-                    `<div class="skeleton"><div class="sk" style="width:40px;height:40px;border-radius:10px"></div><div class="sk" style="height:16px;flex:1;max-width:60%"></div></div>`).join('');
-                return;
-            }
-            if (state.projectsStatus === 'error' && !projects.length) {
-                dom.projectCount.textContent = "โหลดไม่สำเร็จ";
-                dom.projectList.innerHTML = `<div class="state-box"><i class="fas fa-wifi state-icon"></i><strong>โหลดรายชื่อโครงการไม่สำเร็จ</strong><p>ตรวจสอบอินเทอร์เน็ต แล้วลองใหม่อีกครั้ง</p><button type="button" class="btn btn-secondary btn-sm" id="retry-projects"><i class="fas fa-rotate-right"></i> Retry</button></div>`;
-                on("retry-projects", "click", loadSelectionView);
-                return;
-            }
-
-            dom.projectCount.textContent = q ? `พบ ${filtered.length} จาก ${projects.length} โครงการ` : `${projects.length} โครงการ`;
-            if (!filtered.length) {
-                dom.projectList.innerHTML = q
-                    ? `<div class="state-box"><i class="fas fa-magnifying-glass state-icon"></i><strong>ไม่พบโครงการที่ตรงกับ “${safeText(q)}”</strong><p>ลองพิมพ์ให้สั้นลง หรือตรวจตัวสะกด</p></div>`
-                    : `<div class="state-box"><i class="fas fa-folder-open state-icon"></i><strong>ยังไม่มีโครงการในระบบ</strong><p>ติดต่อผู้ดูแลระบบให้เพิ่มโครงการ</p></div>`;
-                return;
-            }
-
-            filtered.forEach(p => {
-                const pending = loadPending(p).length;
-                const card = document.createElement("button");
-                card.type = "button";
-                card.className = "project-item";
-                card.setAttribute('role', 'listitem');
-                card.innerHTML = `<span class="project-icon" aria-hidden="true"><i class="fas fa-folder"></i></span><span class="project-name">${safeText(p)}</span>${pending ? `<span class="chip chip-pending num"><i class="fas fa-clock"></i> รอส่ง ${pending}</span>` : ''}<i class="fas fa-chevron-right" aria-hidden="true"></i>`;
-                card.onclick = () => openProject(p);
-                dom.projectList.appendChild(card);
-            });
-        }
-
-        // --- MOCK API: ใช้เมื่อเปิดด้วย ?mock=1 เท่านั้น ---
-        const mockDb = (() => {
-            const now = Date.now();
-            const pts = (base, n, emp) => Array.from({ length: n }, (_, i) => {
-                const lat = +(base[0] + Math.sin(i * 1.7) * 0.004).toFixed(6), lng = +(base[1] + Math.cos(i * 1.3) * 0.004).toFixed(6);
-                return { ID: `m_${emp}_${i}`, EmployeeID: emp, SurveyID: String(1001 + i), Latitude: lat, Longitude: lng, Timestamp: new Date(now - (i + 1) * 3600e3 * (i % 2 ? 7 : 1)).toISOString(), GoogleMapsLink: `https://maps.google.com/?q=${lat},${lng}` };
-            });
-            return {
-                projects: ['สำรวจครัวเรือน เขตบางรัก 2026', 'ติดตามร้านค้าปลีก ย่านอารีย์–สะพานควาย', 'Pilot ลาดพร้าว (ทีม B)', 'โครงการสำรวจความพึงพอใจผู้ใช้บริการขนส่งสาธารณะ ระยะที่ 2'],
-                data: {
-                    'สำรวจครัวเรือน เขตบางรัก 2026': [...pts([13.7292, 100.5243], 5, '10234'), ...pts([13.7255, 100.5301], 3, '10871')],
-                    'ติดตามร้านค้าปลีก ย่านอารีย์–สะพานควาย': pts([13.7797, 100.5446], 4, '20455'),
-                    'Pilot ลาดพร้าว (ทีม B)': [],
-                    'โครงการสำรวจความพึงพอใจผู้ใช้บริการขนส่งสาธารณะ ระยะที่ 2': pts([13.7563, 100.5018], 2, '30112')
-                }
-            };
-        })();
-
-        async function mockApi(query, payload) {
-            await new Promise(r => setTimeout(r, 450));
-            if (query) {
-                const params = new URLSearchParams(query);
-                if (params.get('action') === 'getProjects') return { success: true, data: mockDb.projects };
-                if (params.get('action') === 'getData') return { success: true, data: JSON.parse(JSON.stringify(mockDb.data[params.get('project')] || [])) };
-                return { success: false, message: 'unknown action' };
-            }
-            if (payload.action === 'verifyPassword') return payload.password === '1234' ? { success: true } : { success: false, message: 'รหัสผ่านไม่ถูกต้อง' };
-            const rows = mockDb.data[payload.project] || (mockDb.data[payload.project] = []);
-            const d = payload.data || {};
-            switch (payload.action) {
-                case 'add':
-                    rows.push({ ID: `m_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, EmployeeID: d.name, SurveyID: d.surveyId, Latitude: d.lat, Longitude: d.lng, Timestamp: new Date().toISOString(), GoogleMapsLink: `https://maps.google.com/?q=${d.lat},${d.lng}` });
-                    return { success: true };
-                case 'update': {
-                    const r = rows.find(x => String(x.ID) === String(payload.id));
-                    if (!r) return { success: false, message: 'ไม่พบรายการ' };
-                    Object.assign(r, { EmployeeID: d.name, SurveyID: d.surveyId, Latitude: d.lat, Longitude: d.lng, GoogleMapsLink: `https://maps.google.com/?q=${d.lat},${d.lng}` });
-                    return { success: true };
-                }
-                case 'delete': {
-                    const i = rows.findIndex(x => String(x.ID) === String(payload.id));
-                    if (i > -1) rows.splice(i, 1);
-                    return { success: true };
-                }
-            }
-            return { success: false, message: 'unknown action' };
         }
 
         window.onload = () => {
-            if (MOCK) $("mock-banner").hidden = false;
-            if (!initLeafletResources()) {
-                dom.projectCount.textContent = "โหลดแผนที่ไม่สำเร็จ";
-                dom.projectList.innerHTML = `<div class="state-box"><i class="fas fa-wifi state-icon"></i><strong>โหลดส่วนประกอบแผนที่ไม่สำเร็จ</strong><p>ตรวจสอบอินเทอร์เน็ต แล้วรีเฟรชหน้านี้</p></div>`;
-                return;
+            ui = {
+                spinner: document.getElementById("loadingSpinner"),
+                employeeId: document.getElementById("employeeIdInput"),
+                surveyId: document.getElementById("surveyIdInput"),
+                savedTable: document.getElementById("savedLocationsTableBody"),
+                dashboardProjectSelector: document.getElementById("dashboard-project-selector"),
+                dashboardSummaryTable: document.getElementById("dashboard-summary-table")
+            };
+            
+            // Auto-login Admin if previously authenticated on this device
+            if (localStorage.getItem("admin_auth_token") === "authenticated_true") {
+                isAdminAuthenticated = true;
             }
-            setupListeners(); loadSelectionView();
-            on("manage-projects-btn", "click", () => { $("password-input").value = ""; openModal(dom.modals.password); });
-            on("cancel-password-btn", "click", () => closeModal(dom.modals.password));
-            on("confirmActionButton", "click", () => state.confirmActionCallback?.());
-            on("cancelActionButton", "click", () => { closeModal(dom.modals.confirm); releaseHold(); });
-            on("menu-back-to-selection-btn", "click", () => showView("project-selection-view"));
-            on("goto-manage-projects-btn", "click", () => showMessage("เมนูจัดการโครงการยังไม่เปิดใช้งานในเวอร์ชันนี้", "info"));
-            on("goto-dashboards-btn", "click", () => showMessage("รายงานข้อมูลสรุปยังไม่เปิดใช้งานในเวอร์ชันนี้", "info"));
-            on("customizeLabelsBtn", "click", () => { $("employeeIdLabelInput").value = state.customLabels.employeeId; $("surveyIdLabelInput").value = state.customLabels.surveyId; openModal(dom.modals.customize); });
-            on("cancelCustomizeLabelsBtn", "click", () => closeModal(dom.modals.customize));
-            on("customize-labels-form", "submit", (e) => {
-                e.preventDefault();
-                state.customLabels.employeeId = $("employeeIdLabelInput").value.trim() || DEFAULT_LABELS.employeeId;
-                state.customLabels.surveyId = $("surveyIdLabelInput").value.trim() || DEFAULT_LABELS.surveyId;
-                localStorage.setItem(LABELS_KEY, JSON.stringify(state.customLabels));
-                updateAllLabels();
-                if (!state.editingId) applyEmployeeIdState();
-                renderAllData();
-                closeModal(dom.modals.customize);
-                showMessage("อัปเดตชื่อช่องกรอกแล้ว", "success");
-            });
+            
+            fetchProjects();
 
-            // ปิด modal / แผ่นประวัติ ด้วย Esc หรือแตะพื้นหลัง
-            Object.values(dom.modals).forEach(modal => {
-                modal.addEventListener("click", (e) => { if (e.target === modal) { closeModal(modal); if (modal !== dom.modals.password && modal !== dom.modals.customize) releaseHold(); } });
+            document.getElementById("project-search-input").oninput = (e) => {
+                const term = e.target.value.toLowerCase();
+                renderProjects(allProjects.filter(p => p.toLowerCase().includes(term)));
+            };
+
+            const adminProjectList = document.getElementById('admin-project-list');
+            if (adminProjectList) {
+                adminProjectList.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    const dragging = document.querySelector('.dragging');
+                    if (!dragging) return;
+                    const afterElement = getDragAfterElement(adminProjectList, e.clientY);
+                    if (afterElement == null) adminProjectList.appendChild(dragging); 
+                    else adminProjectList.insertBefore(dragging, afterElement);
+                });
+            }
+
+            document.getElementById('save-project-order-btn').onclick = async () => {
+                const listItems = [...adminProjectList.querySelectorAll('.project-admin-item')];
+                const order = listItems.map(item => item.dataset.projectName);
+                ui.spinner.classList.remove("hidden");
+                try {
+                    const res = await fetch(WEB_APP_URL, { method: "POST", headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: "reorderProjects", projectOrder: order }) });
+                    const result = await res.json();
+                    if (result.success) { showMessage("Complete", "success"); fetchProjects(); document.getElementById('save-project-order-btn').classList.add('hidden'); }
+                } catch (e) { console.error(e); }
+                ui.spinner.classList.add("hidden");
+            };
+
+            document.getElementById("togglePasswordBtn").onclick = () => {
+                const p = document.getElementById("password-input");
+                const i = document.getElementById("eyeIcon");
+                if (p.type === "password") { p.type = "text"; i.className = "fas fa-eye text-sm"; } 
+                else { p.type = "password"; i.className = "fas fa-eye-slash text-sm"; }
+            };
+
+            document.getElementById("close-password-modal").onclick = () => { document.getElementById("passwordModal").style.display = "none"; };
+            document.getElementById("home-button").onclick = () => { ui.employeeId.value = ""; window.showView("project-selection-view"); };
+            document.getElementById("refresh-projects-btn").onclick = () => fetchProjects();
+            
+            document.getElementById("manage-projects-btn").onclick = () => { 
+                if (isAdminAuthenticated) {
+                    window.showView("admin-menu-view");
+                } else {
+                    document.getElementById("password-input").value = ""; 
+                    document.getElementById("passwordModal").style.display = "flex"; 
+                }
+            };
+
+            document.getElementById("password-form").onsubmit = async (e) => {
+                e.preventDefault();
+                ui.spinner.classList.remove("hidden");
+                try {
+                    const res = await fetch(WEB_APP_URL, { 
+                        method: "POST", 
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
+                        body: JSON.stringify({ action: "verifyPassword", password: document.getElementById("password-input").value }) 
+                    });
+                    const result = await res.json();
+                    if (result.success) { 
+                        isAdminAuthenticated = true; 
+                        localStorage.setItem("admin_auth_token", "authenticated_true"); // Remember authentication
+                        document.getElementById("passwordModal").style.display = "none"; 
+                        window.showView("admin-menu-view"); 
+                    } 
+                    else showMessage("Incorrect Password", "error");
+                } catch(e) {}
+                ui.spinner.classList.add("hidden");
+            };
+
+            document.getElementById("toggleSearchBtn").onclick = () => document.getElementById("searchBox").classList.toggle("expanded");
+            document.getElementById("lockEmployeeIdBtn").onclick = () => window.setEmployeeLock(!isEmployeeIdLocked);
+            ui.employeeId.onblur = () => { if (ui.employeeId.value.trim() !== "") window.setEmployeeLock(true); };
+            ui.employeeId.addEventListener('keydown', (e) => { if (e.key === 'Enter' && ui.employeeId.value.trim() !== "") { window.setEmployeeLock(true); ui.surveyId.focus(); } });
+            ui.employeeId.oninput = () => renderTable();
+
+            document.getElementById("currentLocationButton").onclick = () => { 
+                showMessage("Loading", "info"); 
+                navigator.geolocation.getCurrentPosition(p => { 
+                    updateDisplay(p.coords.latitude, p.coords.longitude); 
+                    map.setView([p.coords.latitude, p.coords.longitude], 18); 
+                    showMessage("Complete", "success"); 
+                }, () => showMessage("GPS Failure", "error"), { enableHighAccuracy: true }); 
+            };
+            
+            document.getElementById("saveButton").onclick = () => {
+                const eid = ui.employeeId.value.trim(), sid = ui.surveyId.value.trim();
+                if (!eid || !sid || currentLat === null) return showMessage("ID or Pin Required", "warning");
+                
+                const all = [...savedLocations, ...pendingLocations];
+                // Check for duplicate ID combination
+                if (all.some(l => l.EmployeeID === eid && l.SurveyID === sid)) {
+                    return showMessage("Duplicate ID combination", "error");
+                }
+                // Check for duplicate coordinates (prevent double-clicking same spot)
+                if (all.some(l => l.Latitude === currentLat && l.Longitude === currentLng)) {
+                    return showMessage("This location is already pinned", "warning");
+                }
+
+                pendingLocations.push({ ID: `p_${Date.now()}`, EmployeeID: eid, SurveyID: sid, Latitude: currentLat, Longitude: currentLng, Timestamp: new Date().toISOString(), isPending: true });
+                if (!isEmployeeIdLocked) ui.employeeId.value = ""; 
+                ui.surveyId.value = ""; renderTable(); showMessage("Saved Locally", "success");
+            };
+
+            document.getElementById("uploadButton").onclick = async () => {
+                if (!pendingLocations.length) return showMessage("Nothing to sync", "info");
+                
+                // Reset Spinner to Loading
+                const spinnerAnim = document.getElementById("spinner-animation");
+                const spinnerSuccess = document.getElementById("spinner-success");
+                const spinnerText = document.getElementById("loading-spinner-text");
+                
+                if (spinnerAnim) spinnerAnim.classList.remove("hidden");
+                if (spinnerSuccess) spinnerSuccess.classList.add("hidden");
+                if (spinnerText) {
+                    spinnerText.textContent = "Loading";
+                    spinnerText.className = "font-black text-primary-blue text-[10px] uppercase tracking-[0.4em]";
+                }
+                ui.spinner.classList.remove("hidden");
+                
+                // Send all requests in parallel for much faster performance
+                try {
+                    const uploadPromises = pendingLocations.map(loc => 
+                        fetch(WEB_APP_URL, { 
+                            method: "POST", 
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
+                            body: JSON.stringify({ 
+                                action: "add", 
+                                project: currentProjectName, 
+                                data: { name: loc.EmployeeID, surveyId: loc.SurveyID, lat: loc.Latitude, lng: loc.Longitude } 
+                            }) 
+                        })
+                    );
+                    
+                    await Promise.all(uploadPromises);
+                    pendingLocations = []; 
+
+                    // Show "Completed" State
+                    if (spinnerAnim) spinnerAnim.classList.add("hidden");
+                    if (spinnerSuccess) spinnerSuccess.classList.remove("hidden");
+                    if (spinnerText) {
+                        spinnerText.textContent = "Completed";
+                        spinnerText.className = "font-black text-emerald-500 text-[10px] uppercase tracking-[0.4em]";
+                    }
+                    
+                    await new Promise(r => setTimeout(r, 1000));
+                    ui.spinner.classList.add("hidden"); 
+                    refreshData(false); // Sync data silently in background after upload
+                } catch (e) {
+                    console.error(e);
+                    ui.spinner.classList.add("hidden");
+                    showMessage("Upload failed", "error");
+                }
+            };
+
+            document.getElementById("add-project-form").onsubmit = async (e) => {
+                e.preventDefault();
+                const name = document.getElementById("new-project-name").value.trim();
+                if (!name) return;
+                ui.spinner.classList.remove("hidden");
+                try {
+                    const res = await fetch(WEB_APP_URL, { 
+                        method: "POST", 
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
+                        body: JSON.stringify({ action: "addProject", projectName: name }) 
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                        document.getElementById("new-project-name").value = "";
+                        showMessage("Project added", "success");
+                        fetchProjects();
+                    } else showMessage(result.message || "Failed to add", "error");
+                } catch(e) { console.error(e); }
+                ui.spinner.classList.add("hidden");
+            };
+
+            document.getElementById("exportCsvButton").onclick = () => {
+                const all = [...savedLocations, ...pendingLocations].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp));
+                if (all.length === 0) return showMessage("No data", "info");
+                const headers = ["No.", customLabels.employeeId, customLabels.surveyId, "Latitude", "Longitude", "Timestamp", "Status"];
+                const rows = all.map((loc, i) => [all.length - i, loc.EmployeeID, loc.SurveyID || '-', loc.Latitude, loc.Longitude, new Date(loc.Timestamp).toLocaleString('en-GB'), loc.isPending ? "Pending" : "Uploaded"]);
+                let csvContent = "\uFEFF" + headers.join(",") + "\n";
+                rows.forEach(row => csvContent += row.map(val => `"${val}"`).join(",") + "\n");
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a"); link.setAttribute("href", URL.createObjectURL(blob));
+                link.setAttribute("download", `Export_${currentProjectName}_${new Date().toISOString().slice(0,10)}.csv`);
+                link.click();
+            };
+
+            document.getElementById("cancel-rename-btn").onclick = () => document.getElementById("renameModal").style.display = "none";
+            document.getElementById("menu-back-to-selection-btn").onclick = () => window.showView("project-selection-view");
+            document.getElementById("goto-manage-projects-btn").onclick = () => window.showView("admin-view");
+            document.getElementById("back-to-menu-btn").onclick = () => window.showView("admin-menu-view");
+            document.getElementById("dashboard-back-to-menu-btn").onclick = () => window.showView("admin-menu-view");
+            document.getElementById("goto-dashboards-btn").onclick = () => { window.showView("dashboard-view"); ui.dashboardProjectSelector.innerHTML = '<option value="">-- Choose Project --</option>' + allProjects.map(p => `<option value="${p}">${p}</option>`).join(''); };
+            document.getElementById("dashboard-project-selector").onchange = (e) => updateDashboard(e.target.value);
+            document.getElementById("confirmActionButton").onclick = () => confirmActionCallback && confirmActionCallback();
+            document.getElementById("cancelActionButton").onclick = () => document.getElementById("confirmationModal").style.display = "none";
+            document.getElementById("customizeLabelsBtn").onclick = () => { document.getElementById("custom-employee-label").value = customLabels.employeeId; document.getElementById("custom-survey-label").value = customLabels.surveyId; document.getElementById("customizeLabelsModal").style.display = "flex"; };
+            document.getElementById("cancel-customize-btn").onclick = () => document.getElementById("customizeLabelsModal").style.display = "none";
+            document.getElementById("customize-labels-form").onsubmit = (e) => {
+                e.preventDefault();
+                customLabels.employeeId = document.getElementById("custom-employee-label").value.trim() || 'Employee ID';
+                customLabels.surveyId = document.getElementById("custom-survey-label").value.trim() || 'Survey ID';
+                localStorage.setItem('customLabels', JSON.stringify(customLabels));
+                updateLabels(); document.getElementById("customizeLabelsModal").style.display = "none";
+            };
+            
+            const sIn = document.getElementById("locationSearchInput"), sBox = document.getElementById("search-suggestions");
+            let deb;
+            sIn.addEventListener("input", (e) => {
+                const term = e.target.value.toLowerCase();
+                clearTimeout(deb);
+                if (!term) { sBox.classList.add("hidden"); return; }
+                deb = setTimeout(async () => {
+                    // History search
+                    const historyResults = [...savedLocations, ...pendingLocations].filter(loc => 
+                        loc.EmployeeID.toLowerCase().includes(term) || 
+                        (loc.SurveyID && loc.SurveyID.toLowerCase().includes(term))
+                    ).slice(0, 3);
+
+                    let res = [];
+                    let viewboxParam = "";
+                    if (map) {
+                        const b = map.getBounds();
+                        viewboxParam = `&viewbox=${b.getWest()},${b.getNorth()},${b.getEast()},${b.getSouth()}`;
+                    }
+                    try { const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(term)}&limit=5&accept-language=th${viewboxParam}`); res = await r.json(); } catch(err) {}
+                    
+                    let html = "";
+                    if (historyResults.length > 0) {
+                        html += `<div class="p-2 bg-slate-50 text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">History</div>`;
+                        html += historyResults.map(h => `<div class="suggestion-item" data-lat="${h.Latitude}" data-lng="${h.Longitude}"><div class="text-[10px] font-black text-slate-900 truncate"><i class="fas fa-clock-rotate-left mr-2 text-primary-blue opacity-50"></i>${h.EmployeeID}</div><div class="text-[9px] text-slate-400 truncate">${h.SurveyID || '-'}</div></div>`).join("");
+                    }
+                    if (res.length > 0) {
+                        html += `<div class="p-2 bg-slate-50 text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Locations</div>`;
+                        html += res.map(r => `<div class="suggestion-item" data-lat="${r.lat}" data-lng="${r.lon}"><div class="text-[10px] font-black text-slate-800 truncate">${r.display_name.split(',')[0]}</div><div class="text-[9px] text-slate-400 truncate">${r.display_name}</div></div>`).join("");
+                    }
+
+                    if (html) {
+                        sBox.innerHTML = html;
+                        sBox.classList.remove("hidden");
+                        document.querySelectorAll(".suggestion-item").forEach(item => { 
+                            item.onclick = () => { 
+                                const lat = parseFloat(item.dataset.lat), lng = parseFloat(item.dataset.lng); 
+                                map.setView([lat, lng], 18); updateDisplay(lat, lng); 
+                                sBox.classList.add("hidden"); sIn.value = ""; 
+                            }; 
+                        });
+                    } else sBox.classList.add("hidden");
+                }, 400);
             });
-            document.addEventListener("keydown", (e) => {
-                if (e.key !== "Escape") return;
-                const open = Object.values(dom.modals).find(m => m.classList.contains("is-open"));
-                if (open) { closeModal(open); if (open === dom.modals.rowActions || open === dom.modals.confirm) releaseHold(); }
-                else closeHistory();
-            });
+            document.getElementById("searchLocationButton").onclick = async () => {
+                const q = sIn.value.trim(); if (!q) return;
+                let viewboxParam = "";
+                if (map) {
+                    const b = map.getBounds();
+                    viewboxParam = `&viewbox=${b.getWest()},${b.getNorth()},${b.getEast()},${b.getSouth()}`;
+                }
+                try {
+                    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1${viewboxParam}`);
+                    const d = await r.json();
+                    if (d.length) { const lat = parseFloat(d[0].lat), lon = parseFloat(d[0].lon); map.setView([lat, lon], 17); updateDisplay(lat, lon); sBox.classList.add("hidden"); }
+                } catch(e) {}
+            };
         };
     </script>
 </body>
