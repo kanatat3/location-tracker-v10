@@ -149,7 +149,7 @@
             background: none; border: 0; border-top: 1px solid var(--line); text-align: left;
             transition: background-color 150ms;
         }
-        .list-item:first-child { border-top: 0; }
+        .list-item:first-child, [role="listitem"]:first-child > .list-item { border-top: 0; }
         button.list-item:hover { background: var(--surface-2); }
         button.list-item:active { background: var(--accent-soft); }
         .item-icon {
@@ -188,6 +188,13 @@
         .search-field i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
         .search-field .input { padding-left: 44px; height: 52px; border-radius: 14px; }
         .list-head { padding: 0 4px 8px; font-size: 14px; color: var(--ink-2); font-weight: 600; }
+        .orphan-box { background: var(--pending-soft); border: 1px solid #efc27a; border-radius: var(--radius-lg); padding: 12px; margin-bottom: 14px; display: grid; gap: 10px; }
+        .orphan-head { display: flex; gap: 10px; color: #5c3200; }
+        .orphan-head strong { display: block; font-size: 15px; }
+        .orphan-head p { font-size: 14px; }
+        .orphan-row { background: var(--surface); border-radius: var(--radius); padding: 10px; display: grid; gap: 8px; }
+        .orphan-actions { display: flex; gap: 8px; }
+        .orphan-actions select { flex: 1; min-width: 0; height: 44px; }
 
         /* ---------- Admin pages ---------- */
         .page-head { display: flex; align-items: center; gap: 8px; margin: 4px 0 18px; }
@@ -434,6 +441,7 @@
                     <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
                     <input id="project-search-input" type="search" class="input" placeholder="Search projects" aria-label="Search projects" autocomplete="off">
                 </div>
+                <div id="orphan-pending" class="orphan-box" hidden></div>
                 <div id="project-count" class="list-head" aria-live="polite">Loading projects…</div>
                 <div id="project-list" class="list" role="list"></div>
             </div>
@@ -693,7 +701,7 @@
         let selectionMarker = null;
         let confirmActionCallback = null;
         let ui = {};
-        const state = { projectsStatus: 'idle', recordsStatus: 'idle', recordsSeq: 0, addressSeq: 0, uploading: false, uploadingProject: null, orderDirty: false };
+        const state = { projectsStatus: 'idle', recordsStatus: 'idle', recordsSeq: 0, addressSeq: 0, uploading: false, uploadingProject: null, orderDirty: false, dashboardSeq: 0 };
 
         const $ = (id) => document.getElementById(id);
         const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -741,7 +749,9 @@
             try { return await fetch(url, { ...options, signal: ctrl.signal }); }
             catch (err) {
                 if (err.name === 'AbortError') { const e = new Error("The connection timed out"); e.isTimeout = true; throw e; }
-                throw new Error("No connection");
+                const e = new Error("No connection");
+                e.offline = !navigator.onLine;
+                throw e;
             }
             finally { clearTimeout(timer); }
         }
@@ -785,14 +795,26 @@
                 const item = { ...p, isPending: true, status: p.status || 'pending', attempts: p.attempts || 0 };
                 // Closed while uploading: the Sheet may already have it, so verify before sending again.
                 if (item.status === 'uploading' && state.uploadingProject !== project) {
-                    item.status = 'failed'; item.attempts = Math.max(1, item.attempts);
+                    item.status = 'failed'; item.attempts = Math.max(1, item.attempts); item.needsVerify = true;
                     item.lastTransportFailAt = item.lastAttemptAt || Date.now();
                 }
                 return item;
             });
         }
+        function storageKeys(prefix) {
+            const keys = [];
+            try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(KEY + prefix)) keys.push(k.slice(KEY.length)); } } catch (e) {}
+            return keys;
+        }
         function writePending(project, list) {
-            const ok = list.length ? store.set(pendingKey(project), JSON.stringify(list)) : (store.remove(pendingKey(project)), true);
+            if (!list.length) { store.remove(pendingKey(project)); return true; }
+            const value = JSON.stringify(list);
+            let ok = store.set(pendingKey(project), value);
+            if (!ok) {
+                // Cached copies of Sheet data can be downloaded again; waiting records cannot.
+                storageKeys('cache_data_').forEach(k => store.remove(k));
+                ok = store.set(pendingKey(project), value);
+            }
             if (!ok) showMessage("Couldn't store the record on this phone (storage full). Upload before closing.", "error");
             return ok;
         }
@@ -802,7 +824,8 @@
             if (current) pendingLocations = list;
             return writePending(project, list);
         }
-        const sameRecord = (r, item) => str(r.EmployeeID) === str(item.EmployeeID) && str(r.SurveyID) === str(item.SurveyID) &&
+        const normId = (v) => { const t = str(v).toLowerCase(); return /^\d+$/.test(t) ? String(Number(t)) : t; };
+        const sameRecord = (r, item) => normId(r.EmployeeID) === normId(item.EmployeeID) && normId(r.SurveyID) === normId(item.SurveyID) &&
             Math.abs(parseFloat(r.Latitude) - parseFloat(item.Latitude)) < 0.00002 && Math.abs(parseFloat(r.Longitude) - parseFloat(item.Longitude)) < 0.00002;
 
         // ---------- Views ----------
@@ -871,6 +894,7 @@
         }
 
         function renderProjects() {
+            renderOrphans();
             const listEl = $("project-list"), countEl = $("project-count");
             const term = $("project-search-input").value.trim().toLowerCase();
             const list = allProjects.filter(p => p.toLowerCase().includes(term));
@@ -896,13 +920,69 @@
             }
             list.forEach(p => {
                 const waiting = loadPending(p).length;
+                const wrap = document.createElement("div");
+                wrap.setAttribute("role", "listitem");
                 const card = document.createElement("button");
                 card.type = "button";
                 card.className = "list-item";
-                card.setAttribute("role", "listitem");
+                wrap.appendChild(card);
                 card.innerHTML = `<span class="item-icon" aria-hidden="true"><i class="fas fa-folder"></i></span><span class="item-text"><span class="item-title">${esc(p)}</span></span>${waiting ? `<span class="chip chip-pending num"><i class="fas fa-clock"></i> ${waiting} waiting</span>` : ''}<i class="fas fa-chevron-right chevron" aria-hidden="true"></i>`;
                 card.onclick = () => openProject(p);
-                listEl.appendChild(card);
+                listEl.appendChild(wrap);
+            });
+        }
+
+        function movePending(fromProject, toProject) {
+            const from = loadPending(fromProject);
+            if (!from.length || fromProject === toProject) return true;
+            const to = loadPending(toProject);
+            const merged = [...to, ...from.filter(f => !to.some(t => t.ID === f.ID)).map(f => ({ ...f, status: f.status === 'uploading' ? 'failed' : f.status }))];
+            if (!writePending(toProject, merged)) return false;
+            store.remove(pendingKey(fromProject));
+            const last = store.get(lastUploadKey(fromProject));
+            if (last) { store.set(lastUploadKey(toProject), last); store.remove(lastUploadKey(fromProject)); }
+            return true;
+        }
+
+        function exportRecordsCsv(records, fileLabel) {
+            const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+            const headers = ["No.", customLabels.employeeId, customLabels.surveyId, "Latitude", "Longitude", "Timestamp", "Status"];
+            let csv = "\uFEFF" + headers.map(q).join(",") + "\n";
+            records.forEach((loc, i) => { csv += [records.length - i, loc.EmployeeID, loc.SurveyID || '-', loc.Latitude, loc.Longitude, new Date(loc.Timestamp).toLocaleString('en-GB'), loc.isPending ? "Pending" : "Uploaded"].map(q).join(",") + "\n"; });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+            link.download = `Export_${fileLabel}_${new Date().toISOString().slice(0, 10)}.csv`;
+            link.click();
+        }
+
+        // Waiting records whose project was renamed or hidden elsewhere
+        function renderOrphans() {
+            const box = $("orphan-pending");
+            if (state.projectsStatus !== 'ready') { box.hidden = true; return; }
+            const orphans = storageKeys('pending::').map(k => k.slice('pending::'.length))
+                .filter(p => !allProjects.includes(p) && !(state.uploading && state.uploadingProject === p))
+                .map(p => ({ project: p, records: loadPending(p) })).filter(o => o.records.length);
+            box.hidden = !orphans.length;
+            if (!orphans.length) return;
+            const options = allProjects.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+            box.innerHTML = `<div class="orphan-head"><i class="fas fa-triangle-exclamation"></i><div><strong>Records waiting in a project that no longer exists</strong><p>The project was renamed or hidden. Move these records to a project, or export them.</p></div></div>`;
+            orphans.forEach(o => {
+                const row = document.createElement("div");
+                row.className = "orphan-row";
+                row.innerHTML = `<span class="item-title">${esc(o.project)} · ${plural(o.records.length, 'record')}</span>
+                    <div class="orphan-actions">
+                        <label class="sr-only">Move to project</label>
+                        <select class="input">${options}</select>
+                        <button type="button" class="btn btn-primary btn-sm move">Move</button>
+                        <button type="button" class="btn btn-secondary btn-sm export"><i class="fas fa-file-csv"></i> CSV</button>
+                    </div>`;
+                row.querySelector('.move').onclick = () => {
+                    const target = row.querySelector('select').value;
+                    if (!target) return;
+                    if (movePending(o.project, target)) { showMessage(`Moved ${plural(o.records.length, 'record')} to ${target}`, "success"); renderProjects(); }
+                };
+                row.querySelector('.export').onclick = () => { exportRecordsCsv(o.records, o.project); showMessage(`Exported ${plural(o.records.length, 'record')}`, "success"); };
+                box.appendChild(row);
             });
         }
 
@@ -935,6 +1015,7 @@
                 setLoading(true, "Renaming…");
                 try {
                     await apiPost({ action: "renameProject", oldProjectName: oldName, newProjectName: newName });
+                    movePending(oldName, newName);
                     showMessage("Project renamed", "success");
                     fetchProjects();
                 } catch (err) { showMessage(`Couldn't rename: ${err.message}`, "error"); }
@@ -1029,10 +1110,11 @@
         async function updateDashboard(projectName) {
             const content = $("dashboard-content"), empty = $("dashboard-empty-state");
             if (!projectName) { content.hidden = true; empty.hidden = false; return; }
+            const seq = ++state.dashboardSeq;
             setLoading(true, "Loading analytics…");
             try {
                 const result = await apiGet(`action=getData&project=${encodeURIComponent(projectName)}`);
-                if ($("dashboard-project-selector").value !== projectName) return;
+                if (seq !== state.dashboardSeq) return;
                 const data = result.data || [];
                 empty.hidden = true; content.hidden = false;
                 $("kpi-total-checkins").textContent = data.length;
@@ -1059,8 +1141,8 @@
                     if (dashboardMarkers.getLayers().length) dashboardMap.fitBounds(dashboardMarkers.getBounds().pad(0.1));
                 }, 120);
             } catch (e) {
-                showMessage(`Couldn't load analytics: ${e.message}`, "error");
-            } finally { setLoading(false); }
+                if (seq === state.dashboardSeq) showMessage(`Couldn't load analytics: ${e.message}`, "error");
+            } finally { if (seq === state.dashboardSeq) setLoading(false); }
         }
 
         // ---------- Tracker: data ----------
@@ -1072,7 +1154,8 @@
             try {
                 const result = await apiGet(`action=getData&project=${encodeURIComponent(project)}`);
                 if (project !== currentProjectName || seq !== state.recordsSeq) return;
-                const newData = Array.isArray(result.data) ? result.data : [];
+                if (!Array.isArray(result.data) || result.success === false) throw new Error(result.message || "The server sent an unexpected reply");
+                const newData = result.data;
                 const hadNone = !savedLocations.length;
                 savedLocations = newData;
                 store.set(`cache_data_${project}`, JSON.stringify(savedLocations));
@@ -1274,7 +1357,7 @@
             const item = pendingLocations.find(l => String(l.ID) === String(id));
             if (!item) return;
             if (item.status === 'uploading') return showMessage("This record is uploading. Wait a moment.", "info");
-            const maybeSent = item.attempts > 0 && !!item.lastTransportFailAt;
+            const maybeSent = !!item.needsVerify || (item.attempts > 0 && !!item.lastTransportFailAt);
             showConfirmation("Delete this record?",
                 maybeSent ? "It was not confirmed as uploaded, but it may already be in the Sheet. It will be removed from this phone only."
                           : "It hasn't been uploaded. It will be removed from this phone.",
@@ -1296,7 +1379,8 @@
         // ---------- Tracker: upload ----------
         async function uploadPending() {
             const project = currentProjectName;
-            if (!project || state.uploading) return;
+            if (!project) return;
+            if (state.uploading) { if (state.uploadingProject !== project) showMessage("Another project is still uploading. Try again in a moment.", "info"); return; }
             if (!pendingLocations.length) return showMessage("Nothing to upload", "info");
             if (!MOCK && !navigator.onLine) return showMessage("You're offline. Records stay on this phone until you upload.", "warning");
 
@@ -1314,24 +1398,36 @@
                 renderTable();
                 try {
                     let already = false;
-                    if (item.attempts > 0 && item.lastTransportFailAt) {
-                        if (!serverRows) { const r = await apiGet(`action=getData&project=${encodeURIComponent(project)}`, { tries: 2 }); serverRows = r.data || []; }
+                    if (item.needsVerify || (item.attempts > 0 && item.lastTransportFailAt)) {
+                        if (!serverRows) {
+                            const r = await apiGet(`action=getData&project=${encodeURIComponent(project)}`, { tries: 2 });
+                            // Without a real list we can't tell whether it arrived, so keep it waiting.
+                            if (!Array.isArray(r.data) || r.success === false) throw new Error(r.message || "Couldn't check the Sheet");
+                            serverRows = r.data;
+                        }
                         already = serverRows.some(r => sameRecord(r, item));
                     }
                     if (!already) await apiPost({ action: "add", project, data: { name: item.EmployeeID, surveyId: item.SurveyID, lat: item.Latitude, lng: item.Longitude } });
                     mutatePending(project, list => list.filter(p => p.ID !== item.ID));
+                    if (project === currentProjectName && !savedLocations.some(r => sameRecord(r, item))) {
+                        // Keep it visible (and in the duplicate check) until the next refresh replaces the list.
+                        const { ID, isPending, status, attempts, lastError, lastAttemptAt, lastTransportFailAt, needsVerify, ...row } = item;
+                        savedLocations = [...savedLocations, row];
+                        store.set(`cache_data_${project}`, JSON.stringify(savedLocations));
+                    }
                     uploaded++;
                 } catch (err) {
                     lastError = err; failed++;
                     const transport = !err.isServerReject;
                     mutatePending(project, list => list.map(p => p.ID === item.ID ? {
-                        ...p, status: 'failed', attempts: (p.attempts || 0) + 1, lastError: err.message,
-                        lastTransportFailAt: transport ? Date.now() : p.lastTransportFailAt
+                        ...p, status: 'failed', attempts: (p.attempts || 0) + 1, lastError: err.message, needsVerify: true,
+                        // Only wait when the request may have reached the server (not when the phone was offline).
+                        lastTransportFailAt: transport && !err.offline ? Date.now() : p.lastTransportFailAt
                     } : p));
                     if (transport) break; // connection problem: stop, keep the rest for later
                 }
             }
-            mutatePending(project, list => list.map(p => p.status === 'uploading' ? { ...p, status: 'failed', attempts: Math.max(1, p.attempts || 0), lastTransportFailAt: p.lastAttemptAt || Date.now() } : p));
+            mutatePending(project, list => list.map(p => p.status === 'uploading' ? { ...p, status: 'failed', attempts: Math.max(1, p.attempts || 0), needsVerify: true, lastTransportFailAt: p.lastAttemptAt || Date.now() } : p));
             state.uploading = false; state.uploadingProject = null; state.progressText = '';
             if (uploaded) store.set(lastUploadKey(project), String(Date.now()));
 
@@ -1522,6 +1618,7 @@
                 showMessage("Field names updated", "success");
             };
 
+            $("lockEmployeeIdBtn").addEventListener("pointerdown", (e) => e.preventDefault());
             $("lockEmployeeIdBtn").onclick = () => {
                 if (!isEmployeeIdLocked && !str(ui.employeeId.value)) { ui.employeeId.focus(); return showMessage(`Enter ${customLabels.employeeId} first`, "warning"); }
                 window.setEmployeeLock(!isEmployeeIdLocked);
@@ -1561,7 +1658,7 @@
                 if (!sid) { ui.surveyId.setAttribute('aria-invalid', 'true'); ui.surveyId.focus(); return showMessage(`Enter ${customLabels.surveyId}`, "warning"); }
 
                 const all = [...savedLocations, ...pendingLocations];
-                if (all.some(l => str(l.EmployeeID) === eid && str(l.SurveyID) === sid)) {
+                if (all.some(l => normId(l.EmployeeID) === normId(eid) && normId(l.SurveyID) === normId(sid))) {
                     ui.surveyId.setAttribute('aria-invalid', 'true'); ui.surveyId.focus();
                     return showMessage(`${customLabels.employeeId} ${eid} + ${customLabels.surveyId} ${sid} is already saved`, "error");
                 }
