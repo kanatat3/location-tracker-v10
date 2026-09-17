@@ -149,7 +149,8 @@
             background: none; border: 0; border-top: 1px solid var(--line); text-align: left;
             transition: background-color 150ms;
         }
-        .list-item:first-child, [role="listitem"]:first-child > .list-item { border-top: 0; }
+        .list-item:first-child { border-top: 0; }
+        [role="listitem"] + [role="listitem"] > .list-item { border-top: 1px solid var(--line); }
         button.list-item:hover { background: var(--surface-2); }
         button.list-item:active { background: var(--accent-soft); }
         .item-icon {
@@ -824,7 +825,7 @@
             if (current) pendingLocations = list;
             return writePending(project, list);
         }
-        const normId = (v) => { const t = str(v).toLowerCase(); return /^\d+$/.test(t) ? String(Number(t)) : t; };
+        const normId = (v) => { const t = str(v).toLowerCase(); return /^\d+$/.test(t) ? t.replace(/^0+(?=\d)/, '') : t; };
         const sameRecord = (r, item) => normId(r.EmployeeID) === normId(item.EmployeeID) && normId(r.SurveyID) === normId(item.SurveyID) &&
             Math.abs(parseFloat(r.Latitude) - parseFloat(item.Latitude)) < 0.00002 && Math.abs(parseFloat(r.Longitude) - parseFloat(item.Longitude)) < 0.00002;
 
@@ -876,6 +877,7 @@
             renderProjects();
             try {
                 const result = await apiGet(`action=getProjects`);
+                if (!Array.isArray(result.data) || result.success === false) throw new Error(result.message || "The server sent an unexpected reply");
                 const newProjects = projectsFromResponse(result.data);
                 if (JSON.stringify(newProjects) !== JSON.stringify(allProjects)) {
                     allProjects = newProjects;
@@ -933,10 +935,11 @@
         }
 
         function movePending(fromProject, toProject) {
+            if (state.uploading) return false;
             const from = loadPending(fromProject);
             if (!from.length || fromProject === toProject) return true;
             const to = loadPending(toProject);
-            const merged = [...to, ...from.filter(f => !to.some(t => t.ID === f.ID)).map(f => ({ ...f, status: f.status === 'uploading' ? 'failed' : f.status }))];
+            const merged = [...to, ...from.filter(f => !to.some(t => t.ID === f.ID)).map(f => f.status === 'uploading' ? { ...f, status: 'failed', needsVerify: true } : f)];
             if (!writePending(toProject, merged)) return false;
             store.remove(pendingKey(fromProject));
             const last = store.get(lastUploadKey(fromProject));
@@ -971,14 +974,14 @@
                 row.className = "orphan-row";
                 row.innerHTML = `<span class="item-title">${esc(o.project)} · ${plural(o.records.length, 'record')}</span>
                     <div class="orphan-actions">
-                        <label class="sr-only">Move to project</label>
-                        <select class="input">${options}</select>
+                        <select class="input" aria-label="Move ${esc(o.project)} records to project">${options}</select>
                         <button type="button" class="btn btn-primary btn-sm move">Move</button>
                         <button type="button" class="btn btn-secondary btn-sm export"><i class="fas fa-file-csv"></i> CSV</button>
                     </div>`;
                 row.querySelector('.move').onclick = () => {
                     const target = row.querySelector('select').value;
                     if (!target) return;
+                    if (state.uploading) return showMessage("Wait for the current upload to finish, then move these records.", "info");
                     if (movePending(o.project, target)) { showMessage(`Moved ${plural(o.records.length, 'record')} to ${target}`, "success"); renderProjects(); }
                 };
                 row.querySelector('.export').onclick = () => { exportRecordsCsv(o.records, o.project); showMessage(`Exported ${plural(o.records.length, 'record')}`, "success"); };
@@ -1015,8 +1018,9 @@
                 setLoading(true, "Renaming…");
                 try {
                     await apiPost({ action: "renameProject", oldProjectName: oldName, newProjectName: newName });
-                    movePending(oldName, newName);
-                    showMessage("Project renamed", "success");
+                    // During an upload the records stay under the old name; the home screen offers to move them afterwards.
+                    const moved = movePending(oldName, newName);
+                    showMessage(moved ? "Project renamed" : "Project renamed. Its waiting records can be moved after the upload finishes.", moved ? "success" : "info");
                     fetchProjects();
                 } catch (err) { showMessage(`Couldn't rename: ${err.message}`, "error"); }
                 setLoading(false);
@@ -1109,12 +1113,12 @@
 
         async function updateDashboard(projectName) {
             const content = $("dashboard-content"), empty = $("dashboard-empty-state");
-            if (!projectName) { content.hidden = true; empty.hidden = false; return; }
             const seq = ++state.dashboardSeq;
+            if (!projectName) { content.hidden = true; empty.hidden = false; setLoading(false); return; }
             setLoading(true, "Loading analytics…");
             try {
                 const result = await apiGet(`action=getData&project=${encodeURIComponent(projectName)}`);
-                if (seq !== state.dashboardSeq) return;
+                if (seq !== state.dashboardSeq || ui.dashboardProjectSelector.value !== projectName) return;
                 const data = result.data || [];
                 empty.hidden = true; content.hidden = false;
                 $("kpi-total-checkins").textContent = data.length;
@@ -1571,6 +1575,8 @@
             };
             $("dashboard-back-to-menu-btn").onclick = () => window.showView("admin-menu-view");
             $("goto-dashboards-btn").onclick = () => {
+                state.dashboardSeq++;
+                setLoading(false);
                 window.showView("dashboard-view");
                 ui.dashboardProjectSelector.innerHTML = '<option value="">Choose a project</option>' + allProjects.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
                 $("dashboard-content").hidden = true; $("dashboard-empty-state").hidden = false;
