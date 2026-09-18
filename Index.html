@@ -2,1832 +2,1392 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
-    <meta name="theme-color" content="#f4f6fa">
-
+    <title>Location Tracker V11.3 (02.04.2026)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
     <style>
-        :root {
-            --bg: #f4f6fa;
-            --surface: #ffffff;
-            --surface-2: #eef2f7;
-            --line: #dde3eb;
-            --line-strong: #c3ccd8;
-            --ink: #111a2b;
-            --ink-2: #3f4b5e;
-            --ink-3: #556173;
-
-            --accent: #0062cc;
-            --accent-hover: #004fa8;
-            --accent-soft: #e5f0fc;
-            --accent-ring: rgba(0, 98, 204, 0.3);
-
-            --pending: #8a4b00;
-            --pending-soft: #fff3df;
-            --danger: #c4262e;
-            --danger-hover: #a51f26;
-            --danger-soft: #fdeceb;
-            --success: #137a45;
-            --success-soft: #e3f4ea;
-
-            --pin-selected: #e5383b;
-            --pin-pending: #f59e0b;
-            --pin-mine: #1a237e;
-            --pin-team: #2f7ff0;
-
-            --radius-sm: 8px;
-            --radius: 12px;
-            --radius-lg: 16px;
-            --shadow-1: 0 1px 2px rgba(17, 26, 43, 0.06);
-            --shadow-2: 0 6px 20px rgba(17, 26, 43, 0.12);
-            --shadow-3: 0 18px 48px rgba(17, 26, 43, 0.22);
-            --shadow-sheet: 0 -8px 28px rgba(17, 26, 43, 0.14);
-
-            --z-sticky: 1100;
-            --z-sheet-backdrop: 1140;
-            --z-sheet: 1150;
-            --z-modal: 1200;
-            --z-toast: 1300;
-
-            --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+        :root { 
+            --primary-blue: #007AFF; 
+            --primary-light: #F0F7FF;
+            --primary-hover: #0062CC;
+            --primary-deep: #003B80;
+            --primary-soft: rgba(0, 122, 255, 0.1);
+            --bg-fintech: #F8FAFF;
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --card-bg: #FFFFFF;
+            --card-shadow: 0 20px 40px -10px rgba(0, 122, 255, 0.08), 0 10px 20px -5px rgba(0, 0, 0, 0.02);
+            --border-soft: #F1F5F9;
+            --my-marker: #1a237e;
         }
 
-        *, *::before, *::after { box-sizing: border-box; }
-        [hidden] { display: none !important; }
-
-        html, body {
-            margin: 0;
-            min-height: 100%;
-            background: var(--bg);
-            color: var(--ink);
-            font-family: 'Inter', 'Noto Sans Thai', system-ui, -apple-system, 'Segoe UI', sans-serif;
-            font-size: 16px;
-            line-height: 1.5;
-            -webkit-font-smoothing: antialiased;
-            -webkit-tap-highlight-color: transparent;
+        body { 
+            font-family: "Myriad Pro", "Myriad", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: var(--bg-fintech);
+            min-height: 100vh;
+            color: var(--text-main);
+            background-image: radial-gradient(at 0% 0%, rgba(0, 122, 255, 0.03) 0px, transparent 50%),
+                              radial-gradient(at 100% 100%, rgba(0, 122, 255, 0.03) 0px, transparent 50%);
         }
-        body.tracker-open { overflow: hidden; }
-        button, input, select { font: inherit; color: inherit; }
-        button { cursor: pointer; }
-        a { color: inherit; }
-        h1, h2, h3 { margin: 0; line-height: 1.25; text-wrap: balance; }
-        p { margin: 0; }
-        .num { font-variant-numeric: tabular-nums; }
-        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-        :focus-visible { outline: 3px solid var(--accent-ring); outline-offset: 2px; }
 
-        /* ---------- Views ---------- */
-        .app-view { display: none; }
-        .app-view.active { display: block; animation: fadeIn 180ms var(--ease-out); }
-        .page { width: 100%; max-width: 560px; margin: 0 auto; padding: max(20px, env(safe-area-inset-top)) 16px 40px; }
-        .mock-banner { background: #2b2140; color: #fff; font-size: 13px; text-align: center; padding: 6px 12px; font-weight: 600; }
+        .app-view { display: none; opacity: 0; transform: scale(0.98); }
+        .app-view.active { display: block; opacity: 1; transform: scale(1); transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
 
-        /* ---------- Buttons ---------- */
-        .btn {
-            min-height: 48px; padding: 0 18px;
-            border-radius: var(--radius); border: 1px solid transparent;
-            font-size: 16px; font-weight: 600;
-            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-            transition: background-color 150ms, border-color 150ms, color 150ms, transform 100ms;
-            white-space: nowrap; text-decoration: none;
+        .main-card { 
+            background-color: var(--card-bg); 
+            border-radius: 2.5rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid #E5E5EA;
+            transition: background-color 0.3s, border-color 0.3s;
         }
-        .btn:active:not(:disabled) { transform: scale(0.98); }
-        .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-        .btn-primary { background: var(--accent); color: #fff; }
-        .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-        .btn-secondary { background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
-        .btn-secondary:hover:not(:disabled) { background: var(--surface-2); }
-        .btn-danger { background: var(--danger); color: #fff; }
-        .btn-danger:hover:not(:disabled) { background: var(--danger-hover); }
-        .btn-sm { min-height: 44px; padding: 0 14px; font-size: 15px; border-radius: 10px; }
-        .btn-block { width: 100%; }
 
-        .icon-btn {
-            width: 44px; height: 44px; flex-shrink: 0;
-            display: inline-flex; align-items: center; justify-content: center;
-            border-radius: var(--radius); border: 1px solid var(--line);
-            background: var(--surface); color: var(--ink-2); font-size: 17px; text-decoration: none;
-            transition: background-color 150ms, color 150ms;
+        #map-container {
+            position: relative;
+            height: 420px;
+            width: 100%;
+            border-radius: 1.75rem;
+            overflow: hidden;
+            border: 1px solid #E5E5EA;
+            z-index: 10;
         }
-        .icon-btn:hover { background: var(--surface-2); color: var(--ink); }
-        .icon-btn.ghost { border-color: transparent; background: transparent; }
-        .icon-btn.ghost:hover { background: var(--surface-2); }
-        .icon-btn.danger:hover { background: var(--danger-soft); color: var(--danger); }
-        .icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .icon-btn.is-busy i { animation: spin 900ms linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ---------- Inputs ---------- */
-        .field-label { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 14px; font-weight: 600; color: var(--ink-2); margin-bottom: 4px; min-width: 0; }
-        .field-label > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .input {
-            width: 100%; height: 48px; padding: 0 14px;
-            border: 1px solid var(--line-strong); border-radius: var(--radius);
-            background: var(--surface); font-size: 16px;
-            transition: border-color 150ms, box-shadow 150ms;
+        #map, #dashboard-map { height: 100%; width: 100%; background: #ddd; }
+
+        .map-hud {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1001;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid #E5E5EA;
+            border-radius: 2rem;
+            padding: 4px 14px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            width: auto;
+            max-width: 90%;
+            opacity: 0.9;
         }
-        .input::placeholder { color: var(--ink-3); opacity: 1; }
-        .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
-        .input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(196, 38, 46, 0.18); }
-        .input:disabled { background: var(--surface-2); color: var(--ink); -webkit-text-fill-color: var(--ink); opacity: 1; cursor: not-allowed; }
-        select.input { appearance: auto; }
 
-        /* ---------- Lists / states ---------- */
-        .list {
-            background: var(--surface); border: 1px solid var(--line);
-            border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-1);
-        }
-        .list-item {
-            width: 100%; display: flex; align-items: center; gap: 14px;
-            padding: 12px 16px; min-height: 64px;
-            background: none; border: 0; border-top: 1px solid var(--line); text-align: left;
-            transition: background-color 150ms;
-        }
-        .list-item:first-child { border-top: 0; }
-        [role="listitem"] + [role="listitem"] > .list-item { border-top: 1px solid var(--line); }
-        button.list-item:hover { background: var(--surface-2); }
-        button.list-item:active { background: var(--accent-soft); }
-        .item-icon {
-            width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
-            background: var(--accent-soft); color: var(--accent);
-            display: flex; align-items: center; justify-content: center;
-        }
-        .item-text { flex: 1; min-width: 0; }
-        .item-title { display: block; font-weight: 600; font-size: 16px; line-height: 1.35; overflow-wrap: anywhere; }
-        .item-sub { display: block; font-size: 14px; color: var(--ink-2); }
-        .chevron { color: var(--ink-3); font-size: 13px; }
-
-        .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; line-height: 1; padding: 5px 8px; border-radius: 999px; white-space: nowrap; }
-        .chip-pending { background: var(--pending-soft); color: var(--pending); }
-        .chip-failed { background: var(--danger-soft); color: var(--danger); }
-        .chip-accent { background: var(--accent-soft); color: var(--accent); }
-
-        .state-box { padding: 32px 20px; text-align: center; color: var(--ink-2); }
-        .state-box i.state-icon { font-size: 26px; color: var(--ink-3); margin-bottom: 10px; display: block; }
-        .state-box strong { display: block; color: var(--ink); font-size: 16px; margin-bottom: 4px; overflow-wrap: anywhere; }
-        .state-box p { font-size: 15px; max-width: 36ch; margin: 0 auto; }
-        .state-box .btn { margin-top: 14px; }
-
-        .skeleton { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-top: 1px solid var(--line); }
-        .skeleton:first-child { border-top: 0; }
-        .sk { background: linear-gradient(90deg, var(--surface-2) 25%, #e2e8f0 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; border-radius: 6px; }
-        @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-
-        /* ---------- Project selection ---------- */
-        .sel-head { display: flex; align-items: center; gap: 12px; margin: 8px 0 20px; }
-        .brand { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
-        .brand-mark { width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-        .brand h1 { font-size: 22px; font-weight: 700; }
-        .brand p { color: var(--ink-2); font-size: 15px; }
-        .search-field { position: relative; margin-bottom: 14px; }
-        .search-field i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
-        .search-field .input { padding-left: 44px; height: 52px; border-radius: 14px; }
-        .list-head { padding: 0 4px 8px; font-size: 14px; color: var(--ink-2); font-weight: 600; }
-        .orphan-box { background: var(--pending-soft); border: 1px solid #efc27a; border-radius: var(--radius-lg); padding: 12px; margin-bottom: 14px; display: grid; gap: 10px; }
-        .orphan-head { display: flex; gap: 10px; color: #5c3200; }
-        .orphan-head strong { display: block; font-size: 15px; }
-        .orphan-head p { font-size: 14px; }
-        .orphan-row { background: var(--surface); border-radius: var(--radius); padding: 10px; display: grid; gap: 8px; }
-        .orphan-actions { display: flex; gap: 8px; }
-        .orphan-actions select { flex: 1; min-width: 0; height: 44px; }
-
-        /* ---------- Admin pages ---------- */
-        .page-head { display: flex; align-items: center; gap: 8px; margin: 4px 0 18px; }
-        .page-head h2 { font-size: 20px; font-weight: 700; flex: 1; min-width: 0; }
-        .add-form { display: flex; gap: 10px; margin-bottom: 16px; }
-        .add-form .input { flex: 1; min-width: 0; }
-        .admin-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; padding: 10px 8px 6px 12px; min-height: 60px; border-top: 1px solid var(--line); background: var(--surface); }
-        .admin-row:first-child { border-top: 0; }
-        .admin-row .grip { color: var(--ink-3); cursor: grab; width: 20px; text-align: center; }
-        .admin-row .item-title { flex: 1 1 calc(100% - 40px); min-width: 0; font-size: 16px; }
-        .admin-row.dragging { opacity: 0.5; background: var(--accent-soft); }
-        .admin-actions { display: flex; gap: 2px; flex-shrink: 0; margin-left: auto; }
-        .sticky-save { position: sticky; bottom: max(12px, env(safe-area-inset-bottom)); margin-top: 16px; box-shadow: var(--shadow-2); }
-
-        .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
-        .stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
-        .stat span { display: block; font-size: 14px; color: var(--ink-2); font-weight: 600; }
-        .stat strong { display: block; font-size: 26px; font-weight: 700; line-height: 1.2; }
-        #dashboard-map-container { height: 320px; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--line); isolation: isolate; }
-        #dashboard-map { height: 100%; width: 100%; background: var(--surface-2); }
-        .section-title { font-size: 16px; font-weight: 700; margin: 18px 0 8px; }
-        .data-table { width: 100%; border-collapse: collapse; font-size: 15px; }
-        .data-table th { text-align: left; font-size: 14px; color: var(--ink-2); font-weight: 600; padding: 10px 14px; background: var(--surface-2); }
-        .data-table td { padding: 10px 14px; border-top: 1px solid var(--line); }
-        .data-table .right { text-align: right; }
-
-        /* ---------- Tracker (mobile first) ---------- */
-        #tracker-view.active { position: fixed; inset: 0; display: flex; flex-direction: column; height: 100vh; height: 100dvh; background: var(--bg); }
-        .topbar {
-            position: relative; z-index: var(--z-sticky);
-            display: flex; align-items: center; gap: 6px;
-            padding: max(6px, env(safe-area-inset-top)) 6px 6px;
-            background: var(--bg); border-bottom: 1px solid var(--line); flex-shrink: 0;
-        }
-        .topbar-title { flex: 1; min-width: 0; text-align: center; }
-        .topbar-title h1 { font-size: 16px; font-weight: 700; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; line-height: 1.25; }
-        .topbar-title p { font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-        .map-area { position: relative; flex: 1; min-height: 64px; }
-        #map-container { position: absolute; inset: 0; isolation: isolate; background: var(--surface-2); }
-        #map { position: absolute; inset: 0; background: var(--surface-2); }
-
-        .search-container {
-            position: absolute; top: 10px; left: 10px; z-index: 1000;
-            display: flex; align-items: center;
-            width: 44px; height: 44px;
-            background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-2); overflow: hidden;
-        }
-        .search-container.expanded { width: min(360px, calc(100% - 20px)); overflow: visible; }
-        #toggleSearchBtn { width: 44px; height: 44px; border: 0; background: none; color: var(--accent); font-size: 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-        .search-input-wrapper { display: none; align-items: center; flex: 1; min-width: 0; padding-right: 4px; position: relative; }
-        .search-container.expanded .search-input-wrapper { display: flex; }
-        #locationSearchInput { flex: 1; min-width: 0; height: 44px; border: 0; outline: none; background: transparent; font-size: 16px; }
-        #locationSearchInput::placeholder { color: var(--ink-3); }
-        #searchLocationButton { min-height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; }
-        #search-suggestions {
-            position: absolute; top: calc(100% + 8px); left: -44px; right: 0;
-            background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-2);
-            max-height: min(300px, 45vh); overflow-y: auto;
-        }
-        .suggestion-group { padding: 8px 14px 4px; font-size: 13px; font-weight: 700; color: var(--ink-2); background: var(--surface-2); }
-        .suggestion-item { width: 100%; display: block; padding: 10px 14px; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; }
-        .suggestion-item:hover, .suggestion-item:focus-visible { background: var(--surface-2); outline: none; }
-        .suggestion-item strong { display: block; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .suggestion-item span { display: block; font-size: 13px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .searching-hint { padding: 14px; font-size: 14px; color: var(--ink-2); text-align: center; }
+        .coords-text { font-family: 'Inter', monospace; font-size: 10px; font-weight: 700; color: var(--text-main); }
+        .coords-sep { margin: 0 8px; color: #E5E5EA; }
+        .coords-label { color: var(--primary-blue); font-size: 8px; text-transform: uppercase; margin-right: 3px; font-weight: 800; }
 
         #currentLocationButton {
-            position: absolute; left: 12px; bottom: 30px; z-index: 1000;
-            width: 52px; height: 52px; border: 0; border-radius: var(--radius);
-            background: var(--surface); color: var(--accent); font-size: 21px; box-shadow: var(--shadow-2);
-            display: flex; align-items: center; justify-content: center;
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            z-index: 1002;
+            background-color: white; 
+            color: var(--primary-blue);
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
         }
-        #currentLocationButton:hover { background: var(--accent-soft); }
-        #currentLocationButton.is-busy i { animation: spin 900ms linear infinite; }
 
-        .side { display: contents; }
-        .capture-sheet {
-            position: relative; z-index: 2; margin-top: -16px;
-            background: var(--surface); border-radius: 20px 20px 0 0; box-shadow: var(--shadow-sheet);
-            padding: 10px 14px max(12px, env(safe-area-inset-bottom));
-            display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px;
-            flex-shrink: 1; min-height: 0; max-height: calc(100dvh - 120px); overflow-y: auto; overscroll-behavior: contain;
+        .search-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1002;
+            display: flex;
+            align-items: center;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid #E5E5EA;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 34px;
+            height: 34px;
         }
-        .capture-sheet > * { min-width: 0; }
+        .search-container.expanded { width: 240px; overflow: visible; }
+        #toggleSearchBtn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--primary-blue); flex-shrink: 0; cursor: pointer; }
+        .search-input-wrapper { display: flex; align-items: center; width: 100%; padding-right: 6px; opacity: 0; transition: opacity 0.3s; }
+        .search-container.expanded .search-input-wrapper { opacity: 1; }
+        #locationSearchInput { background: transparent; border: none; outline: none; font-size: 11px; font-weight: 600; color: var(--text-main); width: 100%; padding: 4px 8px; }
+        #searchLocationButton { background: var(--primary-blue); color: white; padding: 3px 10px; border-radius: 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; border: none; }
 
-        .sync-row { display: flex; align-items: center; gap: 10px; min-height: 44px; }
-        .sync-status { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--ink-2); }
-        .sync-icon { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; background: var(--surface-2); color: var(--ink-2); }
-        .sync-text { min-width: 0; line-height: 1.3; }
-        .sync-status.ok { color: var(--success); } .sync-status.ok .sync-icon { background: var(--success-soft); color: var(--success); }
-        .sync-status.waiting { color: var(--pending); } .sync-status.waiting .sync-icon { background: var(--pending-soft); color: var(--pending); }
-        .sync-status.busy { color: var(--accent); } .sync-status.busy .sync-icon { background: var(--accent-soft); color: var(--accent); }
-        .sync-status.error { color: var(--danger); } .sync-status.error .sync-icon { background: var(--danger-soft); color: var(--danger); }
-        #uploadButton { flex-shrink: 0; }
-        #uploadButton.has-pending { background: var(--pending-soft); border-color: #efc27a; color: #6b3a00; }
-        #uploadButton.is-error { background: var(--danger-soft); border-color: #f0b8ba; color: var(--danger); }
-
-        .pick-status { display: flex; align-items: center; gap: 10px; padding: 6px 4px 6px 10px; border-radius: var(--radius); background: var(--surface-2); min-height: 52px; }
-        .pick-icon { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; background: var(--surface); color: var(--ink-2); }
-        .pick-body { flex: 1; min-width: 0; line-height: 1.3; }
-        .pick-hint { font-size: 15px; color: var(--ink-2); }
-        .pick-coords { font-size: 15px; font-weight: 700; }
-        #current-address-text { font-size: 13.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .pick-status.has-pin { background: #fff0f0; }
-        .pick-status.has-pin .pick-icon { background: var(--pin-selected); color: #fff; }
-
-        .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .input-with-action { position: relative; }
-        .input-with-action .input { padding-right: 50px; }
-        #lockEmployeeIdBtn { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--ink-2); display: flex; align-items: center; justify-content: center; }
-        #lockEmployeeIdBtn:hover { background: var(--surface-2); }
-        #lockEmployeeIdBtn.locked { color: var(--accent); }
-        #eid-pin-count { font-size: 13px; }
-
-        .actions { display: flex; gap: 10px; }
-        #saveButton { flex: 1; min-height: 54px; font-size: 17px; }
-        #historyButton { min-height: 54px; padding: 0 14px; }
-        .count-badge { min-width: 24px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
-
-        .sheet-backdrop { position: fixed; inset: 0; z-index: var(--z-sheet-backdrop); background: rgba(12, 18, 30, 0.45); animation: fadeIn 180ms var(--ease-out); }
-        .history-panel {
-            position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-sheet);
-            max-height: 85vh; max-height: 85dvh; display: flex; flex-direction: column;
-            background: var(--surface); border-radius: 20px 20px 0 0; box-shadow: var(--shadow-3);
-            transform: translateY(105%); visibility: hidden;
-            transition: transform 260ms var(--ease-out), visibility 0s linear 260ms;
+        .btn-primary-action { background-color: rgba(0, 122, 255, 0.04); color: #007AFF; border: 1.5px solid rgba(0, 122, 255, 0.2); box-shadow: 0 12px 24px -6px rgba(0, 122, 255, 0.3); backdrop-filter: blur(4px); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .btn-primary-action:hover {
+            background-color: rgba(0, 122, 255, 0.1);
+            border-color: #007AFF;
+            transform: scale(1.05);
+            box-shadow: 0 15px 30px -5px rgba(0, 122, 255, 0.4);
         }
-        .history-panel.is-open { transform: none; visibility: visible; transition: transform 260ms var(--ease-out); }
-        .sheet-grip { width: 40px; height: 4px; border-radius: 4px; background: var(--line-strong); margin: 8px auto 0; }
-        .history-head { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 16px; }
-        .history-head h2 { flex: 1; font-size: 18px; font-weight: 700; }
-        .history-head h2 span { color: var(--ink-2); font-weight: 600; font-size: 15px; margin-left: 4px; }
-        .legend { display: flex; flex-wrap: wrap; gap: 2px 14px; padding: 0 16px 10px; font-size: 13px; color: var(--ink-2); border-bottom: 1px solid var(--line); }
-        .legend span { display: inline-flex; align-items: center; gap: 6px; }
-        .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-        #savedLocationsTableBody { overflow-y: auto; overscroll-behavior: contain; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 
-        .rec { display: flex; align-items: center; gap: 2px; border-top: 1px solid var(--line); padding-right: 6px; }
-        .rec:first-child { border-top: 0; }
-        .rec.is-me { background: #f3f8ff; }
-        .rec-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 10px 6px 10px 16px; min-height: 60px; border: 0; background: none; text-align: left; }
-        .rec-main:hover .rec-title { color: var(--accent); }
-        .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-        .rec-text { flex: 1; min-width: 0; }
-        .rec-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
-        .rec-title { display: block; min-width: 0; font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .rec-meta { display: block; font-size: 14px; color: var(--ink-2); overflow-wrap: anywhere; }
+        .btn:active { transform: scale(0.94); }
 
-        /* ---------- Leaflet ---------- */
-        .leaflet-bar { border: 0 !important; box-shadow: var(--shadow-2) !important; border-radius: 10px !important; overflow: hidden; }
-        .leaflet-bar a { width: 44px !important; height: 44px !important; line-height: 44px !important; color: var(--ink) !important; }
-        .leaflet-bottom { margin-bottom: 18px; }
-        .leaflet-popup-content-wrapper { border-radius: var(--radius); box-shadow: var(--shadow-2); }
-        .leaflet-popup-content { margin: 12px 14px; font-family: inherit; font-size: 14px; line-height: 1.45; }
-        .pin-icon { background: none; border: 0; }
-        .pin-icon svg { display: block; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25)); }
+        /* FIXED UPLOAD BUTTON STYLES */
+        .btn-upload-minimal {
+            background-color: rgba(52, 199, 89, 0.1);
+            color: #34C759;
+            border: 1.5px solid rgba(52, 199, 89, 0.3);
+            box-shadow: 0 12px 24px -6px rgba(52, 199, 89, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-upload-minimal:hover { 
+            background-color: rgba(52, 199, 89, 0.2); 
+            border-color: #34C759; 
+            box-shadow: 0 15px 30px -5px rgba(52, 199, 89, 0.4);
+            transform: scale(1.05); /* Enlarge on hover */
+        }
 
-        /* ---------- Modals ---------- */
-        .modal-overlay { position: fixed; inset: 0; z-index: var(--z-modal); background: rgba(12, 18, 30, 0.55); display: none; align-items: flex-end; justify-content: center; padding: 12px; }
-        .modal-overlay.is-open { display: flex; animation: fadeIn 180ms var(--ease-out); }
-        .modal-content { background: var(--surface); border-radius: 20px; padding: 22px 18px 18px; box-shadow: var(--shadow-3); width: 100%; max-width: 420px; margin-bottom: env(safe-area-inset-bottom); animation: sheetIn 240ms var(--ease-out); }
-        .modal-content h3 { font-size: 19px; font-weight: 700; margin-bottom: 4px; overflow-wrap: anywhere; }
-        .modal-desc { color: var(--ink-2); font-size: 15px; margin-bottom: 16px; overflow-wrap: anywhere; }
-        .modal-icon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 14px; }
-        .modal-icon.danger { background: var(--danger-soft); color: var(--danger); }
-        .modal-icon.neutral { background: var(--surface-2); color: var(--ink-2); }
-        .modal-form { display: grid; gap: 14px; }
-        .modal-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
-        .modal-form .modal-buttons { margin-top: 2px; }
-        .password-wrap { position: relative; }
-        .password-wrap .input { padding-right: 52px; }
-        #togglePasswordBtn { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border: 0; background: none; color: var(--ink-2); border-radius: 10px; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes sheetIn { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+        .input-field { background-color: #F8FAFC; border: 1px solid #E5E5EA; border-radius: 1.25rem; padding: 0.85rem 1.2rem; width: 100%; transition: all 0.3s; font-size: 0.95rem; color: var(--text-main); font-weight: 500; }
+        .input-field:focus { outline: none; border-color: var(--primary-blue); background-color: var(--card-bg); box-shadow: 0 10px 15px -3px rgba(0, 122, 255, 0.1); }
+        
+        .table-scroll { max-height: 280px; overflow-y: auto; border-radius: 1.5rem; border: 1px solid #E5E5EA; background: var(--card-bg); }
+        .modal-overlay { position: fixed; inset: 0; background-color: rgba(15, 23, 42, 0.6); display: none; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(8px); }
 
-        /* ---------- Toast & progress ---------- */
-        #messageBox {
-            position: fixed; left: 50%; top: calc(max(6px, env(safe-area-inset-top)) + 62px); z-index: var(--z-toast);
-            transform: translate(-50%, -8px); opacity: 0; pointer-events: none;
-            display: flex; align-items: center; gap: 10px;
-            max-width: min(92vw, 460px); width: max-content;
-            padding: 11px 16px; border-radius: 14px;
-            background: var(--ink); color: #fff; font-size: 15px; font-weight: 600; box-shadow: var(--shadow-3);
-            transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
-        }
-        #messageBox.show { opacity: 1; transform: translate(-50%, 0); }
-        #messageBox.success i { color: #6ee7a8; }
-        #messageBox.error { background: #7f1d1d; } #messageBox.error i { color: #fecaca; }
-        #messageBox.warning i { color: #fcd34d; }
-        #messageBox.info i { color: #93c5fd; }
-        #loadingSpinner {
-            position: fixed; left: 50%; top: calc(max(6px, env(safe-area-inset-top)) + 120px); z-index: var(--z-toast);
-            transform: translateX(-50%); display: none; align-items: center; gap: 10px;
-            padding: 10px 16px; border-radius: 999px; max-width: 92vw;
-            background: var(--surface); color: var(--ink); font-size: 15px; font-weight: 600;
-            box-shadow: var(--shadow-3); border: 1px solid var(--line);
-        }
-        #loadingSpinner i { color: var(--accent); }
-        body:not(.tracker-open) #messageBox { top: auto; bottom: max(20px, env(safe-area-inset-bottom)); transform: translate(-50%, 8px); }
-        body:not(.tracker-open) #messageBox.show { transform: translate(-50%, 0); }
-        body:not(.tracker-open) #loadingSpinner { top: auto; bottom: calc(max(20px, env(safe-area-inset-bottom)) + 64px); }
+        .project-admin-item { transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), background-color 0.2s; }
+        .project-admin-item.dragging { opacity: 0.5; background-color: var(--primary-light); border: 2px dashed var(--primary-blue); z-index: 1000; }
 
-        /* ---------- Desktop ---------- */
-        @media (min-width: 960px) {
-            html:not(.phone-view) #tracker-view.active { display: grid; grid-template-columns: minmax(0, 1fr) 420px; grid-template-rows: auto minmax(0, 1fr); }
-            html:not(.phone-view) .topbar { grid-column: 1 / -1; padding: 8px 16px; }
-            html:not(.phone-view) .map-area { grid-row: 2; grid-column: 1; margin: 12px 0 12px 12px; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--line); }
-            html:not(.phone-view) .leaflet-bottom { margin-bottom: 0; }
-            html:not(.phone-view) #currentLocationButton { bottom: 16px; }
-            html:not(.phone-view) .side { display: flex; flex-direction: column; grid-row: 2; grid-column: 2; min-height: 0; padding: 12px; gap: 12px; }
-            html:not(.phone-view) .capture-sheet { margin-top: 0; border-radius: var(--radius-lg); border: 1px solid var(--line); box-shadow: none; padding: 14px; }
-            html:not(.phone-view) .history-panel { position: static; transform: none; visibility: visible; transition: none; flex: 1; min-height: 0; max-height: none; border-radius: var(--radius-lg); border: 1px solid var(--line); box-shadow: none; }
-            html:not(.phone-view) .sheet-grip, html:not(.phone-view) #history-close, html:not(.phone-view) #historyButton, html:not(.phone-view) .sheet-backdrop { display: none !important; }
-            html:not(.phone-view) .modal-overlay { align-items: center; }
+        #search-suggestions {
+            position: absolute;
+            top: 100%; left: 0; width: 100%; background: white; margin-top: 5px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-height: 250px; overflow-y: auto; z-index: 2000;
         }
-        /* ---------- Phone view on a computer ---------- */
-        .view-switch {
-            position: fixed; top: 12px; right: 16px; z-index: 2000;
-            display: inline-flex; padding: 3px; gap: 2px;
-            background: var(--surface); border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow-2);
+        .suggestion-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f8fafc; display: flex; flex-direction: column; gap: 2px; }
+        .suggestion-item:hover { background: #f1f7ff; }
+
+        #project-selection-view .main-card {
+            max-width: 430px;
+            min-height: min(932px, calc(100vh - 24px));
+            margin: 0 auto;
+            padding: 17px 41px 34px;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            background: #fff;
+            color: #343434;
         }
-        .view-switch button {
-            min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent;
-            display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--ink-2);
+
+        .figma-project-toolbar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 13px;
+            height: 24px;
         }
-        .view-switch button:hover { color: var(--ink); background: var(--surface-2); }
-        .view-switch button[aria-pressed="true"] { background: var(--accent); color: #fff; }
-        html.phone-view, html.phone-view body { background: #d9dfe8; min-height: 100%; }
-        html.phone-view #device-frame {
-            position: relative; width: 390px; height: min(844px, calc(100vh - 76px)); margin: 60px auto 16px;
-            transform: translateZ(0); /* fixed-position children (sheets, dialogs, toasts) stay inside the phone */
-            overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
-            background: var(--bg); border-radius: 28px; box-shadow: 0 0 0 10px #1b2233, var(--shadow-3);
+
+        .figma-icon-button {
+            color: #cfd6df;
+            font-size: 13px;
+            line-height: 1;
+            transition: color 0.2s, transform 0.2s;
         }
-        html.phone-view body.tracker-open #device-frame { overflow: hidden; }
-        html.phone-view #tracker-view.active { height: 100%; }
-        html.phone-view .capture-sheet { max-height: calc(100% - 120px); }
-        html.phone-view .history-panel { max-height: 85%; }
-        html.phone-view #messageBox, html.phone-view #loadingSpinner { max-width: 92%; }
-        @media (min-width: 700px) {
-            /* keep the Desktop/Phone switch clear of the page header and the tracker toolbar */
-            html:not(.phone-view) body:not(.tracker-open) #device-frame { padding-top: 48px; }
-            html:not(.phone-view) .topbar { padding-right: 224px; }
+
+        .figma-icon-button:hover {
+            color: #343434;
+            transform: translateY(-1px);
         }
-        @media (max-width: 340px) { .fields { grid-template-columns: 1fr; } }
-        @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+
+        .figma-project-hero {
+            display: grid;
+            justify-items: center;
+            margin-top: 40px;
+            margin-bottom: 30px;
+        }
+
+        .figma-pin-logo {
+            width: 58px;
+            height: 58px;
+            margin-bottom: 13px;
+            display: block;
+        }
+
+        .figma-project-title {
+            margin: 0;
+            color: #343434;
+            font-size: 30px;
+            font-weight: 800;
+            letter-spacing: 0;
+            line-height: 1.1;
+        }
+
+        .figma-search-wrap {
+            position: relative;
+            margin-bottom: 28px;
+        }
+
+        .figma-project-search {
+            width: 100%;
+            height: 47px;
+            border: 1px solid #eeeeee;
+            border-radius: 24px;
+            padding: 0 66px 0 35px;
+            color: #343434;
+            background: #fff;
+            font-size: 20px;
+            font-weight: 400;
+            outline: none;
+            box-shadow: 0 10px 18px rgba(30, 41, 59, 0.09);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .figma-project-search::placeholder {
+            color: #dedede;
+        }
+
+        .figma-project-search:focus {
+            border-color: #d7d7d7;
+            box-shadow: 0 13px 28px rgba(30, 41, 59, 0.13);
+        }
+
+        .figma-search-submit {
+            position: absolute;
+            top: 50%;
+            right: -1px;
+            width: 47px;
+            height: 47px;
+            transform: translateY(-50%);
+            border: 0;
+            border-radius: 50%;
+            background: #2d2927;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 14px 26px rgba(45, 41, 39, 0.26);
+            cursor: pointer;
+        }
+
+        .figma-search-submit i {
+            font-size: 17px;
+            font-weight: 400;
+        }
+
+        .figma-search-icon {
+            position: relative;
+            width: 22px;
+            height: 22px;
+            display: block;
+        }
+
+        .figma-search-icon::before {
+            content: "";
+            position: absolute;
+            left: 1px;
+            top: 1px;
+            width: 14px;
+            height: 14px;
+            border: 1.7px solid #fff;
+            border-radius: 50%;
+        }
+
+        .figma-search-icon::after {
+            content: "";
+            position: absolute;
+            left: 15px;
+            top: 15px;
+            width: 9px;
+            height: 1.7px;
+            border-radius: 2px;
+            background: #fff;
+            transform: rotate(45deg);
+            transform-origin: left center;
+        }
+
+        .figma-project-count {
+            display: block;
+            margin: 0 0 9px 4px;
+            color: #303030;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: lowercase;
+        }
+
+        #project-list.figma-project-list {
+            display: grid;
+            gap: 16px;
+        }
+
+        .figma-project-card {
+            min-height: 54px;
+            padding: 11px 12px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            border: 1px solid #e3e3e3;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.72);
+            color: #4c4c4c;
+            box-shadow: 0 7px 18px rgba(30, 41, 59, 0.05);
+            cursor: pointer;
+            transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+        }
+
+        .figma-project-card:hover {
+            border-color: #cfcfcf;
+            box-shadow: 0 12px 26px rgba(30, 41, 59, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .figma-project-card i {
+            width: 29px;
+            color: #4b4b4b;
+            font-size: 25px;
+            font-weight: 400;
+            flex: 0 0 auto;
+        }
+
+        .figma-project-card span {
+            min-width: 0;
+            color: #4b4b4b;
+            font-size: 15px;
+            font-weight: 500;
+            line-height: 1.22;
+            word-break: break-word;
+        }
+
+        .figma-view-more {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            min-width: 58px;
+            height: 23px;
+            margin: 30px auto 0;
+            padding: 0 13px;
+            border: 0;
+            border-radius: 999px;
+            background: #050505;
+            color: #fff;
+            font-size: 7px;
+            font-weight: 800;
+            box-shadow: 0 9px 18px rgba(0,0,0,0.22);
+            cursor: pointer;
+        }
+
+        @media (min-width: 768px) {
+            #project-selection-view .main-card {
+                border-radius: 0;
+            }
         }
     </style>
 </head>
-<body>
-    <div id="view-switch" class="view-switch" role="group" aria-label="Screen size" hidden>
-        <button type="button" data-view="desktop" aria-pressed="true"><i class="fas fa-desktop" aria-hidden="true"></i> Desktop</button>
-        <button type="button" data-view="phone" aria-pressed="false"><i class="fas fa-mobile-screen-button" aria-hidden="true"></i> Phone</button>
-    </div>
-    <div id="device-frame">
-    <div id="mock-banner" class="mock-banner" hidden>Test mode · sample data, nothing is sent to Google Sheets · admin password 1234</div>
+<body class="p-3 md:p-6 flex justify-center items-start">
 
-    <div id="app-container">
-
+    <div id="app-container" class="w-full max-w-2xl text-primary-deep">
+        
         <!-- View 1: Project Selection -->
-        <main id="project-selection-view" class="app-view active">
-            <div class="page">
-                <header class="sel-head">
-                    <div class="brand">
-                        <span class="brand-mark" aria-hidden="true"><i class="fas fa-location-dot"></i></span>
-                        <div>
-                            <h1>Location Tracker</h1>
-                            <p>Choose a project to start</p>
-                        </div>
-                    </div>
-                    <button id="refresh-projects-btn" class="icon-btn" title="Refresh projects" aria-label="Refresh projects"><i class="fas fa-arrows-rotate"></i></button>
-                    <button id="manage-projects-btn" class="icon-btn" title="Admin" aria-label="Admin"><i class="fas fa-gear"></i></button>
+        <div id="project-selection-view" class="app-view active">
+            <div class="main-card p-8 md:p-12 relative overflow-hidden">
+                <div class="figma-project-toolbar">
+                    <button id="refresh-projects-btn" class="figma-icon-button" title="Refresh Projects">
+                        <i class="fas fa-arrows-rotate"></i>
+                    </button>
+                    <button id="manage-projects-btn" class="figma-icon-button" title="Admin Settings">
+                        <i class="fas fa-gear"></i>
+                    </button>
+                </div>
+
+                <header class="figma-project-hero">
+                    <svg class="figma-pin-logo" viewBox="0 0 58 58" aria-hidden="true">
+                        <path d="M29 53C29 53 10.5 35.6 10.5 22.8C10.5 12.7 18.8 4.5 29 4.5C39.2 4.5 47.5 12.7 47.5 22.8C47.5 35.6 29 53 29 53Z" fill="none" stroke="#2d2d2d" stroke-width="5" stroke-linejoin="round"/>
+                        <circle cx="29" cy="22.5" r="7.5" fill="none" stroke="#2d2d2d" stroke-width="5"/>
+                    </svg>
+                    <h1 class="figma-project-title">Location Tracker</h1>
                 </header>
 
-                <div class="search-field">
-                    <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-                    <input id="project-search-input" type="search" class="input" placeholder="Search projects" aria-label="Search projects" autocomplete="off">
+                <div class="figma-search-wrap">
+                    <input id="project-search-input" type="text" placeholder="Search project..." autocomplete="off" class="figma-project-search">
+                    <button type="button" id="project-search-submit" class="figma-search-submit" title="Search Projects">
+                        <span class="figma-search-icon" aria-hidden="true"></span>
+                    </button>
                 </div>
-                <div id="orphan-pending" class="orphan-box" hidden></div>
-                <div id="project-count" class="list-head" aria-live="polite">Loading projects…</div>
-                <div id="project-list" class="list" role="list"></div>
+
+                <span id="project-count" class="figma-project-count">0 projects</span>
+                <div id="project-list" class="figma-project-list"></div>
+                <button type="button" id="project-view-more" class="figma-view-more">View more</button>
             </div>
-        </main>
+        </div>
 
         <!-- View: Admin Console Menu -->
-        <main id="admin-menu-view" class="app-view">
-            <div class="page">
-                <header class="page-head">
-                    <button id="menu-back-to-selection-btn" class="icon-btn ghost" aria-label="Back to projects"><i class="fas fa-chevron-left"></i></button>
-                    <h2>Admin</h2>
-                </header>
-                <div class="list">
-                    <button id="goto-manage-projects-btn" class="list-item">
-                        <span class="item-icon" aria-hidden="true"><i class="fas fa-folder"></i></span>
-                        <span class="item-text"><span class="item-title">Projects</span><span class="item-sub">Add, rename, hide and reorder</span></span>
-                        <i class="fas fa-chevron-right chevron" aria-hidden="true"></i>
+        <div id="admin-menu-view" class="app-view">
+             <div class="main-card p-10 text-primary-deep">
+                <div class="flex justify-between items-center mb-10">
+                    <h2 class="text-2xl font-black text-slate-900">Admin Console</h2>
+                    <button id="menu-back-to-selection-btn" class="btn bg-[#F8FAFC] text-slate-500 px-6 py-3 rounded-2xl text-xs font-bold hover:bg-slate-100 uppercase tracking-widest">
+                        <i class="fas fa-arrow-left mr-2"></i> Exit
                     </button>
-                    <button id="goto-dashboards-btn" class="list-item">
-                        <span class="item-icon" aria-hidden="true"><i class="fas fa-chart-bar"></i></span>
-                        <span class="item-text"><span class="item-title">Analytics</span><span class="item-sub">Pins and staff per project</span></span>
-                        <i class="fas fa-chevron-right chevron" aria-hidden="true"></i>
+                </div>
+                <div class="grid gap-6">
+                    <button id="goto-manage-projects-btn" class="btn w-full btn-primary-action p-6 rounded-[2rem] flex items-center gap-5 text-white">
+                        <span class="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center shadow-sm"><i class="fas fa-folder text-xl text-primary-deep"></i></span>
+                        <div class="text-left"><p class="font-bold text-base text-slate-800">Projects</p><p class="text-[10px] uppercase tracking-widest text-slate-400">Configuration</p></div>
+                    </button>
+                    <button id="goto-dashboards-btn" class="btn w-full bg-slate-900 text-white p-6 rounded-[2rem] flex items-center gap-5">
+                        <span class="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white"><i class="fas fa-chart-bar text-xl"></i></span>
+                        <div class="text-left"><p class="font-bold text-base text-white text-left text-white">Analytics</p><p class="text-[10px] text-slate-400 uppercase tracking-widest text-white">Performance</p></div>
                     </button>
                 </div>
             </div>
-        </main>
+        </div>
 
         <!-- View: Manage Projects (Admin) -->
-        <main id="admin-view" class="app-view">
-            <div class="page">
-                <header class="page-head">
-                    <button id="back-to-menu-btn" class="icon-btn ghost" aria-label="Back to admin"><i class="fas fa-chevron-left"></i></button>
-                    <h2>Manage projects</h2>
-                </header>
-                <form id="add-project-form" class="add-form">
-                    <label class="sr-only" for="new-project-name">New project name</label>
-                    <input id="new-project-name" type="text" class="input" placeholder="New project name" autocomplete="off" required>
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add</button>
+        <div id="admin-view" class="app-view">
+            <div class="main-card p-10 text-slate-900">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-2xl font-black text-slate-900">Manage Projects</h2>
+                    <button id="back-to-menu-btn" class="btn text-primary-blue font-bold text-sm uppercase tracking-widest">Back</button>
+                </div>
+                <form id="add-project-form" class="flex gap-4 mb-10">
+                    <input id="new-project-name" type="text" class="input-field shadow-sm text-slate-800" placeholder="Add new project name..." autocomplete="off" required>
+                    <button type="submit" class="btn btn-primary-action px-8 py-3 rounded-2xl">Add</button>
                 </form>
-                <div id="admin-project-list" class="list" role="list"></div>
-                <button id="save-project-order-btn" class="btn btn-primary btn-block sticky-save" hidden><i class="fas fa-check"></i> Save new order</button>
+                <div id="admin-project-list" class="space-y-4 mb-8"></div>
+                <button id="save-project-order-btn" class="hidden btn bg-slate-900 text-white w-full py-5 rounded-[1.75rem] font-black uppercase tracking-widest shadow-xl">Confirm New Sequence</button>
             </div>
-        </main>
+        </div>
 
         <!-- View: Analytics Dashboard -->
-        <main id="dashboard-view" class="app-view">
-            <div class="page">
-                <header class="page-head">
-                    <button id="dashboard-back-to-menu-btn" class="icon-btn ghost" aria-label="Back to admin"><i class="fas fa-chevron-left"></i></button>
-                    <h2>Analytics</h2>
-                </header>
-                <label for="dashboard-project-selector" class="field-label"><span>Project</span></label>
-                <select id="dashboard-project-selector" class="input"></select>
-
-                <div id="dashboard-content" hidden>
-                    <div class="stats">
-                        <div class="stat"><span>Total pins</span><strong id="kpi-total-checkins" class="num">0</strong></div>
-                        <div class="stat"><span>Staff</span><strong id="kpi-total-staff" class="num">0</strong></div>
+        <div id="dashboard-view" class="app-view">
+            <div class="main-card p-6 md:p-10 space-y-6 text-primary-deep">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-2xl font-black text-slate-900">Analytics</h2>
+                    <button id="dashboard-back-to-menu-btn" class="btn text-primary-blue font-black uppercase text-xs tracking-widest">Close</button>
+                </div>
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Select Project Insights</label>
+                    <select id="dashboard-project-selector" class="w-full p-4 bg-[#F8FAFC] border-2 border-transparent rounded-[1.5rem] outline-none font-bold text-slate-800 focus:border-primary-blue"></select>
+                </div>
+                
+                <div id="dashboard-content" class="hidden space-y-5">
+                    <div class="grid grid-cols-2 gap-4 px-1">
+                        <div class="bg-primary-blue/5 p-4 rounded-2xl border border-primary-blue/10 flex flex-col items-center">
+                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pins</span>
+                            <span id="kpi-total-checkins" class="text-3xl font-black text-primary-blue">0</span>
+                        </div>
+                        <div class="bg-primary-blue/5 p-4 rounded-2xl border border-primary-blue/10 flex flex-col items-center">
+                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Staff</span>
+                            <span id="kpi-total-staff" class="text-3xl font-black text-primary-blue">0</span>
+                        </div>
                     </div>
-                    <div id="dashboard-map-container"><div id="dashboard-map"></div></div>
-                    <h3 class="section-title">Pins by staff</h3>
-                    <div class="list">
-                        <table class="data-table">
-                            <thead><tr><th>Staff ID</th><th class="right">Pins</th></tr></thead>
-                            <tbody id="dashboard-summary-table" class="num"></tbody>
-                        </table>
+                    <div id="dashboard-map-container" class="h-[420px] rounded-2xl overflow-hidden border border-slate-200 mt-4"><div id="dashboard-map" class="h-full w-full"></div></div>
+                    
+                    <div class="space-y-3 pt-2">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 text-center text-slate-800">Records by Staff ID</h4>
+                        <div class="table-scroll border-none shadow-none">
+                            <table class="w-full border-collapse">
+                                <thead class="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                    <tr><th class="p-3 text-left font-bold text-slate-800">Staff ID</th><th class="p-3 text-right font-bold text-slate-800">Total Pins</th></tr>
+                                </thead>
+                                <tbody id="dashboard-summary-table" class="divide-y divide-slate-50 text-xs font-semibold text-slate-600"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-                <div id="dashboard-empty-state" class="state-box">
-                    <i class="fas fa-chart-bar state-icon"></i>
-                    <strong>Choose a project</strong>
-                    <p>Its pins and staff totals will show here.</p>
+                <div id="dashboard-empty-state" class="py-20 text-center space-y-4">
+                    <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-primary-blue opacity-50"><i class="fas fa-chart-pie text-2xl"></i></div>
+                    <p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Select a project above to view insights</p>
                 </div>
             </div>
-        </main>
+        </div>
 
         <!-- View 3: Location Tracker (Main) -->
-        <main id="tracker-view" class="app-view">
-            <header class="topbar">
-                <button id="home-button" class="icon-btn ghost" title="Back to projects" aria-label="Back to projects"><i class="fas fa-chevron-left"></i></button>
-                <div class="topbar-title">
-                    <h1 id="tracker-title">Project</h1>
-                    <p id="tracker-subtitle" class="num">Loading records…</p>
-                </div>
-                <button id="customizeLabelsBtn" class="icon-btn ghost" title="Field names" aria-label="Field names"><i class="fas fa-sliders"></i></button>
-            </header>
+        <div id="tracker-view" class="app-view">
+            <div class="main-card p-4 md:p-6 space-y-4 text-primary-deep">
+                <header class="flex justify-between items-center">
+                    <button id="home-button" class="btn bg-[#F8FAFC] p-3 rounded-2xl text-slate-500 hover:text-primary-blue hover:scale-110 transition-all shadow-sm"><i class="fas fa-house"></i></button>
+                    <div class="text-center flex-grow px-4"><h3 id="tracker-title" class="text-lg font-black text-slate-900 tracking-tight truncate">Project Name</h3></div>
+                    <button id="customizeLabelsBtn" class="btn bg-primary-soft p-3 rounded-2xl text-primary-blue shadow-sm"><i class="fas fa-sliders"></i></button>
+                </header>
 
-            <div class="map-area">
                 <div id="map-container">
                     <div id="map"></div>
                     <div id="searchBox" class="search-container">
-                        <button id="toggleSearchBtn" type="button" aria-label="Search places or records" title="Search"><i class="fas fa-magnifying-glass"></i></button>
-                        <div class="search-input-wrapper">
-                            <input id="locationSearchInput" type="search" placeholder="Search address or ID" aria-label="Search address or ID" autocomplete="off">
-                            <button id="searchLocationButton" type="button">Find</button>
-                            <div id="search-suggestions" hidden></div>
+                        <div id="toggleSearchBtn"><i class="fas fa-magnifying-glass"></i></div>
+                        <div class="search-input-wrapper relative">
+                            <input id="locationSearchInput" type="text" placeholder="Search address or history..." autocomplete="off">
+                            <button id="searchLocationButton">Find</button>
+                            <div id="search-suggestions" class="hidden"></div>
                         </div>
                     </div>
-                    <button id="currentLocationButton" type="button" title="My location" aria-label="Use my location"><i class="fas fa-location-crosshairs"></i></button>
+                    <button id="currentLocationButton" title="Locate Now"><i class="fas fa-location-crosshairs text-xl"></i></button>
+                    <div class="map-hud">
+                        <div class="coords-text">
+                            <span class="coords-label">Lat</span><span id="lat">--.------</span>
+                            <span class="coords-sep">|</span>
+                            <span class="coords-label">Lng</span><span id="lng">--.------</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <div class="side">
-                <section class="capture-sheet" aria-label="New record">
-                    <div class="sync-row">
-                        <div id="sync-status" class="sync-status" role="status" aria-live="polite">
-                            <span class="sync-icon" aria-hidden="true"><i class="fas fa-cloud"></i></span>
-                            <span id="sync-text" class="sync-text">No records waiting</span>
-                        </div>
-                        <button id="uploadButton" class="btn btn-secondary btn-sm" hidden><i class="fas fa-cloud-arrow-up"></i><span id="uploadButtonText">Upload</span></button>
+                <div id="address-display" class="bg-blue-50/50 px-5 py-3 rounded-2xl border border-blue-100/50 hidden">
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-map-pin text-primary-blue text-[10px] shrink-0"></i>
+                        <p id="current-address-text" class="text-[10px] font-bold text-slate-600 truncate">Locating...</p>
                     </div>
+                </div>
 
-                    <div id="pick-status" class="pick-status" aria-live="polite">
-                        <span class="pick-icon" aria-hidden="true"><i class="fas fa-location-dot"></i></span>
-                        <div class="pick-body">
-                            <p id="pick-hint" class="pick-hint">Tap the map to pin a location</p>
-                            <p id="pick-coords" class="pick-coords num" hidden><span id="lat">--</span>, <span id="lng">--</span></p>
-                            <div id="address-display" hidden><p id="current-address-text">Finding address…</p></div>
-                        </div>
-                        <button id="pick-clear" type="button" class="icon-btn ghost" title="Clear pin" aria-label="Clear pin" hidden><i class="fas fa-xmark"></i></button>
-                    </div>
-
-                    <div class="fields">
-                        <div>
-                            <label for="employeeIdInput" class="field-label"><span id="employeeIdLabel">Employee ID</span><span id="eid-pin-count" class="chip chip-accent num" hidden>0 records</span></label>
-                            <div class="input-with-action">
-                                <input id="employeeIdInput" type="text" inputmode="numeric" class="input" placeholder="Enter Employee ID" autocomplete="off" enterkeyhint="next">
-                                <button id="lockEmployeeIdBtn" type="button" title="Lock" aria-label="Lock Employee ID"><i id="lockIcon" class="fas fa-lock-open"></i></button>
+                <div class="space-y-3">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1.5">
+                            <div class="flex justify-between items-center px-1 h-5">
+                                <label id="employeeIdLabel" class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Employee ID</label>
+                                <span id="eid-pin-count" class="text-[9px] font-black text-primary-blue bg-primary-blue/10 px-2 py-0.5 rounded-full hidden animate-pulse">0 PINS</span>
+                            </div>
+                            <div class="relative flex items-center">
+                                <input id="employeeIdInput" type="text" class="input-field py-3 pr-10" placeholder="ID" autocomplete="off">
+                                <button id="lockEmployeeIdBtn" class="absolute right-3 text-slate-300 hover:text-primary-blue transition-colors p-1" title="Toggle Lock"><i id="lockIcon" class="fas fa-lock-open text-xs"></i></button>
                             </div>
                         </div>
-                        <div>
-                            <label for="surveyIdInput" class="field-label"><span id="surveyIdLabel">Survey ID</span></label>
-                            <input id="surveyIdInput" type="text" inputmode="numeric" class="input" placeholder="Enter Survey ID" autocomplete="off" enterkeyhint="done">
+                        <div class="space-y-1.5">
+                            <div class="flex items-center px-1 h-5"><label id="surveyIdLabel" class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Survey ID</label></div>
+                            <input id="surveyIdInput" type="text" class="input-field py-3" placeholder="ID" autocomplete="off">
                         </div>
                     </div>
+                </div>
 
-                    <div id="normalActionButtons" class="actions">
-                        <button id="saveButton" class="btn btn-primary"><i class="fas fa-location-pin"></i> Save record</button>
-                        <button id="historyButton" class="btn btn-secondary" aria-controls="history-panel">
-                            <i class="fas fa-list-ul"></i><span>Records</span><span id="history-button-count" class="count-badge num">0</span>
-                        </button>
-                    </div>
-                </section>
+                <div id="normalActionButtons" class="flex gap-3 pt-1 items-center">
+                    <button id="saveButton" class="btn btn-primary-action py-4 px-4 flex-grow text-sm uppercase font-black tracking-widest flex items-center justify-center gap-2 rounded-2xl shadow-lg shadow-blue-200"><i class="fas fa-circle-check"></i><span>SAVE RECORD</span></button>
+                    <!-- UPLOAD BUTTON WITH RESTORED STYLES -->
+                    <button id="uploadButton" class="btn btn-upload-minimal w-14 h-14 flex items-center justify-center rounded-2xl shrink-0">
+                        <i class="fas fa-cloud-arrow-up text-xl text-[#34C759]"></i>
+                    </button>
+                </div>
 
-                <div id="history-backdrop" class="sheet-backdrop" hidden></div>
-                <section id="history-panel" class="history-panel" aria-labelledby="history-heading">
-                    <div class="sheet-grip" aria-hidden="true"></div>
-                    <div class="history-head">
-                        <h2 id="history-heading">Records<span id="history-count" class="num"></span></h2>
-                        <button id="exportCsvButton" class="btn btn-secondary btn-sm"><i class="fas fa-file-csv"></i> CSV</button>
-                        <button id="history-close" class="icon-btn ghost" aria-label="Close records"><i class="fas fa-xmark"></i></button>
+                <div class="space-y-2 pt-4 text-primary-deep">
+                    <div class="flex items-center justify-between px-1 text-[10px] font-black uppercase text-slate-400">
+                        <h4>Recent Sessions</h4>
+                        <button id="exportCsvButton" class="btn bg-[#EFF6FF] text-[#2563EB] py-1.5 px-4 rounded-full hover:bg-blue-100 transition-colors shadow-sm"><i class="fas fa-file-csv mr-1"></i><span>Export CSV</span></button>
                     </div>
-                    <div class="legend" aria-label="Pin colors">
-                        <span><i style="background:var(--pin-selected)"></i>New pin</span>
-                        <span><i style="background:var(--pin-pending)"></i>Not uploaded</span>
-                        <span><i style="background:var(--pin-mine)"></i>Mine</span>
-                        <span><i style="background:var(--pin-team)"></i>Team</span>
+                    <div class="table-scroll">
+                        <table class="w-full border-collapse">
+                            <thead class="bg-[#F8FAFC] border-b border-slate-100 text-[9px] text-primary-blue uppercase font-black">
+                                <tr><th class="p-3 text-left">No.</th><th id="tableHeaderEmployeeId" class="p-3 text-left">Staff</th><th id="tableHeaderSurveyId" class="p-3 text-left">ID</th><th class="p-3 text-left">Timestamp</th><th class="p-3 text-center">Del</th></tr>
+                            </thead>
+                            <tbody id="savedLocationsTableBody" class="divide-y divide-slate-100 text-[11px] font-semibold text-slate-600"></tbody>
+                        </table>
                     </div>
-                    <div id="savedLocationsTableBody" role="list"></div>
-                </section>
+                </div>
             </div>
-        </main>
+        </div>
     </div>
 
     <!-- Modals -->
-    <div id="confirmationModal" class="modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalMessage">
-        <div class="modal-content">
-            <div class="modal-icon danger" aria-hidden="true"><i class="fas fa-trash-can"></i></div>
-            <h3 id="modalTitle">Delete?</h3>
-            <p id="modalMessage" class="modal-desc"></p>
-            <div class="modal-buttons">
-                <button id="cancelActionButton" class="btn btn-secondary">Cancel</button>
-                <button id="confirmActionButton" class="btn btn-danger">Delete</button>
+    <div id="confirmationModal" class="modal-overlay">
+        <div class="bg-white rounded-3xl p-6 w-[280px] shadow-2xl text-center border border-slate-100">
+            <div class="mb-4">
+                <div class="w-10 h-10 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-3"><i class="fas fa-trash-can text-sm"></i></div>
+                <h4 id="modalTitle" class="text-sm font-black text-slate-900 uppercase tracking-wide">Confirm Delete</h4>
+            </div>
+            <div class="mb-5"><p id="modalMessage" class="text-[10px] text-slate-400 font-bold px-2 uppercase tracking-tighter"></p></div>
+            <div class="flex gap-2">
+                <button id="confirmActionButton" class="btn bg-red-500 text-white flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm hover:bg-red-600 transition-colors">Yes, Delete</button>
+                <button id="cancelActionButton" class="btn bg-slate-50 text-slate-400 flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest">Cancel</button>
             </div>
         </div>
     </div>
 
-    <div id="passwordModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="passwordTitle">
-        <div class="modal-content">
-            <div class="modal-icon neutral" aria-hidden="true"><i class="fas fa-lock"></i></div>
-            <h3 id="passwordTitle">Admin sign-in</h3>
-            <p class="modal-desc">Enter the admin password to manage projects and see analytics.</p>
-            <form id="password-form" class="modal-form">
-                <label class="sr-only" for="password-input">Password</label>
-                <div class="password-wrap">
-                    <input id="password-input" type="password" class="input" placeholder="Password" required autocomplete="current-password">
-                    <button type="button" id="togglePasswordBtn" aria-label="Show password"><i id="eyeIcon" class="fas fa-eye"></i></button>
+    <div id="passwordModal" class="modal-overlay">
+        <div class="bg-white rounded-[2.5rem] p-8 max-w-xs w-full shadow-2xl text-primary-deep border border-slate-50 transform scale-100 relative">
+            <!-- CLOSE BUTTON AT TOP RIGHT -->
+            <button type="button" id="close-password-modal" class="absolute top-6 right-6 text-slate-300 hover:text-red-500 transition-colors p-1" title="Close">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+            <div class="text-center mb-6">
+                <div class="relative w-16 h-16 mx-auto mb-4">
+                    <div class="absolute inset-0 bg-blue-500 rounded-2xl opacity-10 animate-pulse"></div>
+                    <div class="relative bg-gradient-to-br from-blue-500 to-primary-blue w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200"><i class="fas fa-unlock-keyhole text-white text-2xl"></i></div>
                 </div>
-                <div class="modal-buttons">
-                    <button type="button" id="close-password-modal" class="btn btn-secondary">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Unlock</button>
+                <h4 class="text-lg font-black text-slate-900 uppercase tracking-tight">Unlock Console</h4>
+                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Administrator Access Required</p>
+            </div>
+            <form id="password-form" class="space-y-5">
+                <div class="relative group">
+                    <input id="password-input" type="password" class="input-field text-center text-2xl font-black tracking-[0.5em] bg-slate-50 border-2 border-transparent focus:border-primary-blue focus:bg-white focus:ring-4 focus:ring-blue-50 placeholder:tracking-normal placeholder:text-slate-200 pr-12" placeholder="••••" required autocomplete="off">
+                    <button type="button" id="togglePasswordBtn" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-primary-blue transition-colors p-1"><i id="eyeIcon" class="fas fa-eye-slash text-sm"></i></button>
+                </div>
+                <div class="grid gap-3"><button type="submit" class="btn btn-primary-action py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] shadow-lg shadow-blue-100 active:scale-95 transition-all">Verify Key</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- RENAME MODAL FIXED SIZE -->
+    <div id="renameModal" class="modal-overlay">
+        <div class="bg-white rounded-[2.5rem] p-10 max-w-xs w-full shadow-2xl text-center border border-slate-100">
+            <h4 class="text-lg font-black mb-8 text-slate-900 uppercase">Rename Project</h4>
+            <form id="rename-form" class="space-y-6">
+                <input id="rename-input" type="text" class="input-field text-center font-bold text-slate-800" required autocomplete="off">
+                <div class="flex gap-4">
+                    <button type="submit" class="btn btn-primary-action flex-1 py-4 uppercase text-xs">Apply</button>
+                    <button type="button" id="cancel-rename-btn" class="btn bg-slate-50 text-slate-500 flex-1 py-4 uppercase text-xs">Cancel</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="renameModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="renameTitle">
-        <div class="modal-content">
-            <h3 id="renameTitle">Rename project</h3>
-            <p class="modal-desc">The new name is used for everyone.</p>
-            <form id="rename-form" class="modal-form">
-                <label class="sr-only" for="rename-input">Project name</label>
-                <input id="rename-input" type="text" class="input" required autocomplete="off">
-                <div class="modal-buttons">
-                    <button type="button" id="cancel-rename-btn" class="btn btn-secondary">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Rename</button>
-                </div>
+    <div id="customizeLabelsModal" class="modal-overlay">
+        <div class="bg-white rounded-[2.5rem] p-8 max-w-xs w-full shadow-2xl text-primary-deep border border-slate-50">
+            <h4 class="text-lg font-black text-slate-900 uppercase tracking-tight text-center mb-6">Customize Fields</h4>
+            <form id="customize-labels-form" class="space-y-5">
+                <div class="space-y-1.5"><label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Label</label><input id="custom-employee-label" type="text" class="input-field" placeholder="Default: Employee ID"></div>
+                <div class="space-y-1.5"><label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Secondary Label</label><input id="custom-survey-label" type="text" class="input-field" placeholder="Default: Survey ID"></div>
+                <div class="grid gap-3 pt-2"><button type="submit" class="btn btn-primary-action py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-100">Save Changes</button><button type="button" id="cancel-customize-btn" class="btn bg-white border border-slate-100 text-slate-400 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest">Cancel</button></div>
             </form>
         </div>
     </div>
 
-    <div id="customizeLabelsModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="customizeTitle">
-        <div class="modal-content">
-            <h3 id="customizeTitle">Field names</h3>
-            <p class="modal-desc">Changes the names shown on this device only. Uploaded data is not affected.</p>
-            <form id="customize-labels-form" class="modal-form">
-                <div><label for="custom-employee-label" class="field-label"><span>First field</span></label><input id="custom-employee-label" type="text" class="input" placeholder="Employee ID" autocomplete="off"></div>
-                <div><label for="custom-survey-label" class="field-label"><span>Second field</span></label><input id="custom-survey-label" type="text" class="input" placeholder="Survey ID" autocomplete="off"></div>
-                <div class="modal-buttons">
-                    <button type="button" id="cancel-customize-btn" class="btn btn-secondary">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
-                </div>
-            </form>
+    <div id="loadingSpinner" class="fixed inset-0 z-[10000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center hidden transition-opacity duration-300">
+        <div class="bg-white p-12 rounded-[3.5rem] shadow-2xl flex flex-col items-center gap-6 border border-white/20 min-w-[240px]">
+            <div id="spinner-animation" class="relative w-14 h-14">
+                <div class="absolute inset-0 border-[5px] border-slate-100 rounded-full"></div>
+                <div class="absolute inset-0 border-[5px] border-primary-blue border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <div id="spinner-success" class="hidden text-emerald-500 text-5xl animate-bounce-short">
+                <i class="fas fa-circle-check"></i>
+            </div>
+            <span id="loading-spinner-text" class="font-black text-primary-blue text-[10px] uppercase tracking-[0.4em]">Loading</span>
         </div>
     </div>
-
-    <div id="loadingSpinner" role="status" aria-live="polite"><i class="fas fa-circle-notch fa-spin"></i><span id="loading-spinner-text">Loading…</span></div>
-    <div id="messageBox" role="status" aria-live="polite"></div>
-    </div>
+    <div id="messageBox" class="fixed top-10 left-1/2 -translate-x-1/2 z-[10001] px-10 py-4 rounded-[2rem] shadow-2xl font-black transition-all transform opacity-0 pointer-events-none bg-white/90 backdrop-blur-lg border border-slate-50"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyWJlVXi7eVd_W7E4lKKj3VW9RyqsN750HP0G8gk4nL6BacrOvRsEuOpXGNBHezaJCtkA/exec';
-
-        // Open with ?mock=1 to try the app with sample data. Nothing reaches Google Sheets.
-        const MOCK = new URLSearchParams(location.search).has('mock');
-        const KEY = MOCK ? 'mock::' : '';
-        const GET_TIMEOUT_MS = 90000;
-        const POST_TIMEOUT_MS = 90000;
-        const VERIFY_WAIT_MS = 60000;
-        const DEFAULT_LABELS = { employeeId: 'Employee ID', surveyId: 'Survey ID' };
-        const PIN = { selected: '#e5383b', pending: '#f59e0b', mine: '#1a237e', team: '#2f7ff0' };
-
-        const store = {
-            get(key) { try { return localStorage.getItem(KEY + key); } catch (e) { return null; } },
-            set(key, value) { try { localStorage.setItem(KEY + key, value); return true; } catch (e) { return false; } },
-            remove(key) { try { localStorage.removeItem(KEY + key); } catch (e) {} },
-            json(key, fallback) { try { const v = JSON.parse(this.get(key)); return v ?? fallback; } catch (e) { return fallback; } }
-        };
-
+        
         let map, dashboardMap, permanentMarkers = L.featureGroup(), dashboardMarkers = L.featureGroup();
         let currentLat = null, currentLng = null, currentAddress = "";
         let savedLocations = [], pendingLocations = [], allProjects = [], currentProjectName = null;
-        let isEmployeeIdLocked = false;
-        let customLabels = { ...DEFAULT_LABELS, ...store.json('customLabels', {}) };
+        let loadedProjects = new Set();
+        let isEmployeeIdLocked = false; 
+        let customLabels = JSON.parse(localStorage.getItem('customLabels')) || { employeeId: 'Employee ID', surveyId: 'Survey ID' };
+        
         let isAdminAuthenticated = false;
         let sessionHiddenProjects = [];
+        let visibleProjectLimit = 7;
+        
         let selectionMarker = null;
         let confirmActionCallback = null;
         let ui = {};
-        const state = { projectsStatus: 'idle', recordsStatus: 'idle', recordsSeq: 0, addressSeq: 0, uploading: false, uploadingProject: null, orderDirty: false, dashboardSeq: 0 };
 
-        const $ = (id) => document.getElementById(id);
-        const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-        const str = (v) => String(v ?? '').trim();
-        const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
-
-        // ---------- Feedback ----------
-        let messageTimer = null;
         function showMessage(msg, type = "info") {
-            const icons = { success: 'fa-circle-check', error: 'fa-circle-exclamation', warning: 'fa-triangle-exclamation', info: 'fa-circle-info' };
-            const box = $("messageBox");
-            box.className = `show ${type}`;
-            box.innerHTML = `<i class="fas ${icons[type] || icons.info}" aria-hidden="true"></i><span>${esc(msg)}</span>`;
-            clearTimeout(messageTimer);
-            messageTimer = setTimeout(() => { box.className = type; }, type === 'error' ? 6000 : 3500);
-        }
-        function setLoading(on, text = "Loading…") {
-            $("loading-spinner-text").textContent = text;
-            ui.spinner.style.display = on ? "flex" : "none";
+            const msgBox = document.getElementById("messageBox");
+            if (!msgBox) return;
+            const icon = type === 'success' ? 'check-circle text-emerald-500' : (type === 'error' ? 'triangle-exclamation text-rose-500' : 'circle-info text-blue-500');
+            msgBox.innerHTML = `<div class="flex items-center gap-4"><i class="fas fa-${icon}"></i><span class="text-[11px] font-black uppercase text-slate-800">${msg}</span></div>`;
+            msgBox.style.opacity = "1"; msgBox.style.transform = "translateX(-50%) translateY(0)";
+            setTimeout(() => { msgBox.style.opacity = "0"; msgBox.style.transform = "translateX(-50%) translateY(-20px)"; }, 3500);
         }
 
-        function openModal(modal) {
-            modal._returnFocus = document.activeElement;
-            modal.classList.add("is-open");
-            const target = modal.querySelector("input, button");
-            setTimeout(() => target && target.focus(), 50);
-        }
-        function closeModal(modal) {
-            if (!modal || !modal.classList.contains("is-open")) return;
-            modal.classList.remove("is-open");
-            if (modal._returnFocus && modal._returnFocus.focus) modal._returnFocus.focus();
-        }
-        function showConfirmation(title, message, onConfirm, confirmLabel = "Delete") {
-            $("modalTitle").textContent = title;
-            $("modalMessage").textContent = message;
-            $("confirmActionButton").textContent = confirmLabel;
+        function showConfirmation(title, message, onConfirm) {
+            const modal = document.getElementById("confirmationModal");
+            const titleEl = document.getElementById("modalTitle");
+            const msgEl = document.getElementById("modalMessage");
+            if (titleEl) titleEl.textContent = title;
+            if (msgEl) msgEl.innerHTML = message;
             confirmActionCallback = onConfirm;
-            openModal($("confirmationModal"));
+            if (modal) modal.style.display = "flex";
         }
 
-        // ---------- Network (Apps Script or sample data) ----------
-        async function fetchWithTimeout(url, options, timeoutMs) {
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-            try { return await fetch(url, { ...options, signal: ctrl.signal }); }
-            catch (err) {
-                if (err.name === 'AbortError') { const e = new Error("The connection timed out"); e.isTimeout = true; throw e; }
-                const e = new Error("No connection");
-                e.offline = !navigator.onLine;
-                throw e;
+        window.showView = function(viewId) {
+            document.querySelectorAll(".app-view").forEach(v => { v.classList.remove("active"); v.style.display = "none"; });
+            const currentView = document.getElementById(viewId);
+            if (currentView) { 
+                currentView.style.display = "block"; 
+                setTimeout(() => currentView.classList.add("active"), 50); 
             }
-            finally { clearTimeout(timer); }
-        }
-        // Apps Script sometimes answers with a Google error page instead of JSON, so reads retry.
-        async function apiGet(query, { tries = 3 } = {}) {
-            if (MOCK) return mockApi(query);
-            for (let attempt = 1; ; attempt++) {
-                try {
-                    const res = await fetchWithTimeout(`${WEB_APP_URL}?${query}&t=${Date.now()}`, {}, GET_TIMEOUT_MS);
-                    const text = await res.text();
-                    try { return JSON.parse(text); } catch (e) { throw new Error("The server had a temporary problem"); }
-                } catch (err) {
-                    if (err.isTimeout || attempt >= tries) throw err;
-                    await new Promise(r => setTimeout(r, 700 * attempt));
-                }
-            }
-        }
-        async function apiPost(payload) {
-            let result;
-            if (MOCK) result = await mockApi(null, payload);
-            else {
-                const res = await fetchWithTimeout(WEB_APP_URL, { method: "POST", headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) }, POST_TIMEOUT_MS);
-                const text = await res.text();
-                try { result = JSON.parse(text); } catch (e) { throw new Error("The server had a temporary problem"); }
-            }
-            if (!result || (!result.success && result.status !== 'success')) {
-                const e = new Error((result && result.message) || "The server did not accept the request");
-                e.isServerReject = true;
-                throw e;
-            }
-            return result;
-        }
-
-        // ---------- Records waiting on this phone (per project) ----------
-        const pendingKey = (p) => `pending::${p}`;
-        const lastUploadKey = (p) => `lastUpload::${p}`;
-        function loadPending(project) {
-            const list = store.json(pendingKey(project), []);
-            if (!Array.isArray(list)) return [];
-            return list.map(p => {
-                const item = { ...p, isPending: true, status: p.status || 'pending', attempts: p.attempts || 0 };
-                // Closed while uploading: the Sheet may already have it, so verify before sending again.
-                if (item.status === 'uploading' && state.uploadingProject !== project) {
-                    item.status = 'failed'; item.attempts = Math.max(1, item.attempts); item.needsVerify = true;
-                    item.lastTransportFailAt = item.lastAttemptAt || Date.now();
-                }
-                return item;
-            });
-        }
-        function storageKeys(prefix) {
-            const keys = [];
-            try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(KEY + prefix)) keys.push(k.slice(KEY.length)); } } catch (e) {}
-            return keys;
-        }
-        function writePending(project, list) {
-            if (!list.length) { store.remove(pendingKey(project)); return true; }
-            const value = JSON.stringify(list);
-            let ok = store.set(pendingKey(project), value);
-            if (!ok) {
-                // Cached copies of Sheet data can be downloaded again; waiting records cannot.
-                storageKeys('cache_data_').forEach(k => store.remove(k));
-                ok = store.set(pendingKey(project), value);
-            }
-            if (!ok) showMessage("Couldn't store the record on this phone (storage full). Upload before closing.", "error");
-            return ok;
-        }
-        function mutatePending(project, fn) {
-            const current = project === currentProjectName;
-            const list = fn(current ? pendingLocations : loadPending(project));
-            if (current) pendingLocations = list;
-            return writePending(project, list);
-        }
-        const normId = (v) => { const t = str(v).toLowerCase(); return /^\d+$/.test(t) ? t.replace(/^0+(?=\d)/, '') : t; };
-        const sameRecord = (r, item) => normId(r.EmployeeID) === normId(item.EmployeeID) && normId(r.SurveyID) === normId(item.SurveyID) &&
-            Math.abs(parseFloat(r.Latitude) - parseFloat(item.Latitude)) < 0.00002 && Math.abs(parseFloat(r.Longitude) - parseFloat(item.Longitude)) < 0.00002;
-
-        // ---------- Phone view on a computer ----------
-        const VIEW_KEY = 'viewMode';
-        const PHONE_VIEW_MIN_WIDTH = 700; // real phones never see the switch
-        function applyViewMode() {
-            const wide = window.innerWidth >= PHONE_VIEW_MIN_WIDTH;
-            const phone = wide && store.get(VIEW_KEY) === 'phone';
-            const changed = document.documentElement.classList.contains('phone-view') !== phone;
-            document.documentElement.classList.toggle('phone-view', phone);
-            $("view-switch").hidden = !wide;
-            document.querySelectorAll('#view-switch button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.view === 'phone') === phone)));
-            if (changed) {
-                $("device-frame").scrollTop = 0;
-                setTimeout(() => { if (map) map.invalidateSize(); if (dashboardMap) dashboardMap.invalidateSize(); }, 60);
-            }
-        }
-        (() => {
-            const requested = new URLSearchParams(location.search).get('view');
-            if (requested === 'phone' || requested === 'desktop') store.set(VIEW_KEY, requested);
-            document.querySelectorAll('#view-switch button').forEach(b => b.addEventListener('click', () => { store.set(VIEW_KEY, b.dataset.view); applyViewMode(); }));
-            window.addEventListener('resize', applyViewMode);
-            applyViewMode();
-        })();
-
-        // ---------- Views ----------
-        window.showView = function (viewId) {
-            document.querySelectorAll(".app-view").forEach(v => v.classList.remove("active"));
-            const view = $(viewId);
-            if (view) view.classList.add("active");
-            document.body.classList.toggle("tracker-open", viewId === 'tracker-view');
-            if (viewId !== 'tracker-view') closeHistory();
-            if (viewId === 'tracker-view' && map) setTimeout(() => map.invalidateSize(), 60);
-            if (viewId === 'dashboard-view') setTimeout(() => { initDashboardMap(); dashboardMap.invalidateSize(); }, 60);
+            if (viewId === 'tracker-view' && map) setTimeout(() => map.invalidateSize(), 300);
+            if (viewId === 'dashboard-view') setTimeout(() => { initDashboardMap(); if(dashboardMap) dashboardMap.invalidateSize(); }, 300);
             updateLabels();
-            window.scrollTo(0, 0);
-            $("device-frame").scrollTop = 0;
         };
 
-        window.setEmployeeLock = function (locked) {
+        window.setEmployeeLock = function(locked) {
             isEmployeeIdLocked = locked;
-            ui.employeeId.disabled = locked;
-            const btn = $("lockEmployeeIdBtn");
-            btn.classList.toggle("locked", locked);
-            btn.setAttribute("aria-label", locked ? `Unlock ${customLabels.employeeId}` : `Lock ${customLabels.employeeId}`);
-            btn.title = locked ? "Unlock" : "Lock";
-            $("lockIcon").className = locked ? "fas fa-lock" : "fas fa-lock-open";
-        };
-
-        function updateLabels() {
-            $("employeeIdLabel").textContent = customLabels.employeeId;
-            $("surveyIdLabel").textContent = customLabels.surveyId;
-            if (ui.employeeId) ui.employeeId.placeholder = 'Enter ID';
-            if (ui.surveyId) ui.surveyId.placeholder = 'Enter ID';
+            const input = document.getElementById("employeeIdInput");
+            if (input) input.disabled = locked;
+            const icon = document.getElementById("lockIcon");
+            if (icon) icon.className = locked ? "fas fa-lock text-primary-blue" : "fas fa-lock-open text-slate-300";
         }
 
-        // ---------- Projects ----------
-        function projectsFromResponse(rawData) {
-            return (rawData || []).filter(p => {
-                const name = (typeof p === 'object' && p !== null) ? String(p.name) : String(p);
-                const isVisible = (typeof p === 'object' && p !== null) ? (p.isVisible !== false && p.hidden !== true) : true;
-                return isVisible && !name.startsWith("[HIDDEN]") && !sessionHiddenProjects.includes(name.trim());
-            }).map(p => (typeof p === 'object' && p !== null) ? String(p.name) : String(p));
-        }
-
-        async function fetchProjects({ manual = false } = {}) {
-            const btn = $("refresh-projects-btn");
-            btn.classList.add("is-busy");
-            const cached = store.json('cache_projects', null);
-            if (Array.isArray(cached) && !allProjects.length) { allProjects = cached; }
-            state.projectsStatus = 'loading';
-            renderProjects();
-            try {
-                const result = await apiGet(`action=getProjects`);
-                if (!Array.isArray(result.data) || result.success === false) throw new Error(result.message || "The server sent an unexpected reply");
-                const newProjects = projectsFromResponse(result.data);
-                if (JSON.stringify(newProjects) !== JSON.stringify(allProjects)) {
-                    allProjects = newProjects;
-                    store.set('cache_projects', JSON.stringify(allProjects));
-                    renderAdminProjectList(allProjects);
-                }
-                state.projectsStatus = 'ready';
-                if (manual) showMessage("Projects updated", "success");
-            } catch (e) {
-                state.projectsStatus = 'error';
-                if (manual || !allProjects.length) showMessage(`Couldn't load projects: ${e.message}`, "error");
-            } finally {
-                btn.classList.remove("is-busy");
-                renderProjects();
-            }
-        }
-
-        function renderProjects() {
-            renderOrphans();
-            const listEl = $("project-list"), countEl = $("project-count");
-            const term = $("project-search-input").value.trim().toLowerCase();
-            const list = allProjects.filter(p => p.toLowerCase().includes(term));
-            listEl.innerHTML = "";
-
-            if (!allProjects.length && state.projectsStatus === 'loading') {
-                countEl.textContent = "Loading projects…";
-                listEl.innerHTML = Array.from({ length: 3 }, () => `<div class="skeleton"><div class="sk" style="width:40px;height:40px;border-radius:10px"></div><div class="sk" style="height:16px;flex:1;max-width:60%"></div></div>`).join('');
-                return;
-            }
-            if (!allProjects.length && state.projectsStatus === 'error') {
-                countEl.textContent = "Couldn't load projects";
-                listEl.innerHTML = `<div class="state-box"><i class="fas fa-wifi state-icon"></i><strong>Couldn't load projects</strong><p>Check your connection and try again.</p><button type="button" id="retry-projects" class="btn btn-secondary btn-sm"><i class="fas fa-rotate-right"></i> Try again</button></div>`;
-                $("retry-projects").onclick = () => fetchProjects();
-                return;
-            }
-            countEl.textContent = term ? `${list.length} of ${plural(allProjects.length, 'project')}` : plural(allProjects.length, 'project') + (state.projectsStatus === 'loading' ? ' · updating…' : '');
-            if (!list.length) {
-                listEl.innerHTML = term
-                    ? `<div class="state-box"><i class="fas fa-magnifying-glass state-icon"></i><strong>No project matches “${esc(term)}”</strong><p>Try a shorter search.</p></div>`
-                    : `<div class="state-box"><i class="fas fa-folder-open state-icon"></i><strong>No projects yet</strong><p>Ask an admin to add a project.</p></div>`;
-                return;
-            }
-            list.forEach(p => {
-                const waiting = loadPending(p).length;
-                const wrap = document.createElement("div");
-                wrap.setAttribute("role", "listitem");
-                const card = document.createElement("button");
-                card.type = "button";
-                card.className = "list-item";
-                wrap.appendChild(card);
-                card.innerHTML = `<span class="item-icon" aria-hidden="true"><i class="fas fa-folder"></i></span><span class="item-text"><span class="item-title">${esc(p)}</span></span>${waiting ? `<span class="chip chip-pending num"><i class="fas fa-clock"></i> ${waiting} waiting</span>` : ''}<i class="fas fa-chevron-right chevron" aria-hidden="true"></i>`;
-                card.onclick = () => openProject(p);
-                listEl.appendChild(wrap);
-            });
-        }
-
-        function movePending(fromProject, toProject) {
-            if (state.uploading) return false;
-            const from = loadPending(fromProject);
-            if (!from.length || fromProject === toProject) return true;
-            const to = loadPending(toProject);
-            const merged = [...to, ...from.filter(f => !to.some(t => t.ID === f.ID)).map(f => f.status === 'uploading' ? { ...f, status: 'failed', needsVerify: true } : f)];
-            if (!writePending(toProject, merged)) return false;
-            store.remove(pendingKey(fromProject));
-            const last = store.get(lastUploadKey(fromProject));
-            if (last) { store.set(lastUploadKey(toProject), last); store.remove(lastUploadKey(fromProject)); }
-            return true;
-        }
-
-        function exportRecordsCsv(records, fileLabel) {
-            const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-            const headers = ["No.", customLabels.employeeId, customLabels.surveyId, "Latitude", "Longitude", "Timestamp", "Status"];
-            let csv = "\uFEFF" + headers.map(q).join(",") + "\n";
-            records.forEach((loc, i) => { csv += [records.length - i, loc.EmployeeID, loc.SurveyID || '-', loc.Latitude, loc.Longitude, new Date(loc.Timestamp).toLocaleString('en-GB'), loc.isPending ? "Pending" : "Uploaded"].map(q).join(",") + "\n"; });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-            link.download = `Export_${fileLabel}_${new Date().toISOString().slice(0, 10)}.csv`;
-            link.click();
-        }
-
-        // Waiting records whose project was renamed or hidden elsewhere
-        function renderOrphans() {
-            const box = $("orphan-pending");
-            if (state.projectsStatus !== 'ready') { box.hidden = true; return; }
-            const orphans = storageKeys('pending::').map(k => k.slice('pending::'.length))
-                .filter(p => !allProjects.includes(p) && !(state.uploading && state.uploadingProject === p))
-                .map(p => ({ project: p, records: loadPending(p) })).filter(o => o.records.length);
-            box.hidden = !orphans.length;
-            if (!orphans.length) return;
-            const options = allProjects.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
-            box.innerHTML = `<div class="orphan-head"><i class="fas fa-triangle-exclamation"></i><div><strong>Records waiting in a project that no longer exists</strong><p>The project was renamed or hidden. Move these records to a project, or export them.</p></div></div>`;
-            orphans.forEach(o => {
-                const row = document.createElement("div");
-                row.className = "orphan-row";
-                row.innerHTML = `<span class="item-title">${esc(o.project)} · ${plural(o.records.length, 'record')}</span>
-                    <div class="orphan-actions">
-                        <select class="input" aria-label="Move ${esc(o.project)} records to project">${options}</select>
-                        <button type="button" class="btn btn-primary btn-sm move">Move</button>
-                        <button type="button" class="btn btn-secondary btn-sm export"><i class="fas fa-file-csv"></i> CSV</button>
-                    </div>`;
-                row.querySelector('.move').onclick = () => {
-                    const target = row.querySelector('select').value;
-                    if (!target) return;
-                    if (state.uploading) return showMessage("Wait for the current upload to finish, then move these records.", "info");
-                    if (movePending(o.project, target)) { showMessage(`Moved ${plural(o.records.length, 'record')} to ${target}`, "success"); renderProjects(); }
-                };
-                row.querySelector('.export').onclick = () => { exportRecordsCsv(o.records, o.project); showMessage(`Exported ${plural(o.records.length, 'record')}`, "success"); };
-                box.appendChild(row);
-            });
-        }
-
-        function openProject(p) {
-            currentProjectName = p;
-            savedLocations = store.json(`cache_data_${p}`, []);
-            if (!Array.isArray(savedLocations)) savedLocations = [];
-            pendingLocations = loadPending(p);
-            state.recordsStatus = savedLocations.length ? 'refreshing' : 'loading';
-            $("tracker-title").textContent = p;
-            clearSelection();
-            resetSearch();
-            window.showView("tracker-view");
-            initMap();
-            renderTable();
-            fitToPins();
-            refreshData();
-        }
-
-        // ---------- Admin: projects ----------
-        window.renameProjectPrompt = function (oldName) {
-            const modal = $("renameModal"), input = $("rename-input");
+        window.renameProjectPrompt = function(oldName) {
+            const modal = document.getElementById("renameModal");
+            const input = document.getElementById("rename-input");
+            if (!modal || !input) return;
             input.value = oldName;
-            openModal(modal);
-            $("rename-form").onsubmit = async (e) => {
+            modal.style.display = "flex";
+            const form = document.getElementById("rename-form");
+            form.onsubmit = async (e) => {
                 e.preventDefault();
                 const newName = input.value.trim();
-                if (!newName || newName === oldName) return closeModal(modal);
-                closeModal(modal);
-                setLoading(true, "Renaming…");
+                if (!newName || newName === oldName) { modal.style.display = "none"; return; }
+                modal.style.display = "none";
+                ui.spinner.classList.remove("hidden");
                 try {
-                    await apiPost({ action: "renameProject", oldProjectName: oldName, newProjectName: newName });
-                    // During an upload the records stay under the old name; the home screen offers to move them afterwards.
-                    const moved = movePending(oldName, newName);
-                    showMessage(moved ? "Project renamed" : "Project renamed. Its waiting records can be moved after the upload finishes.", moved ? "success" : "info");
-                    fetchProjects();
-                } catch (err) { showMessage(`Couldn't rename: ${err.message}`, "error"); }
-                setLoading(false);
+                    const res = await fetch(WEB_APP_URL, { 
+                        method: "POST", 
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action: "renameProject", oldProjectName: oldName, newProjectName: newName }) 
+                    });
+                    const result = await res.json();
+                    if (result.success) { showMessage("Complete", "success"); fetchProjects(); }
+                } catch(err) { console.error(err); }
+                ui.spinner.classList.add("hidden");
             };
         };
 
-        window.deleteProjectPrompt = function (name) {
-            showConfirmation("Hide this project?", `“${name}” will be hidden for all users immediately.`, async () => {
-                closeModal($("confirmationModal"));
+        window.deleteProjectPrompt = function(name) {
+            showConfirmation("Confirm Project Deletion", `Are you sure you want to delete "${name}"? This project will be hidden for all users immediately.`, async () => {
+                document.getElementById("confirmationModal").style.display = "none";
                 const trimmedName = String(name).trim();
                 sessionHiddenProjects.push(trimmedName);
+                
                 allProjects = allProjects.filter(p => p.trim() !== trimmedName);
-                renderProjects();
+                renderProjects(allProjects);
                 renderAdminProjectList(allProjects);
-                setLoading(true, "Hiding project…");
+
+                ui.spinner.classList.remove("hidden");
                 try {
-                    await apiPost({ action: "hideProject", projectName: trimmedName });
-                    showMessage("Project hidden", "success");
-                    fetchProjects();
-                } catch (e) { showMessage(`Couldn't hide the project: ${e.message}`, "error"); }
-                setLoading(false);
-            }, "Hide");
+                    const res = await fetch(WEB_APP_URL, { 
+                        method: "POST", 
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action: "hideProject", projectName: trimmedName })
+                    });
+                    const result = await res.json();
+                    if (result.success) { 
+                        showMessage("Project Deleted", "success"); 
+                        fetchProjects(); 
+                    }
+                } catch(e) { console.error(e); }
+                ui.spinner.classList.add("hidden");
+            });
         };
+
+        // FIXED MARKER ICON: INITIAL PIN IS RED
+        function getMarkerIcon(color) {
+            const iconUrl = (color === 'yellow') ? 
+                'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png' : 
+                (color === 'red') ?
+                'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png' :
+                (color === '#1a237e') ? 
+                'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-black.png' : 
+                'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png';
+            return new L.Icon({ iconUrl: iconUrl, shadowUrl: '', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [0, 0] });
+        }
 
         function getDragAfterElement(container, y) {
             const draggableElements = [...container.querySelectorAll('.project-admin-item:not(.dragging)')];
             return draggableElements.reduce((closest, child) => {
                 const box = child.getBoundingClientRect();
                 const offset = y - box.top - box.height / 2;
-                if (offset < 0 && offset > closest.offset) return { offset, element: child };
-                return closest;
+                if (offset < 0 && offset > closest.offset) return { offset: offset, element: child };
+                else return closest;
             }, { offset: Number.NEGATIVE_INFINITY }).element;
         }
 
-        function markOrderDirty() {
-            state.orderDirty = true;
-            $("save-project-order-btn").hidden = false;
-            refreshMoveButtons();
+        function updateLabels() {
+            document.querySelectorAll('#employeeIdLabel, #tableHeaderEmployeeId').forEach(el => el.textContent = customLabels.employeeId);
+            document.querySelectorAll('#surveyIdLabel, #tableHeaderSurveyId').forEach(el => el.textContent = customLabels.surveyId);
+            if (ui.employeeId) ui.employeeId.placeholder = customLabels.employeeId;
         }
-        function refreshMoveButtons() {
-            const rows = [...$("admin-project-list").querySelectorAll('.project-admin-item')];
-            rows.forEach((row, i) => {
-                row.querySelector('.move-up').disabled = i === 0;
-                row.querySelector('.move-down').disabled = i === rows.length - 1;
+
+        function initDashboardMap() {
+            if (!dashboardMap) {
+                dashboardMap = L.map("dashboard-map", { zoomControl: true }).setView([13.75, 100.5], 6);
+                L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(dashboardMap);
+                dashboardMarkers.addTo(dashboardMap);
+            }
+        }
+
+        async function fetchProjects() {
+            const btn = document.getElementById("refresh-projects-btn");
+            if (btn) btn.classList.add("animate-spin", "text-primary-blue");
+
+            const cachedProjects = localStorage.getItem('cache_projects');
+            if (cachedProjects) {
+                allProjects = JSON.parse(cachedProjects);
+                renderProjects(allProjects);
+                renderAdminProjectList(allProjects);
+            }
+
+            try {
+                const res = await fetch(`${WEB_APP_URL}?action=getProjects&t=${Date.now()}`);
+                const result = await res.json();
+                const rawData = result.data || [];
+                
+                // Enhanced filtering: Ignore any project marked as hidden or starts with [HIDDEN]
+                const newProjects = rawData.filter(p => {
+                    const name = (typeof p === 'object' && p !== null) ? p.name : String(p);
+                    const isVisible = (typeof p === 'object' && p !== null) ? (p.isVisible !== false && p.hidden !== true) : true;
+                    const hasHiddenPrefix = name.startsWith("[HIDDEN]");
+                    return isVisible && !hasHiddenPrefix && !sessionHiddenProjects.includes(name.trim());
+                }).map(p => (typeof p === 'object' && p !== null) ? p.name : String(p));
+
+                if (JSON.stringify(newProjects) !== JSON.stringify(allProjects)) {
+                    allProjects = newProjects;
+                    localStorage.setItem('cache_projects', JSON.stringify(allProjects));
+                    renderProjects(allProjects);
+                    renderAdminProjectList(allProjects);
+                }
+                if (btn) showMessage("Projects updated", "success");
+            } catch(e) { 
+                console.error(e); 
+                if(!allProjects.length) showMessage("Connection Error", "error"); 
+            } finally {
+                if (btn) setTimeout(() => btn.classList.remove("animate-spin", "text-primary-blue"), 500);
+            }
+        }
+
+        function renderProjects(list) {
+            const listEl = document.getElementById("project-list");
+            if (!listEl) return;
+            const viewMoreBtn = document.getElementById("project-view-more");
+            listEl.innerHTML = "";
+            document.getElementById("project-count").textContent = `${list.length} projects`;
+            if (list.length === 0) {
+                listEl.innerHTML = `<div class="py-12 text-center text-slate-400 text-sm">No matching projects found</div>`;
+                if (viewMoreBtn) viewMoreBtn.style.display = "none";
+                return;
+            }
+            const visibleProjects = list.slice(0, visibleProjectLimit);
+            visibleProjects.forEach(p => {
+                const card = document.createElement("div");
+                card.className = "figma-project-card";
+                card.innerHTML = `<i class="far fa-folder"></i><span>${p}</span>`;
+                card.onclick = () => { currentProjectName = p; document.getElementById("tracker-title").textContent = p; window.showView("tracker-view"); initMap(); refreshData(); };
+                listEl.appendChild(card);
             });
+            if (viewMoreBtn) {
+                const hasMore = list.length > visibleProjectLimit;
+                viewMoreBtn.style.display = hasMore ? "flex" : "none";
+                viewMoreBtn.onclick = () => {
+                    visibleProjectLimit += 7;
+                    renderProjects(list);
+                };
+            }
         }
 
         function renderAdminProjectList(projects) {
-            const adminList = $("admin-project-list");
+            const adminList = document.getElementById("admin-project-list");
+            if (!adminList) return;
             adminList.innerHTML = "";
-            state.orderDirty = false;
-            $("save-project-order-btn").hidden = true;
-            if (!projects.length) {
-                adminList.innerHTML = `<div class="state-box"><i class="fas fa-folder-open state-icon"></i><strong>No projects</strong><p>Add the first project above.</p></div>`;
-                return;
-            }
             projects.forEach(p => {
                 const row = document.createElement("div");
-                row.className = "admin-row project-admin-item";
-                row.setAttribute("role", "listitem");
+                row.className = "flex justify-between items-center p-5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 cursor-grab project-admin-item text-slate-800 hover:scale-[1.05] transition-transform";
                 row.draggable = true;
                 row.dataset.projectName = p;
-                row.innerHTML = `
-                    <i class="fas fa-grip-vertical grip" aria-hidden="true"></i>
-                    <span class="item-title">${esc(p)}</span>
-                    <div class="admin-actions">
-                        <button type="button" class="icon-btn ghost move-up" aria-label="Move ${esc(p)} up"><i class="fas fa-arrow-up"></i></button>
-                        <button type="button" class="icon-btn ghost move-down" aria-label="Move ${esc(p)} down"><i class="fas fa-arrow-down"></i></button>
-                        <button type="button" class="icon-btn ghost rename" aria-label="Rename ${esc(p)}"><i class="fas fa-pen"></i></button>
-                        <button type="button" class="icon-btn ghost danger hide" aria-label="Hide ${esc(p)}"><i class="fas fa-eye-slash"></i></button>
-                    </div>`;
-                row.querySelector('.rename').onclick = (e) => { e.stopPropagation(); window.renameProjectPrompt(p); };
-                row.querySelector('.hide').onclick = (e) => { e.stopPropagation(); window.deleteProjectPrompt(p); };
-                row.querySelector('.move-up').onclick = () => { const prev = row.previousElementSibling; if (prev) { adminList.insertBefore(row, prev); markOrderDirty(); } };
-                row.querySelector('.move-down').onclick = () => { const next = row.nextElementSibling; if (next) { adminList.insertBefore(next, row); markOrderDirty(); } };
+                row.innerHTML = `<div class="flex items-center gap-3 pointer-events-none"><i class="fas fa-grip-vertical text-slate-200"></i><i class="fas fa-folder text-primary-blue"></i><span class="font-bold text-slate-800 text-sm">${p}</span></div>`;
+                const acts = document.createElement("div");
+                acts.className = "flex gap-2 relative z-20";
+                const ren = document.createElement("button");
+                ren.className = "w-10 h-10 bg-slate-50 text-slate-400 rounded-xl hover:bg-primary-blue hover:text-white transition-all flex items-center justify-center";
+                ren.innerHTML = `<i class="fas fa-pencil-alt text-xs"></i>`;
+                ren.onclick = (e) => { e.stopPropagation(); window.renameProjectPrompt(p); };
+                const del = document.createElement("button");
+                del.className = "w-10 h-10 bg-slate-50 text-slate-400 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center";
+                del.innerHTML = `<i class="fas fa-trash text-xs"></i>`;
+                del.onclick = (e) => { e.stopPropagation(); window.deleteProjectPrompt(p); };
+                acts.appendChild(ren); acts.appendChild(del);
+                row.appendChild(acts);
                 row.addEventListener('dragstart', () => { setTimeout(() => row.classList.add('dragging'), 0); });
-                row.addEventListener('dragend', () => { row.classList.remove('dragging'); markOrderDirty(); });
+                row.addEventListener('dragend', () => { row.classList.remove('dragging'); document.getElementById('save-project-order-btn').classList.remove('hidden'); });
                 adminList.appendChild(row);
             });
-            refreshMoveButtons();
-        }
-
-        // ---------- Admin: analytics ----------
-        function initDashboardMap() {
-            if (dashboardMap) return;
-            dashboardMap = L.map("dashboard-map", { zoomControl: true }).setView([13.75, 100.5], 6);
-            L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], maxZoom: 20 }).addTo(dashboardMap);
-            dashboardMarkers.addTo(dashboardMap);
         }
 
         async function updateDashboard(projectName) {
-            const content = $("dashboard-content"), empty = $("dashboard-empty-state");
-            const seq = ++state.dashboardSeq;
-            if (!projectName) { content.hidden = true; empty.hidden = false; setLoading(false); return; }
-            setLoading(true, "Loading analytics…");
+            if (!projectName) {
+                document.getElementById("dashboard-content").classList.add("hidden");
+                document.getElementById("dashboard-empty-state").classList.remove("hidden");
+                return;
+            }
+            if (ui.spinner) ui.spinner.classList.remove("hidden");
+            document.getElementById("dashboard-empty-state").classList.add("hidden");
+            document.getElementById("dashboard-content").classList.remove("hidden");
             try {
-                const result = await apiGet(`action=getData&project=${encodeURIComponent(projectName)}`);
-                if (seq !== state.dashboardSeq || ui.dashboardProjectSelector.value !== projectName) return;
+                const res = await fetch(`${WEB_APP_URL}?action=getData&project=${encodeURIComponent(projectName)}`);
+                const result = await res.json();
                 const data = result.data || [];
-                empty.hidden = true; content.hidden = false;
-                $("kpi-total-checkins").textContent = data.length;
+                document.getElementById("kpi-total-checkins").textContent = data.length;
                 dashboardMarkers.clearLayers();
+                if (ui.dashboardSummaryTable) ui.dashboardSummaryTable.innerHTML = "";
                 const summary = {};
                 data.forEach(loc => {
                     if (loc.Latitude && loc.Longitude) {
-                        L.marker([loc.Latitude, loc.Longitude], { icon: pinIcon(PIN.team) })
-                            .bindPopup(`<b>Staff:</b> ${esc(loc.EmployeeID)}<br><b>Survey:</b> ${esc(loc.SurveyID || '-')}`)
-                            .addTo(dashboardMarkers);
+                        const marker = L.marker([loc.Latitude, loc.Longitude], { icon: getMarkerIcon('#007AFF') });
+                        marker.bindPopup(`<b>Staff:</b> ${loc.EmployeeID}<br><b>Survey:</b> ${loc.SurveyID || '-'}`);
+                        marker.addTo(dashboardMarkers);
                         summary[loc.EmployeeID] = (summary[loc.EmployeeID] || 0) + 1;
                     }
                 });
-                $("kpi-total-staff").textContent = Object.keys(summary).length;
-                const tbody = $("dashboard-summary-table");
-                tbody.innerHTML = Object.keys(summary).length ? "" : `<tr><td colspan="2">No pins in this project yet.</td></tr>`;
-                Object.keys(summary).sort((a, b) => summary[b] - summary[a]).forEach(eid => {
-                    const row = document.createElement("tr");
-                    row.innerHTML = `<td>${esc(eid)}</td><td class="right">${summary[eid]}</td>`;
-                    tbody.appendChild(row);
-                });
-                setTimeout(() => {
-                    dashboardMap.invalidateSize();
-                    if (dashboardMarkers.getLayers().length) dashboardMap.fitBounds(dashboardMarkers.getBounds().pad(0.1));
-                }, 120);
-            } catch (e) {
-                if (seq === state.dashboardSeq) showMessage(`Couldn't load analytics: ${e.message}`, "error");
-            } finally { if (seq === state.dashboardSeq) setLoading(false); }
+                document.getElementById("kpi-total-staff").textContent = Object.keys(summary).length;
+                if (ui.dashboardSummaryTable) {
+                    Object.keys(summary).sort((a,b) => summary[b] - summary[a]).forEach(eid => {
+                        const row = document.createElement("tr");
+                        row.innerHTML = `<td class="p-3 text-left font-mono font-bold text-slate-800">${eid}</td><td class="p-3 text-right"><span class="text-primary-blue font-black tracking-tight">${summary[eid]}</span></td>`;
+                        ui.dashboardSummaryTable.appendChild(row);
+                    });
+                }
+                if (data.length > 0 && dashboardMap) {
+                    setTimeout(() => { dashboardMap.invalidateSize(); dashboardMap.fitBounds(dashboardMarkers.getBounds().pad(0.1)); }, 200);
+                }
+            } catch(e) { console.error(e); }
+            if (ui.spinner) ui.spinner.classList.add("hidden");
         }
 
-        // ---------- Tracker: data ----------
-        async function refreshData({ quiet = false } = {}) {
-            const project = currentProjectName;
-            if (!project) return;
-            const seq = ++state.recordsSeq;
-            if (!quiet) { state.recordsStatus = savedLocations.length ? 'refreshing' : 'loading'; renderTable(); }
-            try {
-                const result = await apiGet(`action=getData&project=${encodeURIComponent(project)}`);
-                if (project !== currentProjectName || seq !== state.recordsSeq) return;
-                if (!Array.isArray(result.data) || result.success === false) throw new Error(result.message || "The server sent an unexpected reply");
-                const newData = result.data;
-                const hadNone = !savedLocations.length;
-                savedLocations = newData;
-                store.set(`cache_data_${project}`, JSON.stringify(savedLocations));
-                state.recordsStatus = 'ready';
-                renderTable();
-                if (hadNone && !quiet) fitToPins();
-            } catch (e) {
-                if (project !== currentProjectName || seq !== state.recordsSeq) return;
-                state.recordsStatus = 'error';
-                renderTable();
-                if (!quiet) showMessage(savedLocations.length ? `Showing saved copy. Couldn't refresh: ${e.message}` : `Couldn't load records: ${e.message}`, "error");
+        async function refreshData(forceSpinner = false) {
+            if (!currentProjectName) return;
+            const isFirstLoad = !loadedProjects.has(currentProjectName);
+            
+            // Only show full-screen spinner on first project entry in session
+            if (isFirstLoad || forceSpinner) {
+                const spinnerAnim = document.getElementById("spinner-animation");
+                const spinnerSuccess = document.getElementById("spinner-success");
+                const spinnerText = document.getElementById("loading-spinner-text");
+                
+                if (spinnerAnim) spinnerAnim.classList.remove("hidden");
+                if (spinnerSuccess) spinnerSuccess.classList.add("hidden");
+                if (spinnerText) {
+                    spinnerText.textContent = "Loading";
+                    spinnerText.className = "font-black text-primary-blue text-[10px] uppercase tracking-[0.4em]";
+                }
+                if (ui.spinner) ui.spinner.classList.remove("hidden");
+                loadedProjects.add(currentProjectName);
             }
-        }
+            
+            // 1. Load from Cache (Instant UI + Map Pins)
+            const cacheKey = `cache_data_${currentProjectName}`;
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                savedLocations = JSON.parse(cached);
+                renderTable();
+                if (savedLocations.length > 0 && map) {
+                    setTimeout(() => { 
+                        map.invalidateSize(); 
+                        if (permanentMarkers.getLayers().length > 0) {
+                            map.fitBounds(permanentMarkers.getBounds().pad(0.2)); 
+                        }
+                    }, 150);
+                }
+            }
 
-        function fitToPins() {
-            if (!map) return;
-            setTimeout(() => {
-                map.invalidateSize();
-                if (permanentMarkers.getLayers().length) map.fitBounds(permanentMarkers.getBounds().pad(0.2), { maxZoom: 17 });
-            }, 120);
-        }
+            // 2. Sync with Google Sheets
+            try {
+                const res = await fetch(`${WEB_APP_URL}?action=getData&project=${encodeURIComponent(currentProjectName)}&t=${Date.now()}`);
+                const result = await res.json();
+                const newData = result.data || [];
+                
+                if (JSON.stringify(newData) !== JSON.stringify(savedLocations)) {
+                    savedLocations = newData;
+                    localStorage.setItem(cacheKey, JSON.stringify(savedLocations));
+                    renderTable();
+                    if (savedLocations.length > 0 && map) {
+                        map.invalidateSize();
+                        if (permanentMarkers.getLayers().length > 0) {
+                            map.fitBounds(permanentMarkers.getBounds().pad(0.2));
+                        }
+                    }
+                }
 
-        // ---------- Tracker: map & pin ----------
-        function pinIcon(color) {
-            return L.divIcon({
-                className: 'pin-icon',
-                html: `<svg width="28" height="40" viewBox="0 0 28 40" aria-hidden="true"><path d="M14 1.5C7.1 1.5 1.5 7 1.5 13.9c0 9.3 12.5 24.6 12.5 24.6s12.5-15.3 12.5-24.6C26.5 7 20.9 1.5 14 1.5z" fill="${color}" stroke="#fff" stroke-width="2"/><circle cx="14" cy="14" r="4.6" fill="#fff"/></svg>`,
-                iconSize: [28, 40], iconAnchor: [14, 39], popupAnchor: [0, -34]
-            });
-        }
+                // If spinner was active, show success state before closing
+                if (isFirstLoad || forceSpinner) {
+                    const spinnerAnim = document.getElementById("spinner-animation");
+                    const spinnerSuccess = document.getElementById("spinner-success");
+                    const spinnerText = document.getElementById("loading-spinner-text");
+                    
+                    if (spinnerAnim) spinnerAnim.classList.add("hidden");
+                    if (spinnerSuccess) spinnerSuccess.classList.remove("hidden");
+                    if (spinnerText) {
+                        spinnerText.textContent = "Complete";
+                        spinnerText.className = "font-black text-emerald-500 text-[10px] uppercase tracking-[0.4em]";
+                    }
+                    await new Promise(r => setTimeout(r, 800));
+                }
 
-        function initMap() {
-            if (map) return;
-            map = L.map("map", { zoomControl: false }).setView([13.75, 100.5], 13);
-            L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], maxZoom: 20 }).addTo(map);
-            L.control.zoom({ position: 'bottomright' }).addTo(map);
-            permanentMarkers.addTo(map);
-            map.on("click", (e) => updateDisplay(e.latlng.lat, e.latlng.lng));
+            } catch(e) { 
+                console.error(e);
+                if (!savedLocations.length) showMessage("Sync failed", "error");
+            } finally {
+                if (ui.spinner) ui.spinner.classList.add("hidden");
+            }
         }
 
         async function updateAddress(lat, lng) {
-            const seq = ++state.addressSeq;
-            $("address-display").hidden = false;
-            $("current-address-text").textContent = "Finding address…";
+            const addrEl = document.getElementById("address-display");
+            const addrText = document.getElementById("current-address-text");
+            addrEl.classList.remove("hidden");
+            addrText.textContent = "Locating...";
             try {
                 const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=th`);
                 const data = await res.json();
-                if (seq !== state.addressSeq) return;
-                currentAddress = data.display_name || "Address not found";
-            } catch (e) {
-                if (seq !== state.addressSeq) return;
-                currentAddress = "Address not found";
-            }
-            $("current-address-text").textContent = currentAddress;
-            $("current-address-text").title = currentAddress;
+                currentAddress = data.display_name || "Unknown address";
+                addrText.textContent = currentAddress;
+            } catch (e) { addrText.textContent = "Address not found"; }
         }
 
+        // FIXED DISPLAY: INITIAL PIN MUST BE RED
         function updateDisplay(lat, lng) {
             currentLat = lat; currentLng = lng;
-            $("lat").textContent = lat.toFixed(6);
-            $("lng").textContent = lng.toFixed(6);
-            if (!selectionMarker) selectionMarker = L.marker([lat, lng], { icon: pinIcon(PIN.selected), zIndexOffset: 3000 }).addTo(map);
-            else selectionMarker.setLatLng([lat, lng]);
-            $("pick-status").classList.add("has-pin");
-            $("pick-hint").hidden = true;
-            $("pick-coords").hidden = false;
-            $("pick-clear").hidden = false;
+            document.getElementById("lat").textContent = lat.toFixed(6);
+            document.getElementById("lng").textContent = lng.toFixed(6);
+            if (!selectionMarker) {
+                selectionMarker = L.marker([lat, lng], { icon: getMarkerIcon('red') }).addTo(map);
+            } else { selectionMarker.setLatLng([lat, lng]); }
             updateAddress(lat, lng);
         }
 
-        function clearSelection() {
-            if (selectionMarker && map) map.removeLayer(selectionMarker);
-            selectionMarker = null;
-            currentLat = null; currentLng = null; currentAddress = "";
-            state.addressSeq++;
-            $("lat").textContent = "--"; $("lng").textContent = "--";
-            $("pick-status").classList.remove("has-pin");
-            $("pick-hint").hidden = false;
-            $("pick-coords").hidden = true;
-            $("pick-clear").hidden = true;
-            $("address-display").hidden = true;
-        }
-
-        function resetSearch() {
-            $("searchBox").classList.remove("expanded");
-            $("locationSearchInput").value = "";
-            $("search-suggestions").hidden = true;
-        }
-
-        // ---------- Tracker: records list ----------
-        function formatTs(ts) {
-            const d = new Date(ts);
-            if (isNaN(d)) return '--';
-            return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-        }
-
-        function renderSyncStatus() {
-            const n = pendingLocations.length;
-            const failed = pendingLocations.filter(p => p.status === 'failed').length;
-            const busyHere = state.uploading && state.uploadingProject === currentProjectName;
-            const box = $("sync-status"), icon = box.querySelector('.sync-icon i'), btn = $("uploadButton");
-            let cls = '', ico = 'fa-cloud', text = 'No records waiting';
-            if (busyHere) { cls = 'busy'; ico = 'fa-circle-notch fa-spin'; text = state.progressText || 'Uploading…'; }
-            else if (n && failed) { cls = 'error'; ico = 'fa-triangle-exclamation'; text = failed === n ? `${plural(n, 'record')} failed to upload` : `${n} not uploaded · ${failed} failed`; }
-            else if (n) { cls = 'waiting'; ico = 'fa-clock'; text = `${plural(n, 'record')} not uploaded yet`; }
-            else {
-                const last = Number(store.get(lastUploadKey(currentProjectName)));
-                if (last) { cls = 'ok'; ico = 'fa-check'; text = `All uploaded · ${new Date(last).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`; }
+        function initMap() {
+            if (!map) {
+                map = L.map("map", { zoomControl: false }).setView([13.75, 100.5], 13);
+                L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
+                permanentMarkers.addTo(map);
+                map.on("click", (e) => updateDisplay(e.latlng.lat, e.latlng.lng));
             }
-            box.className = `sync-status ${cls}`;
-            icon.className = `fas ${ico}`;
-            $("sync-text").textContent = text;
-            btn.hidden = !n || busyHere;
-            btn.classList.toggle('has-pending', !!n && !failed);
-            btn.classList.toggle('is-error', !!failed);
-            $("uploadButtonText").textContent = failed ? `Retry (${n})` : `Upload (${n})`;
         }
 
         function renderTable() {
-            const all = [...savedLocations, ...pendingLocations].sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp));
-            const list = ui.savedTable;
-            list.innerHTML = "";
+            const all = [...savedLocations, ...pendingLocations].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp));
+            ui.savedTable.innerHTML = "";
             permanentMarkers.clearLayers();
-            const currentEID = str(ui.employeeId.value);
-
-            const badge = $("eid-pin-count");
-            if (currentEID) {
-                const count = all.filter(l => str(l.EmployeeID) === currentEID).length;
-                badge.textContent = plural(count, 'record');
-                badge.hidden = false;
-            } else badge.hidden = true;
-
-            $("history-count").textContent = all.length ? ` (${all.length})` : '';
-            $("history-button-count").textContent = all.length;
-            const sub = $("tracker-subtitle");
-            const prefix = MOCK ? 'Test mode · ' : '';
-            if (state.recordsStatus === 'loading') sub.textContent = prefix + 'Loading records…';
-            else sub.textContent = prefix + `${plural(savedLocations.length, 'record')} in Sheet` + (pendingLocations.length ? ` · ${pendingLocations.length} waiting` : '') + (state.recordsStatus === 'refreshing' ? ' · updating…' : '');
-            renderSyncStatus();
-
-            all.forEach(loc => {
-                const lat = parseFloat(loc.Latitude), lng = parseFloat(loc.Longitude);
-                if (isNaN(lat) || isNaN(lng)) return;
-                const isP = !!loc.isPending, isMe = currentEID !== "" && str(loc.EmployeeID) === currentEID;
-                L.marker([lat, lng], { icon: pinIcon(isP ? PIN.pending : (isMe ? PIN.mine : PIN.team)), zIndexOffset: isMe ? 2000 : (isP ? 1000 : 0) })
-                    .bindPopup(`<b>${esc(customLabels.surveyId)}:</b> ${esc(loc.SurveyID || '-')}<br><b>${esc(customLabels.employeeId)}:</b> ${esc(loc.EmployeeID)}`)
-                    .addTo(permanentMarkers);
-            });
-
-            if (!all.length) {
-                if (state.recordsStatus === 'loading') {
-                    list.innerHTML = Array.from({ length: 3 }, () => `<div class="skeleton"><div class="sk" style="width:10px;height:10px;border-radius:50%"></div><div style="flex:1;display:grid;gap:6px"><div class="sk" style="height:14px;width:45%"></div><div class="sk" style="height:11px;width:70%"></div></div></div>`).join('');
-                } else if (state.recordsStatus === 'error') {
-                    list.innerHTML = `<div class="state-box"><i class="fas fa-wifi state-icon"></i><strong>Couldn't load records</strong><p>Check your connection and try again. You can still save new records.</p><button type="button" id="retry-records" class="btn btn-secondary btn-sm"><i class="fas fa-rotate-right"></i> Try again</button></div>`;
-                    $("retry-records").onclick = () => refreshData();
-                } else {
-                    list.innerHTML = `<div class="state-box"><i class="fas fa-map-location-dot state-icon"></i><strong>No records yet</strong><p>Tap the map, enter both IDs, then Save record.</p></div>`;
+            const currentEID = ui.employeeId ? ui.employeeId.value.trim() : "";
+            if (currentEID !== "") {
+                const count = all.filter(l => l.EmployeeID === currentEID).length;
+                if (document.getElementById("eid-pin-count")) {
+                    document.getElementById("eid-pin-count").textContent = `${count} PINS`;
+                    document.getElementById("eid-pin-count").classList.remove("hidden");
                 }
-                return;
-            }
-
+            } else if (document.getElementById("eid-pin-count")) document.getElementById("eid-pin-count").classList.add("hidden");
+            
             all.forEach((loc, i) => {
-                const isP = !!loc.isPending, isMe = currentEID !== "" && str(loc.EmployeeID) === currentEID;
-                const row = document.createElement("div");
-                row.className = "rec" + (isMe ? " is-me" : "");
-                row.setAttribute("role", "listitem");
-                const dotColor = isP ? (loc.status === 'failed' ? 'var(--danger)' : PIN.pending) : (isMe ? PIN.mine : PIN.team);
-                const chip = !isP ? '' : loc.status === 'uploading' ? '<span class="chip chip-accent"><i class="fas fa-circle-notch fa-spin"></i> Uploading</span>'
-                    : loc.status === 'failed' ? '<span class="chip chip-failed"><i class="fas fa-triangle-exclamation"></i> Failed</span>'
-                    : '<span class="chip chip-pending"><i class="fas fa-clock"></i> Not uploaded</span>';
-                row.innerHTML = `
-                    <button type="button" class="rec-main" title="Show on map">
-                        <span class="dot" style="background:${dotColor}" aria-hidden="true"></span>
-                        <span class="rec-text">
-                            <span class="rec-top"><span class="rec-title">${esc(customLabels.surveyId)} ${esc(loc.SurveyID || '-')}</span>${chip}</span>
-                            <span class="rec-meta num">${esc(customLabels.employeeId)} ${esc(loc.EmployeeID)} · ${formatTs(loc.Timestamp)} · #${all.length - i}${loc.status === 'failed' && loc.lastError ? ` · ${esc(loc.lastError)}` : ''}</span>
-                        </span>
-                    </button>`;
-                row.querySelector('.rec-main').onclick = () => {
-                    const lat = parseFloat(loc.Latitude), lng = parseFloat(loc.Longitude);
-                    if (isNaN(lat) || isNaN(lng)) return;
-                    closeHistory();
-                    map.setView([lat, lng], 18);
-                };
+                const isP = loc.isPending, isMe = currentEID !== "" && loc.EmployeeID === currentEID;
+                let markerColor = isP ? 'yellow' : (isMe ? '#1a237e' : '#007AFF');
+                const marker = L.marker([loc.Latitude, loc.Longitude], { icon: getMarkerIcon(markerColor), zIndexOffset: isMe ? 2000 : (isP ? 1000 : 0) }).addTo(permanentMarkers);
+                const row = document.createElement("tr");
+                row.className = isMe ? "bg-blue-50/50" : (isP ? "bg-red-50/20" : "hover:bg-slate-50 transition-colors");
+                const ts = new Date(loc.Timestamp).toLocaleString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+                row.innerHTML = `<td class="p-3 text-slate-400 font-mono text-[9px]">${all.length - i}</td><td class="p-3 font-black text-[10px] ${isMe ? 'text-primary-blue' : 'text-slate-900'}">${loc.EmployeeID}${isP ? ' ⏳' : ''}</td><td class="p-3 text-slate-500 font-bold text-[10px]">${loc.SurveyID || '-'}</td><td class="p-3 text-slate-400 font-bold text-[9px]">${ts}</td><td class="p-3 text-center"></td>`;
                 if (isP) {
-                    const delBtn = document.createElement("button");
-                    delBtn.type = "button";
-                    delBtn.className = "icon-btn ghost danger";
-                    delBtn.setAttribute("aria-label", `Delete ${customLabels.surveyId} ${loc.SurveyID || ''}`);
-                    delBtn.innerHTML = `<i class="fas fa-trash-can"></i>`;
-                    delBtn.onclick = (e) => { e.stopPropagation(); deletePending(loc.ID); };
-                    row.appendChild(delBtn);
+                    const delBtn = document.createElement("button"); delBtn.className = "text-slate-200 hover:text-red-500 transition-all flex items-center justify-center mx-auto"; delBtn.innerHTML = `<i class="fas fa-trash-alt"></i>`;
+                    delBtn.onclick = (e) => { 
+                        e.stopPropagation(); 
+                        showConfirmation("Confirm Delete", "Are you sure you want to delete this pending record?", () => {
+                            pendingLocations = pendingLocations.filter(l => String(l.ID) !== String(loc.ID));
+                            document.getElementById("confirmationModal").style.display = "none";
+                            renderTable();
+                            showMessage("Record deleted", "success");
+                        });
+                    };
+                    row.cells[4].appendChild(delBtn);
                 }
-                list.appendChild(row);
+                row.onclick = () => { map.setView([loc.Latitude, loc.Longitude], 18); };
+                ui.savedTable.appendChild(row);
             });
         }
 
-        function deletePending(id) {
-            const item = pendingLocations.find(l => String(l.ID) === String(id));
-            if (!item) return;
-            if (item.status === 'uploading') return showMessage("This record is uploading. Wait a moment.", "info");
-            const maybeSent = !!item.needsVerify || (item.attempts > 0 && !!item.lastTransportFailAt);
-            showConfirmation("Delete this record?",
-                maybeSent ? "It was not confirmed as uploaded, but it may already be in the Sheet. It will be removed from this phone only."
-                          : "It hasn't been uploaded. It will be removed from this phone.",
-                () => {
-                    closeModal($("confirmationModal"));
-                    const project = currentProjectName;
-                    const current = pendingLocations.find(l => String(l.ID) === String(id));
-                    if (!current) return showMessage("This record was already uploaded.", "info");
-                    if (current.status === 'uploading') return showMessage("This record is uploading. Wait a moment.", "info");
-                    mutatePending(project, list => list.filter(l => String(l.ID) !== String(id)));
-                    renderTable();
-                    showMessage("Record deleted", "success");
-                });
-        }
-
-        function openHistory() { $("history-panel").classList.add("is-open"); $("history-backdrop").hidden = false; setTimeout(() => $("history-close").focus(), 60); }
-        function closeHistory() { const p = $("history-panel"); if (!p.classList.contains("is-open")) return; p.classList.remove("is-open"); $("history-backdrop").hidden = true; }
-
-        // ---------- Tracker: upload ----------
-        async function uploadPending() {
-            const project = currentProjectName;
-            if (!project) return;
-            if (state.uploading) { if (state.uploadingProject !== project) showMessage("Another project is still uploading. Try again in a moment.", "info"); return; }
-            if (!pendingLocations.length) return showMessage("Nothing to upload", "info");
-            if (!MOCK && !navigator.onLine) return showMessage("You're offline. Records stay on this phone until you upload.", "warning");
-
-            state.uploading = true; state.uploadingProject = project;
-            const ids = pendingLocations.map(p => p.ID);
-            let uploaded = 0, failed = 0, waiting = 0, serverRows = null, lastError = null;
-            for (let i = 0; i < ids.length; i++) {
-                if (project !== currentProjectName) break;
-                const item = pendingLocations.find(p => p.ID === ids[i]);
-                if (!item) continue;
-                // A request that timed out may still be writing; give it time before checking.
-                if (item.lastTransportFailAt && Date.now() - item.lastTransportFailAt < VERIFY_WAIT_MS) { waiting++; continue; }
-                state.progressText = `Uploading ${i + 1} of ${ids.length}…`;
-                mutatePending(project, list => list.map(p => p.ID === item.ID ? { ...p, status: 'uploading', lastAttemptAt: Date.now() } : p));
-                renderTable();
-                try {
-                    let already = false;
-                    if (item.needsVerify || (item.attempts > 0 && item.lastTransportFailAt)) {
-                        if (!serverRows) {
-                            const r = await apiGet(`action=getData&project=${encodeURIComponent(project)}`, { tries: 2 });
-                            // Without a real list we can't tell whether it arrived, so keep it waiting.
-                            if (!Array.isArray(r.data) || r.success === false) throw new Error(r.message || "Couldn't check the Sheet");
-                            serverRows = r.data;
-                        }
-                        already = serverRows.some(r => sameRecord(r, item));
-                    }
-                    if (!already) await apiPost({ action: "add", project, data: { name: item.EmployeeID, surveyId: item.SurveyID, lat: item.Latitude, lng: item.Longitude } });
-                    mutatePending(project, list => list.filter(p => p.ID !== item.ID));
-                    if (project === currentProjectName && !savedLocations.some(r => sameRecord(r, item))) {
-                        // Keep it visible (and in the duplicate check) until the next refresh replaces the list.
-                        const { ID, isPending, status, attempts, lastError, lastAttemptAt, lastTransportFailAt, needsVerify, ...row } = item;
-                        savedLocations = [...savedLocations, row];
-                        store.set(`cache_data_${project}`, JSON.stringify(savedLocations));
-                    }
-                    uploaded++;
-                } catch (err) {
-                    lastError = err; failed++;
-                    const transport = !err.isServerReject;
-                    mutatePending(project, list => list.map(p => p.ID === item.ID ? {
-                        ...p, status: 'failed', attempts: (p.attempts || 0) + 1, lastError: err.message, needsVerify: true,
-                        // Only wait when the request may have reached the server (not when the phone was offline).
-                        lastTransportFailAt: transport && !err.offline ? Date.now() : p.lastTransportFailAt
-                    } : p));
-                    if (transport) break; // connection problem: stop, keep the rest for later
-                }
-            }
-            mutatePending(project, list => list.map(p => p.status === 'uploading' ? { ...p, status: 'failed', attempts: Math.max(1, p.attempts || 0), needsVerify: true, lastTransportFailAt: p.lastAttemptAt || Date.now() } : p));
-            state.uploading = false; state.uploadingProject = null; state.progressText = '';
-            if (uploaded) store.set(lastUploadKey(project), String(Date.now()));
-
-            if (project === currentProjectName) {
-                renderTable();
-                if (uploaded) refreshData({ quiet: true });
-                const left = pendingLocations.length;
-                if (!failed && !waiting && !left) showMessage(`Uploaded ${plural(uploaded, 'record')}`, "success");
-                else if (failed) showMessage(`Uploaded ${uploaded}. ${left} still waiting: ${lastError.message}`, "error");
-                else if (waiting) showMessage(`Uploaded ${uploaded}. ${plural(waiting, 'record')} may still be processing. Try again in a minute.`, "warning");
-                else showMessage(`Uploaded ${uploaded}. ${left} still waiting.`, "warning");
-            }
-        }
-
-        // ---------- Test mode data ----------
-        const mockDb = (() => {
-            const now = Date.now();
-            const pts = (base, n, emp) => Array.from({ length: n }, (_, i) => ({
-                EmployeeID: emp, SurveyID: String(1001 + i),
-                Latitude: +(base[0] + Math.sin(i * 1.7) * 0.004).toFixed(6), Longitude: +(base[1] + Math.cos(i * 1.3) * 0.004).toFixed(6),
-                Timestamp: new Date(now - (i + 1) * 3600e3 * (i % 2 ? 7 : 1)).toISOString()
-            }));
-            return {
-                password: '1234',
-                projects: ['SCGC Community 2026', 'DOW Thailand Group Community Acceptance Survey 2026', 'Pilot Lat Phrao (Team B)'],
-                data: {
-                    'SCGC Community 2026': [...pts([12.7120, 101.1340], 5, '10234'), ...pts([12.7090, 101.1400], 3, '10871')],
-                    'DOW Thailand Group Community Acceptance Survey 2026': pts([12.6810, 101.1120], 4, '20455'),
-                    'Pilot Lat Phrao (Team B)': []
-                }
-            };
-        })();
-        async function mockApi(query, payload) {
-            await new Promise(r => setTimeout(r, 400));
-            if (query) {
-                const q = new URLSearchParams(query);
-                if (q.get('action') === 'getProjects') return { success: true, data: [...mockDb.projects] };
-                if (q.get('action') === 'getData') return { success: true, data: JSON.parse(JSON.stringify(mockDb.data[q.get('project')] || [])) };
-                return { success: false, message: 'Unknown action' };
-            }
-            switch (payload.action) {
-                case 'verifyPassword': return payload.password === mockDb.password ? { success: true } : { success: false, message: 'Incorrect password' };
-                case 'add': {
-                    const d = payload.data, rows = mockDb.data[payload.project] || (mockDb.data[payload.project] = []);
-                    rows.push({ EmployeeID: d.name, SurveyID: d.surveyId, Latitude: d.lat, Longitude: d.lng, Timestamp: new Date().toISOString() });
-                    return { success: true };
-                }
-                case 'addProject':
-                    if (mockDb.projects.includes(payload.projectName)) return { success: false, message: 'Project already exists' };
-                    mockDb.projects.push(payload.projectName); mockDb.data[payload.projectName] = []; return { success: true };
-                case 'renameProject': {
-                    const i = mockDb.projects.indexOf(payload.oldProjectName);
-                    if (i < 0) return { success: false, message: 'Project not found' };
-                    mockDb.projects[i] = payload.newProjectName;
-                    mockDb.data[payload.newProjectName] = mockDb.data[payload.oldProjectName] || []; delete mockDb.data[payload.oldProjectName];
-                    return { success: true };
-                }
-                case 'hideProject': mockDb.projects = mockDb.projects.filter(p => p !== payload.projectName); return { success: true };
-                case 'reorderProjects': mockDb.projects = [...payload.projectOrder]; return { success: true };
-            }
-            return { success: false, message: 'Unknown action' };
-        }
-
-        // ---------- Wiring ----------
         window.onload = () => {
             ui = {
-                spinner: $("loadingSpinner"),
-                employeeId: $("employeeIdInput"),
-                surveyId: $("surveyIdInput"),
-                savedTable: $("savedLocationsTableBody"),
-                dashboardProjectSelector: $("dashboard-project-selector"),
-                dashboardSummaryTable: $("dashboard-summary-table")
+                spinner: document.getElementById("loadingSpinner"),
+                employeeId: document.getElementById("employeeIdInput"),
+                surveyId: document.getElementById("surveyIdInput"),
+                savedTable: document.getElementById("savedLocationsTableBody"),
+                dashboardProjectSelector: document.getElementById("dashboard-project-selector"),
+                dashboardSummaryTable: document.getElementById("dashboard-summary-table")
             };
-            if (MOCK) $("mock-banner").hidden = false;
-
-            // Admin stays unlocked on a device that signed in before
-            if (store.get("admin_auth_token") === "authenticated_true") isAdminAuthenticated = true;
-
-            updateLabels();
+            
+            // Auto-login Admin if previously authenticated on this device
+            if (localStorage.getItem("admin_auth_token") === "authenticated_true") {
+                isAdminAuthenticated = true;
+            }
+            
             fetchProjects();
 
-            $("project-search-input").oninput = () => renderProjects();
-            $("refresh-projects-btn").onclick = () => fetchProjects({ manual: true });
-
-            const adminProjectList = $("admin-project-list");
-            adminProjectList.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                const dragging = document.querySelector('.dragging');
-                if (!dragging) return;
-                const afterElement = getDragAfterElement(adminProjectList, e.clientY);
-                if (afterElement == null) adminProjectList.appendChild(dragging);
-                else adminProjectList.insertBefore(dragging, afterElement);
-            });
-            $("save-project-order-btn").onclick = async () => {
-                const order = [...adminProjectList.querySelectorAll('.project-admin-item')].map(item => item.dataset.projectName);
-                setLoading(true, "Saving order…");
-                try {
-                    await apiPost({ action: "reorderProjects", projectOrder: order });
-                    allProjects = order;
-                    store.set('cache_projects', JSON.stringify(allProjects));
-                    $("save-project-order-btn").hidden = true; state.orderDirty = false;
-                    showMessage("Order saved", "success");
-                    fetchProjects();
-                } catch (e) { showMessage(`Couldn't save the order: ${e.message}`, "error"); }
-                setLoading(false);
+            document.getElementById("project-search-input").oninput = (e) => {
+                const term = e.target.value.toLowerCase();
+                visibleProjectLimit = 7;
+                renderProjects(allProjects.filter(p => p.toLowerCase().includes(term)));
             };
 
-            $("togglePasswordBtn").onclick = () => {
-                const p = $("password-input"), show = p.type === "password";
-                p.type = show ? "text" : "password";
-                $("eyeIcon").className = show ? "fas fa-eye-slash" : "fas fa-eye";
-                $("togglePasswordBtn").setAttribute("aria-label", show ? "Hide password" : "Show password");
+            document.getElementById("project-search-submit").onclick = () => {
+                const input = document.getElementById("project-search-input");
+                input.focus();
+                const term = input.value.toLowerCase();
+                visibleProjectLimit = 7;
+                renderProjects(allProjects.filter(p => p.toLowerCase().includes(term)));
             };
-            $("close-password-modal").onclick = () => closeModal($("passwordModal"));
-            $("manage-projects-btn").onclick = () => {
-                if (isAdminAuthenticated) { renderAdminProjectList(allProjects); window.showView("admin-menu-view"); }
-                else { $("password-input").value = ""; openModal($("passwordModal")); }
-            };
-            $("password-form").onsubmit = async (e) => {
-                e.preventDefault();
-                setLoading(true, "Checking password…");
+
+            const adminProjectList = document.getElementById('admin-project-list');
+            if (adminProjectList) {
+                adminProjectList.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    const dragging = document.querySelector('.dragging');
+                    if (!dragging) return;
+                    const afterElement = getDragAfterElement(adminProjectList, e.clientY);
+                    if (afterElement == null) adminProjectList.appendChild(dragging); 
+                    else adminProjectList.insertBefore(dragging, afterElement);
+                });
+            }
+
+            document.getElementById('save-project-order-btn').onclick = async () => {
+                const listItems = [...adminProjectList.querySelectorAll('.project-admin-item')];
+                const order = listItems.map(item => item.dataset.projectName);
+                ui.spinner.classList.remove("hidden");
                 try {
-                    await apiPost({ action: "verifyPassword", password: $("password-input").value });
-                    isAdminAuthenticated = true;
-                    store.set("admin_auth_token", "authenticated_true");
-                    closeModal($("passwordModal"));
-                    renderAdminProjectList(allProjects);
+                    const res = await fetch(WEB_APP_URL, { method: "POST", headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: "reorderProjects", projectOrder: order }) });
+                    const result = await res.json();
+                    if (result.success) { showMessage("Complete", "success"); fetchProjects(); document.getElementById('save-project-order-btn').classList.add('hidden'); }
+                } catch (e) { console.error(e); }
+                ui.spinner.classList.add("hidden");
+            };
+
+            document.getElementById("togglePasswordBtn").onclick = () => {
+                const p = document.getElementById("password-input");
+                const i = document.getElementById("eyeIcon");
+                if (p.type === "password") { p.type = "text"; i.className = "fas fa-eye text-sm"; } 
+                else { p.type = "password"; i.className = "fas fa-eye-slash text-sm"; }
+            };
+
+            document.getElementById("close-password-modal").onclick = () => { document.getElementById("passwordModal").style.display = "none"; };
+            document.getElementById("home-button").onclick = () => { ui.employeeId.value = ""; window.showView("project-selection-view"); };
+            document.getElementById("refresh-projects-btn").onclick = () => fetchProjects();
+            
+            document.getElementById("manage-projects-btn").onclick = () => { 
+                if (isAdminAuthenticated) {
                     window.showView("admin-menu-view");
-                } catch (err) {
-                    showMessage(err.isServerReject ? "Incorrect password" : `Couldn't check the password: ${err.message}`, "error");
-                    $("password-input").select();
+                } else {
+                    document.getElementById("password-input").value = ""; 
+                    document.getElementById("passwordModal").style.display = "flex"; 
                 }
-                setLoading(false);
             };
 
-            $("menu-back-to-selection-btn").onclick = () => { window.showView("project-selection-view"); renderProjects(); };
-            $("goto-manage-projects-btn").onclick = () => { renderAdminProjectList(allProjects); window.showView("admin-view"); };
-            $("back-to-menu-btn").onclick = () => {
-                if (state.orderDirty) return showConfirmation("Discard the new order?", "You moved projects but didn't save the order.", () => { closeModal($("confirmationModal")); state.orderDirty = false; window.showView("admin-menu-view"); }, "Discard");
-                window.showView("admin-menu-view");
-            };
-            $("dashboard-back-to-menu-btn").onclick = () => window.showView("admin-menu-view");
-            $("goto-dashboards-btn").onclick = () => {
-                state.dashboardSeq++;
-                setLoading(false);
-                window.showView("dashboard-view");
-                ui.dashboardProjectSelector.innerHTML = '<option value="">Choose a project</option>' + allProjects.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
-                $("dashboard-content").hidden = true; $("dashboard-empty-state").hidden = false;
-            };
-            ui.dashboardProjectSelector.onchange = (e) => updateDashboard(e.target.value);
-
-            $("add-project-form").onsubmit = async (e) => {
+            document.getElementById("password-form").onsubmit = async (e) => {
                 e.preventDefault();
-                const name = $("new-project-name").value.trim();
-                if (!name) return;
-                setLoading(true, "Adding project…");
+                ui.spinner.classList.remove("hidden");
                 try {
-                    await apiPost({ action: "addProject", projectName: name });
-                    $("new-project-name").value = "";
-                    showMessage("Project added", "success");
-                    await fetchProjects();
-                    renderAdminProjectList(allProjects);
-                } catch (err) { showMessage(`Couldn't add the project: ${err.message}`, "error"); }
-                setLoading(false);
-            };
-            $("cancel-rename-btn").onclick = () => closeModal($("renameModal"));
-
-            // Tracker
-            $("home-button").onclick = () => {
-                ui.employeeId.value = "";
-                window.setEmployeeLock(false);
-                clearSelection();
-                resetSearch();
-                window.showView("project-selection-view");
-                renderProjects();
-            };
-            $("customizeLabelsBtn").onclick = () => {
-                $("custom-employee-label").value = customLabels.employeeId;
-                $("custom-survey-label").value = customLabels.surveyId;
-                openModal($("customizeLabelsModal"));
-            };
-            $("cancel-customize-btn").onclick = () => closeModal($("customizeLabelsModal"));
-            $("customize-labels-form").onsubmit = (e) => {
-                e.preventDefault();
-                customLabels.employeeId = $("custom-employee-label").value.trim() || DEFAULT_LABELS.employeeId;
-                customLabels.surveyId = $("custom-survey-label").value.trim() || DEFAULT_LABELS.surveyId;
-                store.set('customLabels', JSON.stringify(customLabels));
-                updateLabels(); renderTable(); window.setEmployeeLock(isEmployeeIdLocked);
-                closeModal($("customizeLabelsModal"));
-                showMessage("Field names updated", "success");
+                    const res = await fetch(WEB_APP_URL, { 
+                        method: "POST", 
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
+                        body: JSON.stringify({ action: "verifyPassword", password: document.getElementById("password-input").value }) 
+                    });
+                    const result = await res.json();
+                    if (result.success) { 
+                        isAdminAuthenticated = true; 
+                        localStorage.setItem("admin_auth_token", "authenticated_true"); // Remember authentication
+                        document.getElementById("passwordModal").style.display = "none"; 
+                        window.showView("admin-menu-view"); 
+                    } 
+                    else showMessage("Incorrect Password", "error");
+                } catch(e) {}
+                ui.spinner.classList.add("hidden");
             };
 
-            $("lockEmployeeIdBtn").addEventListener("pointerdown", (e) => e.preventDefault());
-            $("lockEmployeeIdBtn").onclick = () => {
-                if (!isEmployeeIdLocked && !str(ui.employeeId.value)) { ui.employeeId.focus(); return showMessage(`Enter ${customLabels.employeeId} first`, "warning"); }
-                window.setEmployeeLock(!isEmployeeIdLocked);
-                if (!isEmployeeIdLocked) ui.employeeId.focus();
+            document.getElementById("toggleSearchBtn").onclick = () => document.getElementById("searchBox").classList.toggle("expanded");
+            document.getElementById("lockEmployeeIdBtn").onclick = () => window.setEmployeeLock(!isEmployeeIdLocked);
+            ui.employeeId.onblur = () => { if (ui.employeeId.value.trim() !== "") window.setEmployeeLock(true); };
+            ui.employeeId.addEventListener('keydown', (e) => { if (e.key === 'Enter' && ui.employeeId.value.trim() !== "") { window.setEmployeeLock(true); ui.surveyId.focus(); } });
+            ui.employeeId.oninput = () => renderTable();
+
+            document.getElementById("currentLocationButton").onclick = () => { 
+                showMessage("Loading", "info"); 
+                navigator.geolocation.getCurrentPosition(p => { 
+                    updateDisplay(p.coords.latitude, p.coords.longitude); 
+                    map.setView([p.coords.latitude, p.coords.longitude], 18); 
+                    showMessage("Complete", "success"); 
+                }, () => showMessage("GPS Failure", "error"), { enableHighAccuracy: true }); 
             };
-            ui.employeeId.onblur = () => { if (str(ui.employeeId.value) !== "") window.setEmployeeLock(true); };
-            ui.employeeId.addEventListener('keydown', (e) => { if (e.key === 'Enter' && str(ui.employeeId.value) !== "") { window.setEmployeeLock(true); ui.surveyId.focus(); } });
-            ui.employeeId.oninput = () => { ui.employeeId.removeAttribute('aria-invalid'); renderTable(); };
-            ui.surveyId.oninput = () => ui.surveyId.removeAttribute('aria-invalid');
-            ui.surveyId.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $("saveButton").click(); } });
-
-            $("pick-clear").onclick = clearSelection;
-            $("currentLocationButton").onclick = () => {
-                if (!navigator.geolocation) return showMessage("This device can't share its location", "error");
-                const btn = $("currentLocationButton");
-                btn.classList.add("is-busy");
-                setLoading(true, "Finding your location…");
-                navigator.geolocation.getCurrentPosition(p => {
-                    updateDisplay(p.coords.latitude, p.coords.longitude);
-                    map.setView([p.coords.latitude, p.coords.longitude], 18);
-                    const acc = Math.round(p.coords.accuracy || 0);
-                    showMessage(acc ? `Location found (about ±${acc} m)` : "Location found", "success");
-                    setLoading(false); btn.classList.remove("is-busy");
-                }, (err) => {
-                    const msg = err.code === 1 ? "Allow location access for this site, then try again"
-                        : err.code === 3 ? "GPS signal is weak. Move to an open area and try again"
-                        : "Couldn't get your location. Turn on GPS and try again";
-                    showMessage(msg, "error");
-                    setLoading(false); btn.classList.remove("is-busy");
-                }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-            };
-
-            $("saveButton").onclick = () => {
-                const eid = str(ui.employeeId.value), sid = str(ui.surveyId.value);
-                if (currentLat === null) return showMessage("Tap the map to pin the location first", "warning");
-                if (!eid) { ui.employeeId.disabled = false; ui.employeeId.setAttribute('aria-invalid', 'true'); ui.employeeId.focus(); return showMessage(`Enter ${customLabels.employeeId}`, "warning"); }
-                if (!sid) { ui.surveyId.setAttribute('aria-invalid', 'true'); ui.surveyId.focus(); return showMessage(`Enter ${customLabels.surveyId}`, "warning"); }
-
+            
+            document.getElementById("saveButton").onclick = () => {
+                const eid = ui.employeeId.value.trim(), sid = ui.surveyId.value.trim();
+                if (!eid || !sid || currentLat === null) return showMessage("ID or Pin Required", "warning");
+                
                 const all = [...savedLocations, ...pendingLocations];
-                if (all.some(l => normId(l.EmployeeID) === normId(eid) && normId(l.SurveyID) === normId(sid))) {
-                    ui.surveyId.setAttribute('aria-invalid', 'true'); ui.surveyId.focus();
-                    return showMessage(`${customLabels.employeeId} ${eid} + ${customLabels.surveyId} ${sid} is already saved`, "error");
+                // Check for duplicate ID combination
+                if (all.some(l => l.EmployeeID === eid && l.SurveyID === sid)) {
+                    return showMessage("Duplicate ID combination", "error");
                 }
-                if (all.some(l => parseFloat(l.Latitude) === currentLat && parseFloat(l.Longitude) === currentLng)) {
-                    return showMessage("This exact location is already pinned. Tap a different spot.", "warning");
+                // Check for duplicate coordinates (prevent double-clicking same spot)
+                if (all.some(l => l.Latitude === currentLat && l.Longitude === currentLng)) {
+                    return showMessage("This location is already pinned", "warning");
                 }
 
-                const project = currentProjectName;
-                const ok = mutatePending(project, list => [...list, { ID: `p_${Date.now()}`, EmployeeID: eid, SurveyID: sid, Latitude: currentLat, Longitude: currentLng, Timestamp: new Date().toISOString(), isPending: true, status: 'pending', attempts: 0 }]);
-                if (!isEmployeeIdLocked) ui.employeeId.value = "";
-                ui.surveyId.value = "";
-                ui.employeeId.removeAttribute('aria-invalid'); ui.surveyId.removeAttribute('aria-invalid');
-                clearSelection();
-                renderTable();
-                if (ok) showMessage(`Saved on this phone · ${plural(pendingLocations.length, 'record')} to upload`, "success");
+                pendingLocations.push({ ID: `p_${Date.now()}`, EmployeeID: eid, SurveyID: sid, Latitude: currentLat, Longitude: currentLng, Timestamp: new Date().toISOString(), isPending: true });
+                if (!isEmployeeIdLocked) ui.employeeId.value = ""; 
+                ui.surveyId.value = ""; renderTable(); showMessage("Saved Locally", "success");
             };
 
-            $("uploadButton").onclick = uploadPending;
-            $("historyButton").onclick = openHistory;
-            $("history-close").onclick = closeHistory;
-            $("history-backdrop").onclick = closeHistory;
+            document.getElementById("uploadButton").onclick = async () => {
+                if (!pendingLocations.length) return showMessage("Nothing to sync", "info");
+                
+                // Reset Spinner to Loading
+                const spinnerAnim = document.getElementById("spinner-animation");
+                const spinnerSuccess = document.getElementById("spinner-success");
+                const spinnerText = document.getElementById("loading-spinner-text");
+                
+                if (spinnerAnim) spinnerAnim.classList.remove("hidden");
+                if (spinnerSuccess) spinnerSuccess.classList.add("hidden");
+                if (spinnerText) {
+                    spinnerText.textContent = "Loading";
+                    spinnerText.className = "font-black text-primary-blue text-[10px] uppercase tracking-[0.4em]";
+                }
+                ui.spinner.classList.remove("hidden");
+                
+                // Send all requests in parallel for much faster performance
+                try {
+                    const uploadPromises = pendingLocations.map(loc => 
+                        fetch(WEB_APP_URL, { 
+                            method: "POST", 
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
+                            body: JSON.stringify({ 
+                                action: "add", 
+                                project: currentProjectName, 
+                                data: { name: loc.EmployeeID, surveyId: loc.SurveyID, lat: loc.Latitude, lng: loc.Longitude } 
+                            }) 
+                        })
+                    );
+                    
+                    await Promise.all(uploadPromises);
+                    pendingLocations = []; 
 
-            $("exportCsvButton").onclick = () => {
-                const all = [...savedLocations, ...pendingLocations].sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp));
-                if (all.length === 0) return showMessage("No records to export", "info");
-                const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+                    // Show "Completed" State
+                    if (spinnerAnim) spinnerAnim.classList.add("hidden");
+                    if (spinnerSuccess) spinnerSuccess.classList.remove("hidden");
+                    if (spinnerText) {
+                        spinnerText.textContent = "Completed";
+                        spinnerText.className = "font-black text-emerald-500 text-[10px] uppercase tracking-[0.4em]";
+                    }
+                    
+                    await new Promise(r => setTimeout(r, 1000));
+                    ui.spinner.classList.add("hidden"); 
+                    refreshData(false); // Sync data silently in background after upload
+                } catch (e) {
+                    console.error(e);
+                    ui.spinner.classList.add("hidden");
+                    showMessage("Upload failed", "error");
+                }
+            };
+
+            document.getElementById("add-project-form").onsubmit = async (e) => {
+                e.preventDefault();
+                const name = document.getElementById("new-project-name").value.trim();
+                if (!name) return;
+                ui.spinner.classList.remove("hidden");
+                try {
+                    const res = await fetch(WEB_APP_URL, { 
+                        method: "POST", 
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
+                        body: JSON.stringify({ action: "addProject", projectName: name }) 
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                        document.getElementById("new-project-name").value = "";
+                        showMessage("Project added", "success");
+                        fetchProjects();
+                    } else showMessage(result.message || "Failed to add", "error");
+                } catch(e) { console.error(e); }
+                ui.spinner.classList.add("hidden");
+            };
+
+            document.getElementById("exportCsvButton").onclick = () => {
+                const all = [...savedLocations, ...pendingLocations].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp));
+                if (all.length === 0) return showMessage("No data", "info");
                 const headers = ["No.", customLabels.employeeId, customLabels.surveyId, "Latitude", "Longitude", "Timestamp", "Status"];
-                let csv = "﻿" + headers.map(q).join(",") + "\n";
-                all.forEach((loc, i) => { csv += [all.length - i, loc.EmployeeID, loc.SurveyID || '-', loc.Latitude, loc.Longitude, new Date(loc.Timestamp).toLocaleString('en-GB'), loc.isPending ? "Pending" : "Uploaded"].map(q).join(",") + "\n"; });
-                const link = document.createElement("a");
-                link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-                link.download = `Export_${currentProjectName}_${new Date().toISOString().slice(0, 10)}.csv`;
+                const rows = all.map((loc, i) => [all.length - i, loc.EmployeeID, loc.SurveyID || '-', loc.Latitude, loc.Longitude, new Date(loc.Timestamp).toLocaleString('en-GB'), loc.isPending ? "Pending" : "Uploaded"]);
+                let csvContent = "\uFEFF" + headers.join(",") + "\n";
+                rows.forEach(row => csvContent += row.map(val => `"${val}"`).join(",") + "\n");
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a"); link.setAttribute("href", URL.createObjectURL(blob));
+                link.setAttribute("download", `Export_${currentProjectName}_${new Date().toISOString().slice(0,10)}.csv`);
                 link.click();
-                showMessage(`Exported ${plural(all.length, 'record')}`, "success");
             };
 
-            // Map search: previous records + addresses
-            const sBox = $("searchBox"), sIn = $("locationSearchInput"), sList = $("search-suggestions");
-            $("toggleSearchBtn").onclick = () => {
-                const open = !sBox.classList.contains("expanded");
-                sBox.classList.toggle("expanded", open);
-                if (open) setTimeout(() => sIn.focus(), 50); else resetSearch();
+            document.getElementById("cancel-rename-btn").onclick = () => document.getElementById("renameModal").style.display = "none";
+            document.getElementById("menu-back-to-selection-btn").onclick = () => window.showView("project-selection-view");
+            document.getElementById("goto-manage-projects-btn").onclick = () => window.showView("admin-view");
+            document.getElementById("back-to-menu-btn").onclick = () => window.showView("admin-menu-view");
+            document.getElementById("dashboard-back-to-menu-btn").onclick = () => window.showView("admin-menu-view");
+            document.getElementById("goto-dashboards-btn").onclick = () => { window.showView("dashboard-view"); ui.dashboardProjectSelector.innerHTML = '<option value="">-- Choose Project --</option>' + allProjects.map(p => `<option value="${p}">${p}</option>`).join(''); };
+            document.getElementById("dashboard-project-selector").onchange = (e) => updateDashboard(e.target.value);
+            document.getElementById("confirmActionButton").onclick = () => confirmActionCallback && confirmActionCallback();
+            document.getElementById("cancelActionButton").onclick = () => document.getElementById("confirmationModal").style.display = "none";
+            document.getElementById("customizeLabelsBtn").onclick = () => { document.getElementById("custom-employee-label").value = customLabels.employeeId; document.getElementById("custom-survey-label").value = customLabels.surveyId; document.getElementById("customizeLabelsModal").style.display = "flex"; };
+            document.getElementById("cancel-customize-btn").onclick = () => document.getElementById("customizeLabelsModal").style.display = "none";
+            document.getElementById("customize-labels-form").onsubmit = (e) => {
+                e.preventDefault();
+                customLabels.employeeId = document.getElementById("custom-employee-label").value.trim() || 'Employee ID';
+                customLabels.surveyId = document.getElementById("custom-survey-label").value.trim() || 'Survey ID';
+                localStorage.setItem('customLabels', JSON.stringify(customLabels));
+                updateLabels(); document.getElementById("customizeLabelsModal").style.display = "none";
             };
-            L.DomEvent.disableClickPropagation(sBox);
-            L.DomEvent.disableScrollPropagation(sBox);
-            const pickPlace = (lat, lng, zoom = 18) => { map.setView([lat, lng], zoom); updateDisplay(lat, lng); sList.hidden = true; sIn.value = ""; sBox.classList.remove("expanded"); };
+            
+            const sIn = document.getElementById("locationSearchInput"), sBox = document.getElementById("search-suggestions");
             let deb;
-            sIn.addEventListener("input", () => {
-                const term = sIn.value.trim().toLowerCase();
+            sIn.addEventListener("input", (e) => {
+                const term = e.target.value.toLowerCase();
                 clearTimeout(deb);
-                if (!term) { sList.hidden = true; return; }
-                sList.hidden = false;
-                sList.innerHTML = `<div class="searching-hint"><i class="fas fa-circle-notch fa-spin"></i> Searching…</div>`;
+                if (!term) { sBox.classList.add("hidden"); return; }
                 deb = setTimeout(async () => {
-                    const historyResults = [...savedLocations, ...pendingLocations].filter(loc =>
-                        String(loc.EmployeeID ?? '').toLowerCase().includes(term) || String(loc.SurveyID ?? '').toLowerCase().includes(term)
+                    // History search
+                    const historyResults = [...savedLocations, ...pendingLocations].filter(loc => 
+                        loc.EmployeeID.toLowerCase().includes(term) || 
+                        (loc.SurveyID && loc.SurveyID.toLowerCase().includes(term))
                     ).slice(0, 3);
-                    let places = [];
-                    let viewbox = "";
-                    if (map) { const b = map.getBounds(); viewbox = `&viewbox=${b.getWest()},${b.getNorth()},${b.getEast()},${b.getSouth()}`; }
-                    try { const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(term)}&limit=5&accept-language=th${viewbox}`); places = await r.json(); } catch (err) {}
-                    if (sIn.value.trim().toLowerCase() !== term) return;
-                    sList.innerHTML = "";
-                    const addGroup = (title) => { const g = document.createElement("div"); g.className = "suggestion-group"; g.textContent = title; sList.appendChild(g); };
-                    const addItem = (main, sub, lat, lng) => {
-                        const b = document.createElement("button");
-                        b.type = "button"; b.className = "suggestion-item";
-                        b.innerHTML = `<strong>${esc(main)}</strong><span>${esc(sub)}</span>`;
-                        b.onclick = () => pickPlace(parseFloat(lat), parseFloat(lng));
-                        sList.appendChild(b);
-                    };
-                    if (historyResults.length) { addGroup("Records"); historyResults.forEach(h => addItem(`${customLabels.surveyId} ${h.SurveyID || '-'}`, `${customLabels.employeeId} ${h.EmployeeID}`, h.Latitude, h.Longitude)); }
-                    if (Array.isArray(places) && places.length) { addGroup("Places"); places.forEach(p => addItem(p.display_name.split(',')[0], p.display_name, p.lat, p.lon)); }
-                    if (!sList.children.length) sList.innerHTML = `<div class="searching-hint">No records or places found</div>`;
+
+                    let res = [];
+                    let viewboxParam = "";
+                    if (map) {
+                        const b = map.getBounds();
+                        viewboxParam = `&viewbox=${b.getWest()},${b.getNorth()},${b.getEast()},${b.getSouth()}`;
+                    }
+                    try { const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(term)}&limit=5&accept-language=th${viewboxParam}`); res = await r.json(); } catch(err) {}
+                    
+                    let html = "";
+                    if (historyResults.length > 0) {
+                        html += `<div class="p-2 bg-slate-50 text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">History</div>`;
+                        html += historyResults.map(h => `<div class="suggestion-item" data-lat="${h.Latitude}" data-lng="${h.Longitude}"><div class="text-[10px] font-black text-slate-900 truncate"><i class="fas fa-clock-rotate-left mr-2 text-primary-blue opacity-50"></i>${h.EmployeeID}</div><div class="text-[9px] text-slate-400 truncate">${h.SurveyID || '-'}</div></div>`).join("");
+                    }
+                    if (res.length > 0) {
+                        html += `<div class="p-2 bg-slate-50 text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Locations</div>`;
+                        html += res.map(r => `<div class="suggestion-item" data-lat="${r.lat}" data-lng="${r.lon}"><div class="text-[10px] font-black text-slate-800 truncate">${r.display_name.split(',')[0]}</div><div class="text-[9px] text-slate-400 truncate">${r.display_name}</div></div>`).join("");
+                    }
+
+                    if (html) {
+                        sBox.innerHTML = html;
+                        sBox.classList.remove("hidden");
+                        document.querySelectorAll(".suggestion-item").forEach(item => { 
+                            item.onclick = () => { 
+                                const lat = parseFloat(item.dataset.lat), lng = parseFloat(item.dataset.lng); 
+                                map.setView([lat, lng], 18); updateDisplay(lat, lng); 
+                                sBox.classList.add("hidden"); sIn.value = ""; 
+                            }; 
+                        });
+                    } else sBox.classList.add("hidden");
                 }, 400);
             });
-            sIn.addEventListener("keydown", (e) => { if (e.key === 'Enter') { e.preventDefault(); $("searchLocationButton").click(); } if (e.key === 'Escape') resetSearch(); });
-            $("searchLocationButton").onclick = async () => {
+            document.getElementById("searchLocationButton").onclick = async () => {
                 const q = sIn.value.trim(); if (!q) return;
-                let viewbox = "";
-                if (map) { const b = map.getBounds(); viewbox = `&viewbox=${b.getWest()},${b.getNorth()},${b.getEast()},${b.getSouth()}`; }
+                let viewboxParam = "";
+                if (map) {
+                    const b = map.getBounds();
+                    viewboxParam = `&viewbox=${b.getWest()},${b.getNorth()},${b.getEast()},${b.getSouth()}`;
+                }
                 try {
-                    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1${viewbox}`);
+                    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1${viewboxParam}`);
                     const d = await r.json();
-                    if (d.length) pickPlace(parseFloat(d[0].lat), parseFloat(d[0].lon), 17);
-                    else showMessage("Place not found", "info");
-                } catch (e) { showMessage("Couldn't search right now", "error"); }
+                    if (d.length) { const lat = parseFloat(d[0].lat), lon = parseFloat(d[0].lon); map.setView([lat, lon], 17); updateDisplay(lat, lon); sBox.classList.add("hidden"); }
+                } catch(e) {}
             };
-
-            // Modals and sheets: Esc / tap outside
-            $("confirmActionButton").onclick = () => confirmActionCallback && confirmActionCallback();
-            $("cancelActionButton").onclick = () => closeModal($("confirmationModal"));
-            document.querySelectorAll(".modal-overlay").forEach(m => m.addEventListener("click", (e) => { if (e.target === m) closeModal(m); }));
-            document.addEventListener("keydown", (e) => {
-                if (e.key !== "Escape") return;
-                const open = document.querySelector(".modal-overlay.is-open");
-                if (open) closeModal(open); else closeHistory();
-            });
-            window.addEventListener("beforeunload", (e) => { if (state.uploading) { e.preventDefault(); e.returnValue = ''; } });
-            window.addEventListener("storage", (e) => {
-                if (!currentProjectName || state.uploading || e.key !== KEY + pendingKey(currentProjectName)) return;
-                pendingLocations = loadPending(currentProjectName);
-                renderTable();
-            });
         };
     </script>
 </body>
