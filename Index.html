@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker V11.3 (02.04.2026)</title>
+    <title>Location Tracker V12 (30.09.2026)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
     <!-- Leaflet CSS -->
@@ -12,388 +12,555 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
     <style>
-        :root { 
-            --primary-blue: #007AFF; 
+        :root {
+            --primary-blue: #007AFF;
             --primary-light: #F0F7FF;
             --primary-hover: #0062CC;
             --primary-deep: #003B80;
             --primary-soft: rgba(0, 122, 255, 0.1);
-            --bg-fintech: #F8FAFF;
-            --text-main: #1E293B;
-            --text-muted: #64748B;
-            --card-bg: #FFFFFF;
-            --card-shadow: 0 20px 40px -10px rgba(0, 122, 255, 0.08), 0 10px 20px -5px rgba(0, 0, 0, 0.02);
-            --border-soft: #F1F5F9;
             --my-marker: #1a237e;
+
+            --ink: #0B1220;
+            --ink-2: #334155;
+            --muted: #5B6472;
+            --placeholder: #6B7482;
+            --line: #D8DEE6;
+            --line-soft: #E9EDF2;
+            --fill: #F2F4F7;
+            --fill-hover: #E6EAF0;
+            --canvas: #EEF1F5;
+            --blue-tint: #EAF3FF;
+            --green: #1F9D55;
+            --green-tint: #EAF8EF;
+            --danger: #E5484D;
+            --danger-tint: #FDECEC;
+
+            --r-field: 16px;
+            --r-sheet: 28px;
+            --shadow-float: 0 6px 20px rgba(11, 18, 32, 0.14);
+            --shadow-sheet: 0 -10px 30px rgba(11, 18, 32, 0.10);
+            --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+            --z-map: 10;
+            --z-sheet: 20;
+            --z-modal: 9999;
         }
 
-        body { 
-            font-family: "Myriad Pro", "Myriad", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            background-color: var(--bg-fintech);
+        * { -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: "Plus Jakarta Sans", "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #fff;
             min-height: 100vh;
-            color: var(--text-main);
-            background-image: radial-gradient(at 0% 0%, rgba(0, 122, 255, 0.03) 0px, transparent 50%),
-                              radial-gradient(at 100% 100%, rgba(0, 122, 255, 0.03) 0px, transparent 50%);
+            color: var(--ink);
+            -webkit-font-smoothing: antialiased;
         }
 
-        .app-view { display: none; opacity: 0; transform: scale(0.98); }
-        .app-view.active { display: block; opacity: 1; transform: scale(1); transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        /* Colour helpers the app script already uses (were undefined before) */
+        .text-primary-blue { color: var(--primary-blue); }
+        .border-primary-blue { border-color: var(--primary-blue); }
+        .bg-primary-blue { background-color: var(--primary-blue); }
 
-        .main-card { 
-            background-color: var(--card-bg); 
-            border-radius: 2.5rem;
-            box-shadow: var(--card-shadow);
-            border: 1px solid #E5E5EA;
-            transition: background-color 0.3s, border-color 0.3s;
+        .btn { cursor: pointer; }
+        .btn:active { transform: scale(0.97); }
+        button:focus-visible, [id="toggleSearchBtn"]:focus-visible, .figma-project-card:focus-visible {
+            outline: 3px solid rgba(0, 122, 255, 0.45);
+            outline-offset: 2px;
         }
 
-        #map-container {
-            position: relative;
-            height: 420px;
-            width: 100%;
-            border-radius: 1.75rem;
-            overflow: hidden;
-            border: 1px solid #E5E5EA;
-            z-index: 10;
-        }
+        .app-view { display: none; opacity: 0; }
+        .app-view.active { display: block; opacity: 1; transition: opacity 0.25s var(--ease-out); }
 
-        #map, #dashboard-map { height: 100%; width: 100%; background: #ddd; }
-
-        .map-hud {
-            position: absolute;
-            bottom: 12px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1001;
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid #E5E5EA;
-            border-radius: 2rem;
-            padding: 4px 14px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-            display: flex;
-            align-items: center;
-            white-space: nowrap;
-            width: auto;
-            max-width: 90%;
-            opacity: 0.9;
-        }
-
-        .coords-text { font-family: 'Inter', monospace; font-size: 10px; font-weight: 700; color: var(--text-main); }
-        .coords-sep { margin: 0 8px; color: #E5E5EA; }
-        .coords-label { color: var(--primary-blue); font-size: 8px; text-transform: uppercase; margin-right: 3px; font-weight: 800; }
-
-        #currentLocationButton {
-            position: absolute;
-            bottom: 12px;
-            right: 12px;
-            z-index: 1002;
-            background-color: white; 
-            color: var(--primary-blue);
-            width: 38px;
-            height: 38px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            transition: all 0.2s;
-            cursor: pointer;
-            border: none;
-        }
-
-        .search-container {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 1002;
-            display: flex;
-            align-items: center;
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid #E5E5EA;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-            overflow: hidden;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            width: 34px;
-            height: 34px;
-        }
-        .search-container.expanded { width: 240px; overflow: visible; }
-        #toggleSearchBtn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--primary-blue); flex-shrink: 0; cursor: pointer; }
-        .search-input-wrapper { display: flex; align-items: center; width: 100%; padding-right: 6px; opacity: 0; transition: opacity 0.3s; }
-        .search-container.expanded .search-input-wrapper { opacity: 1; }
-        #locationSearchInput { background: transparent; border: none; outline: none; font-size: 11px; font-weight: 600; color: var(--text-main); width: 100%; padding: 4px 8px; }
-        #searchLocationButton { background: var(--primary-blue); color: white; padding: 3px 10px; border-radius: 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; border: none; }
-
-        .btn-primary-action { background-color: rgba(0, 122, 255, 0.04); color: #007AFF; border: 1.5px solid rgba(0, 122, 255, 0.2); box-shadow: 0 12px 24px -6px rgba(0, 122, 255, 0.3); backdrop-filter: blur(4px); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .btn-primary-action:hover {
-            background-color: rgba(0, 122, 255, 0.1);
-            border-color: #007AFF;
-            transform: scale(1.05);
-            box-shadow: 0 15px 30px -5px rgba(0, 122, 255, 0.4);
-        }
-
-        .btn:active { transform: scale(0.94); }
-
-        /* FIXED UPLOAD BUTTON STYLES */
-        .btn-upload-minimal {
-            background-color: rgba(52, 199, 89, 0.1);
-            color: #34C759;
-            border: 1.5px solid rgba(52, 199, 89, 0.3);
-            box-shadow: 0 12px 24px -6px rgba(52, 199, 89, 0.3);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .btn-upload-minimal:hover { 
-            background-color: rgba(52, 199, 89, 0.2); 
-            border-color: #34C759; 
-            box-shadow: 0 15px 30px -5px rgba(52, 199, 89, 0.4);
-            transform: scale(1.05); /* Enlarge on hover */
-        }
-
-        .input-field { background-color: #F8FAFC; border: 1px solid #E5E5EA; border-radius: 1.25rem; padding: 0.85rem 1.2rem; width: 100%; transition: all 0.3s; font-size: 0.95rem; color: var(--text-main); font-weight: 500; }
-        .input-field:focus { outline: none; border-color: var(--primary-blue); background-color: var(--card-bg); box-shadow: 0 10px 15px -3px rgba(0, 122, 255, 0.1); }
-        
-        .table-scroll { max-height: 280px; overflow-y: auto; border-radius: 1.5rem; border: 1px solid #E5E5EA; background: var(--card-bg); }
-        .modal-overlay { position: fixed; inset: 0; background-color: rgba(15, 23, 42, 0.6); display: none; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(8px); }
-
-        .project-admin-item { transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), background-color 0.2s; }
-        .project-admin-item.dragging { opacity: 0.5; background-color: var(--primary-light); border: 2px dashed var(--primary-blue); z-index: 1000; }
-
-        #search-suggestions {
-            position: absolute;
-            top: 100%; left: 0; width: 100%; background: white; margin-top: 5px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-height: 250px; overflow-y: auto; z-index: 2000;
-        }
-        .suggestion-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f8fafc; display: flex; flex-direction: column; gap: 2px; }
-        .suggestion-item:hover { background: #f1f7ff; }
-
-        #project-selection-view .main-card {
-            max-width: 430px;
-            min-height: min(932px, calc(100vh - 24px));
-            margin: 0 auto;
-            padding: 17px 41px 34px;
-            border: none;
+        .main-card {
+            background: #fff;
             border-radius: 0;
-            box-shadow: none;
-            background: #fff;
-            color: #343434;
-        }
-
-        .figma-project-toolbar {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            gap: 13px;
-            height: 24px;
-        }
-
-        .figma-icon-button {
-            color: #cfd6df;
-            font-size: 13px;
-            line-height: 1;
-            transition: color 0.2s, transform 0.2s;
-        }
-
-        .figma-icon-button:hover {
-            color: #343434;
-            transform: translateY(-1px);
-        }
-
-        .figma-project-hero {
-            display: grid;
-            justify-items: center;
-            margin-top: 40px;
-            margin-bottom: 30px;
-        }
-
-        .figma-pin-logo {
-            width: 58px;
-            height: 58px;
-            margin-bottom: 13px;
-            display: block;
-        }
-
-        .figma-project-title {
-            margin: 0;
-            color: #343434;
-            font-size: 30px;
-            font-weight: 800;
-            letter-spacing: 0;
-            line-height: 1.1;
-        }
-
-        .figma-search-wrap {
-            position: relative;
-            margin-bottom: 28px;
-        }
-
-        .figma-project-search {
-            width: 100%;
-            height: 47px;
-            border: 1px solid #eeeeee;
-            border-radius: 24px;
-            padding: 0 66px 0 35px;
-            color: #343434;
-            background: #fff;
-            font-size: 20px;
-            font-weight: 400;
-            outline: none;
-            box-shadow: 0 10px 18px rgba(30, 41, 59, 0.09);
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        .figma-project-search::placeholder {
-            color: #dedede;
-        }
-
-        .figma-project-search:focus {
-            border-color: #d7d7d7;
-            box-shadow: 0 13px 28px rgba(30, 41, 59, 0.13);
-        }
-
-        .figma-search-submit {
-            position: absolute;
-            top: 50%;
-            right: -1px;
-            width: 47px;
-            height: 47px;
-            transform: translateY(-50%);
             border: 0;
-            border-radius: 50%;
-            background: #2d2927;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 14px 26px rgba(45, 41, 39, 0.26);
-            cursor: pointer;
+            box-shadow: none;
+            min-height: 100vh;
+            min-height: 100dvh;
         }
 
-        .figma-search-submit i {
-            font-size: 17px;
-            font-weight: 400;
-        }
-
-        .figma-search-icon {
-            position: relative;
-            width: 22px;
-            height: 22px;
-            display: block;
-        }
-
-        .figma-search-icon::before {
-            content: "";
-            position: absolute;
-            left: 1px;
-            top: 1px;
-            width: 14px;
-            height: 14px;
-            border: 1.7px solid #fff;
-            border-radius: 50%;
-        }
-
-        .figma-search-icon::after {
-            content: "";
-            position: absolute;
-            left: 15px;
-            top: 15px;
-            width: 9px;
-            height: 1.7px;
-            border-radius: 2px;
+        /* ---------- Inputs ---------- */
+        .input-field {
+            width: 100%;
+            min-height: 52px;
+            padding: 0 16px;
+            border: 1.5px solid var(--line);
+            border-radius: var(--r-field);
             background: #fff;
-            transform: rotate(45deg);
-            transform-origin: left center;
+            color: var(--ink);
+            font-size: 16px;
+            font-weight: 600;
+            transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+        }
+        .input-field::placeholder { color: var(--placeholder); font-weight: 500; }
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            background: #F7FAFF;
+            box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.14);
         }
 
-        .figma-project-count {
-            display: block;
-            margin: 0 0 9px 4px;
-            color: #303030;
-            font-size: 11px;
-            font-weight: 500;
-            text-transform: lowercase;
+        .lt-label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); }
+        .lt-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 22px; margin-bottom: 6px; }
+        .lt-field + .lt-field { margin-top: 0; }
+        .lt-input { min-height: 56px; font-size: 17px; }
+        .lt-input-wrap { position: relative; }
+        .lt-input--lock, .lt-password { padding-right: 46px; }
+        .lt-input::placeholder { font-size: 15px; }
+        .lt-lock {
+            position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+            width: 40px; height: 44px; border-radius: 12px;
+            display: grid; place-items: center;
+            color: var(--muted); background: transparent; border: 0; cursor: pointer;
+        }
+        .lt-lock:hover { background: var(--fill); }
+        #lockIcon { font-size: 14px; }
+        #lockIcon.fa-lock-open { color: #8A94A3; }
+        #lockIcon.fa-lock { color: var(--primary-blue); }
+        .lt-count {
+            font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+            color: #0057B8; background: var(--blue-tint);
+            padding: 3px 8px; border-radius: 999px;
         }
 
-        #project-list.figma-project-list {
-            display: grid;
-            gap: 16px;
+        /* ---------- Buttons ---------- */
+        .lt-primary {
+            flex: 1 1 auto;
+            min-height: 60px;
+            padding: 0 20px;
+            border: 0;
+            border-radius: 18px;
+            background: var(--primary-blue);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: 0.14em;
+            display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+            box-shadow: 0 12px 26px -10px rgba(0, 122, 255, 0.65);
+            transition: background-color 0.15s, transform 0.12s, box-shadow 0.15s;
         }
+        .lt-primary:hover { background: var(--primary-hover); }
+        .lt-primary i { font-size: 18px; }
+        .lt-primary--compact { flex: 0 0 auto; min-height: 52px; padding: 0 22px; letter-spacing: 0; font-size: 15px; box-shadow: none; }
 
-        .figma-project-card {
-            min-height: 54px;
-            padding: 11px 12px;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            border: 1px solid #e3e3e3;
-            border-radius: 14px;
-            background: rgba(255, 255, 255, 0.72);
-            color: #4c4c4c;
-            box-shadow: 0 7px 18px rgba(30, 41, 59, 0.05);
-            cursor: pointer;
-            transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-        }
-
-        .figma-project-card:hover {
-            border-color: #cfcfcf;
-            box-shadow: 0 12px 26px rgba(30, 41, 59, 0.1);
-            transform: translateY(-1px);
-        }
-
-        .figma-project-card i {
-            width: 29px;
-            color: #4b4b4b;
-            font-size: 25px;
-            font-weight: 400;
+        .lt-upload {
             flex: 0 0 auto;
+            width: 60px; height: 60px;
+            border-radius: 18px;
+            background: var(--green-tint);
+            border: 1.5px solid #BFE6CD;
+            display: grid; place-items: center;
+            transition: background-color 0.15s, border-color 0.15s, transform 0.12s;
+        }
+        .lt-upload:hover { background: #DDF3E5; border-color: #8FD3A8; }
+
+        .lt-secondary, .lt-danger {
+            min-height: 54px; padding: 0 16px; border: 0; border-radius: 16px;
+            font-size: 14px; font-weight: 800; letter-spacing: 0.08em;
+        }
+        .lt-secondary { background: var(--fill); color: var(--ink-2); }
+        .lt-secondary:hover { background: var(--fill-hover); }
+        .lt-danger { background: var(--danger); color: #fff; }
+        .lt-danger:hover { background: #CC3A3F; }
+
+        .lt-dark-btn {
+            width: 100%; min-height: 56px; margin-top: 8px;
+            border: 0; border-radius: 18px;
+            background: var(--ink); color: #fff;
+            font-size: 14px; font-weight: 800; letter-spacing: 0.12em;
         }
 
-        .figma-project-card span {
-            min-width: 0;
-            color: #4b4b4b;
-            font-size: 15px;
-            font-weight: 500;
-            line-height: 1.22;
-            word-break: break-word;
+        .lt-circle-btn {
+            width: 44px; height: 44px; border-radius: 50%;
+            display: grid; place-items: center;
+            background: var(--fill); color: var(--ink-2); border: 0;
+            font-size: 16px;
+            transition: background-color 0.15s;
+        }
+        .lt-circle-btn:hover { background: var(--fill-hover); }
+        .lt-circle-btn--blue { background: var(--blue-tint); color: var(--primary-blue); }
+        .lt-circle-btn--blue:hover { background: #D9EAFF; }
+
+        .lt-pill {
+            min-height: 40px; padding: 0 16px; border-radius: 20px; border: 0;
+            background: var(--fill); color: var(--ink-2);
+            font-size: 13px; font-weight: 700; letter-spacing: 0.06em;
+        }
+        .lt-pill:hover { background: var(--fill-hover); }
+        .lt-link {
+            min-height: 44px; padding: 0 6px; border: 0; background: none;
+            color: var(--primary-blue); font-size: 14px; font-weight: 800; letter-spacing: 0.06em;
+        }
+        .lt-text-btn {
+            min-height: 40px; padding: 0 4px; border: 0; background: none;
+            color: var(--primary-blue); font-size: 15px; font-weight: 700;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .lt-text-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+        /* ---------- Project selection ---------- */
+        #project-selection-view .main-card { padding: 14px 20px 36px; color: var(--ink); }
+
+        .figma-project-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+        .figma-icon-button {
+            width: 40px; height: 40px; border-radius: 50%;
+            display: grid; place-items: center;
+            background: var(--fill); color: var(--ink-2); border: 0;
+            font-size: 15px; cursor: pointer;
+            transition: background-color 0.15s, color 0.15s;
+        }
+        .figma-icon-button:hover { background: var(--fill-hover); color: var(--ink); }
+
+        .figma-project-hero { display: grid; justify-items: center; margin: 22px 0 26px; }
+        .figma-pin-logo { width: 56px; height: 56px; margin-bottom: 12px; display: block; }
+        .figma-pin-logo path, .figma-pin-logo circle { stroke: var(--primary-blue); }
+        .figma-project-title { margin: 0; color: var(--ink); font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+
+        .figma-search-wrap { position: relative; margin-bottom: 22px; }
+        .figma-project-search {
+            width: 100%; height: 56px;
+            padding: 0 64px 0 22px;
+            border: 1.5px solid var(--line); border-radius: 28px;
+            background: #fff; color: var(--ink);
+            font-size: 17px; font-weight: 500;
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .figma-project-search::placeholder { color: var(--placeholder); }
+        .figma-project-search:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.14); }
+        .figma-search-submit {
+            position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
+            width: 44px; height: 44px; border-radius: 50%; border: 0;
+            background: var(--ink); color: #fff;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .figma-search-submit:hover { background: #1E293B; }
+        .figma-search-icon { position: relative; width: 20px; height: 20px; display: block; }
+        .figma-search-icon::before { content: ""; position: absolute; left: 1px; top: 1px; width: 13px; height: 13px; border: 2px solid #fff; border-radius: 50%; }
+        .figma-search-icon::after { content: ""; position: absolute; left: 13px; top: 13px; width: 7px; height: 2px; border-radius: 2px; background: #fff; transform: rotate(45deg); transform-origin: left center; }
+
+        .figma-project-count { display: block; margin: 0 0 10px 4px; color: var(--muted); font-size: 13px; font-weight: 600; }
+
+        #project-list.figma-project-list { display: grid; gap: 10px; }
+        .figma-project-card {
+            min-height: 64px; padding: 12px 16px 12px 12px;
+            display: flex; align-items: center; gap: 14px;
+            border: 1.5px solid var(--line); border-radius: var(--r-field);
+            background: #fff; color: var(--ink);
+            cursor: pointer;
+            transition: border-color 0.15s, background-color 0.15s, transform 0.12s;
+        }
+        .figma-project-card:hover { border-color: #9CC7FF; background: #FAFCFF; }
+        .figma-project-card:active { transform: scale(0.985); }
+        .figma-project-card i {
+            width: 40px; height: 40px; border-radius: 50%; flex: 0 0 auto;
+            display: grid; place-items: center;
+            background: var(--blue-tint); color: var(--primary-blue);
+            font-size: 16px;
+        }
+        .figma-project-card span { flex: 1 1 auto; min-width: 0; font-size: 16px; font-weight: 600; line-height: 1.3; color: var(--ink); overflow-wrap: anywhere; }
+        .figma-project-card::after {
+            content: ""; flex: 0 0 auto; width: 8px; height: 8px; margin-right: 4px;
+            border-top: 2px solid #9AA3AF; border-right: 2px solid #9AA3AF;
+            transform: rotate(45deg);
         }
 
         .figma-view-more {
             display: none;
-            align-items: center;
-            justify-content: center;
-            min-width: 58px;
-            height: 23px;
-            margin: 30px auto 0;
-            padding: 0 13px;
-            border: 0;
-            border-radius: 999px;
-            background: #050505;
-            color: #fff;
-            font-size: 7px;
-            font-weight: 800;
-            box-shadow: 0 9px 18px rgba(0,0,0,0.22);
-            cursor: pointer;
+            align-items: center; justify-content: center;
+            min-height: 44px; margin: 18px auto 0; padding: 0 22px;
+            border: 1.5px solid var(--line); border-radius: 22px;
+            background: #fff; color: var(--ink);
+            font-size: 14px; font-weight: 700; cursor: pointer;
+        }
+        .figma-view-more:hover { border-color: #9CC7FF; background: #FAFCFF; }
+
+        /* ---------- Tracker: map + bottom sheet ---------- */
+        #tracker-view .main-card.lt-tracker { padding: 0; }
+
+        #map-container {
+            position: relative;
+            height: clamp(300px, 50vh, 560px);
+            height: clamp(300px, 50dvh, 560px);
+            width: 100%;
+            overflow: hidden;
+            z-index: var(--z-map);
+        }
+        #map, #dashboard-map { height: 100%; width: 100%; background: #E5E9EE; }
+        #map .leaflet-bottom { bottom: 28px; }
+
+        .search-container {
+            position: absolute; top: 14px; left: 14px; z-index: 1002;
+            display: flex; align-items: center;
+            width: 48px; height: 48px;
+            background: #fff; border-radius: 24px;
+            box-shadow: var(--shadow-float);
+            overflow: hidden;
+            transition: width 0.35s var(--ease-out);
+        }
+        .search-container.expanded { width: min(320px, calc(100% - 28px)); overflow: visible; }
+        #toggleSearchBtn { width: 48px; height: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--ink); font-size: 17px; cursor: pointer; }
+        .search-input-wrapper { display: flex; align-items: center; gap: 6px; width: 100%; padding-right: 8px; opacity: 0; transition: opacity 0.25s; }
+        .search-container.expanded .search-input-wrapper { opacity: 1; }
+        #locationSearchInput { flex: 1 1 auto; min-width: 0; background: transparent; border: 0; outline: none; font-size: 15px; font-weight: 600; color: var(--ink); padding: 6px 2px; }
+        #locationSearchInput::placeholder { color: var(--placeholder); font-weight: 500; }
+        #searchLocationButton {
+            flex: 0 0 auto; min-height: 34px; padding: 0 12px; border: 0; border-radius: 17px;
+            background: var(--primary-blue); color: #fff;
+            font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+        }
+        #search-suggestions {
+            position: absolute; top: calc(100% + 8px); left: 0; width: 100%;
+            background: #fff; border-radius: var(--r-field);
+            box-shadow: 0 14px 34px rgba(11, 18, 32, 0.18);
+            max-height: 260px; overflow-y: auto; z-index: 2000;
+        }
+        .suggestion-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+        .suggestion-item:hover { background: #F4F8FF; }
+
+        #currentLocationButton {
+            position: absolute; right: 14px; bottom: 44px; z-index: 1002;
+            width: 48px; height: 48px; border-radius: 50%; border: 0;
+            background: #fff; color: var(--primary-blue);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: var(--shadow-float); cursor: pointer;
+        }
+        #currentLocationButton:active { transform: scale(0.95); }
+
+        .map-hud {
+            position: absolute; left: 14px; bottom: 44px; z-index: 1001;
+            max-width: calc(100% - 90px);
+            display: flex; align-items: center;
+            padding: 9px 14px;
+            background: #fff; border-radius: 14px;
+            box-shadow: var(--shadow-float);
+            white-space: nowrap;
+        }
+        .coords-text { font-size: 13px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+        .coords-sep { margin: 0 10px; color: var(--line); }
+        .coords-label { color: var(--primary-hover); font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; margin-right: 5px; }
+
+        .lt-sheet {
+            position: relative; z-index: var(--z-sheet);
+            margin-top: -28px;
+            padding: 10px 20px calc(28px + env(safe-area-inset-bottom));
+            background: #fff;
+            border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+            box-shadow: var(--shadow-sheet);
+        }
+        .app-view.active .lt-sheet { animation: lt-rise 0.45s var(--ease-out); }
+        .lt-grabber { width: 40px; height: 5px; border-radius: 3px; background: #D5DAE1; margin: 0 auto 12px; }
+        .lt-sheet-head { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .lt-sheet-title {
+            margin: 0; text-align: center;
+            font-size: 20px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.25; color: var(--ink);
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+            text-wrap: balance;
         }
 
+        .lt-address { margin-bottom: 16px; }
+        .lt-address-row {
+            display: flex; align-items: flex-start; gap: 12px;
+            padding: 12px 14px;
+            border: 1.5px solid var(--line); border-radius: var(--r-field);
+        }
+        .lt-address-row i {
+            width: 28px; height: 28px; border-radius: 50%; flex: 0 0 auto;
+            display: grid; place-items: center;
+            background: var(--primary-blue); color: #fff; font-size: 12px;
+        }
+        #current-address-text {
+            margin: 3px 0 0; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--ink);
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+
+        .lt-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+        .lt-actions { display: flex; align-items: stretch; gap: 12px; margin-bottom: 26px; }
+
+        .lt-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+        .lt-section-title { margin: 0; font-size: 17px; font-weight: 800; color: var(--ink); }
+
+        /* ---------- Tables (rows are built by the app script) ---------- */
+        .table-scroll { max-height: 320px; overflow-y: auto; border: 1.5px solid var(--line); border-radius: var(--r-field); background: #fff; }
+        .lt-table table { width: 100%; border-collapse: collapse; }
+        .lt-table thead th {
+            position: sticky; top: 0; z-index: 1;
+            background: #F7F9FB; border-bottom: 1px solid var(--line-soft);
+            padding: 10px 12px; font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap;
+        }
+        #savedLocationsTableBody td, #dashboard-summary-table td { padding: 12px; font-size: 13px; font-weight: 600; color: var(--ink-2); vertical-align: middle; }
+        #savedLocationsTableBody tr + tr td, #dashboard-summary-table tr + tr td { border-top: 1px solid var(--line-soft); }
+        #savedLocationsTableBody td:nth-child(1), #savedLocationsTableBody td:nth-child(4) { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+        #savedLocationsTableBody td:nth-child(2):not(.text-primary-blue) { color: var(--ink); }
+        #savedLocationsTableBody td:nth-child(2) { font-weight: 800; }
+        #savedLocationsTableBody button {
+            width: 40px; height: 40px; border-radius: 10px; border: 0;
+            color: #6B7482; background: transparent; cursor: pointer;
+        }
+        #savedLocationsTableBody button:hover { color: var(--danger); background: var(--danger-tint); }
+        #dashboard-summary-table td:first-child { color: var(--ink); font-weight: 700; }
+        #dashboard-summary-table td span { color: var(--primary-blue); font-weight: 800; font-size: 14px; }
+
+        /* Recent sessions table: fixed columns so all five fit a phone screen */
+        .lt-sheet .lt-table table { table-layout: fixed; }
+        .lt-sheet .lt-table th { white-space: normal; line-height: 1.25; padding: 10px 8px; }
+        .lt-sheet .lt-table th:nth-child(1) { width: 12%; }
+        .lt-sheet .lt-table th:nth-child(2) { width: 25%; }
+        .lt-sheet .lt-table th:nth-child(3) { width: 22%; }
+        .lt-sheet .lt-table th:nth-child(4) { width: 27%; }
+        .lt-sheet .lt-table th:nth-child(5) { width: 14%; }
+        #savedLocationsTableBody td { padding: 12px 8px; overflow-wrap: anywhere; }
+        #savedLocationsTableBody td:nth-child(4) { font-size: 11.5px; line-height: 1.35; }
+
+        /* ---------- Admin + analytics pages ---------- */
+        .lt-page { padding: 20px 20px 36px; }
+        .lt-page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+        .lt-page-title { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+
+        .lt-rows { display: grid; gap: 12px; }
+        .lt-row-btn {
+            width: 100%; display: flex; align-items: center; gap: 16px;
+            padding: 16px; text-align: left;
+            border: 1.5px solid var(--line); border-radius: 18px; background: #fff;
+            transition: border-color 0.15s, background-color 0.15s, transform 0.12s;
+        }
+        .lt-row-btn:hover { border-color: #9CC7FF; background: #FAFCFF; }
+        .lt-row-btn::after {
+            content: ""; margin-left: auto; flex: 0 0 auto; width: 9px; height: 9px; margin-right: 6px;
+            border-top: 2px solid #9AA3AF; border-right: 2px solid #9AA3AF; transform: rotate(45deg);
+        }
+        .lt-row-icon { width: 48px; height: 48px; border-radius: 14px; flex: 0 0 auto; display: grid; place-items: center; background: var(--blue-tint); color: var(--primary-blue); font-size: 19px; }
+        .lt-row-title { margin: 0; font-size: 17px; font-weight: 800; color: var(--ink); }
+        .lt-row-sub { margin: 2px 0 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: var(--muted); }
+        .lt-row-btn--dark { background: var(--ink); border-color: var(--ink); }
+        .lt-row-btn--dark:hover { background: #1B2536; border-color: #1B2536; }
+        .lt-row-btn--dark .lt-row-icon { background: rgba(255, 255, 255, 0.12); color: #fff; }
+        .lt-row-btn--dark .lt-row-title { color: #fff; }
+        .lt-row-btn--dark .lt-row-sub { color: #B8C1CD; }
+        .lt-row-btn--dark::after { border-color: #8994A3; }
+
+        .lt-add-form { display: flex; gap: 10px; margin-bottom: 20px; }
+        .lt-add-form .input-field { flex: 1 1 auto; min-width: 0; }
+
+        .project-admin-item { transition: border-color 0.15s, background-color 0.15s; }
+        #admin-project-list .project-admin-item {
+            padding: 12px 12px 12px 16px; margin-bottom: 10px;
+            border: 1.5px solid var(--line); border-radius: var(--r-field);
+            background: #fff; box-shadow: none;
+        }
+        #admin-project-list .project-admin-item:hover { transform: none; border-color: #9CC7FF; }
+        #admin-project-list .project-admin-item span { font-size: 15px; font-weight: 700; color: var(--ink); }
+        #admin-project-list .fa-grip-vertical { color: #A3ACB8; }
+        #admin-project-list button { width: 40px; height: 40px; border-radius: 12px; background: var(--fill); color: var(--ink-2); }
+        #admin-project-list button:first-child:hover { background: var(--primary-blue); color: #fff; }
+        #admin-project-list button:last-child:hover { background: var(--danger); color: #fff; }
+        .project-admin-item.dragging { opacity: 0.55; background-color: var(--primary-light); border: 2px dashed var(--primary-blue); z-index: 1000; }
+
+        .lt-select {
+            appearance: none; -webkit-appearance: none; cursor: pointer;
+            padding-right: 44px;
+            background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235B6472' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 16px center;
+        }
+        .lt-dash-field { margin-bottom: 20px; }
+        .lt-dash-field .lt-label { margin-bottom: 6px; }
+        .lt-dash > * + * { margin-top: 20px; }
+        .lt-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .lt-kpi { padding: 14px 16px; border: 1.5px solid var(--line); border-radius: var(--r-field); }
+        .lt-kpi-label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); }
+        .lt-kpi-value { display: block; margin-top: 2px; font-size: 30px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.15; }
+        .lt-dash-map { height: 360px; border-radius: 18px; overflow: hidden; border: 1.5px solid var(--line); }
+        .lt-dash .lt-section-title { margin-bottom: 8px; }
+        .lt-empty { padding: 56px 0; text-align: center; }
+        .lt-empty-icon { width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 50%; display: grid; place-items: center; background: var(--blue-tint); color: var(--primary-blue); font-size: 22px; }
+        .lt-empty p { margin: 0; font-size: 14px; font-weight: 600; color: var(--muted); }
+
+        /* ---------- Modals: bottom sheet on phones, dialog on larger screens ---------- */
+        .modal-overlay {
+            position: fixed; inset: 0; z-index: var(--z-modal);
+            display: none; align-items: flex-end; justify-content: center;
+            background: rgba(11, 18, 32, 0.5);
+        }
+        .lt-modal {
+            position: relative; width: 100%; max-width: 520px;
+            padding: 10px 22px calc(24px + env(safe-area-inset-bottom));
+            background: #fff; color: var(--ink);
+            border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+            box-shadow: 0 -12px 40px rgba(11, 18, 32, 0.2);
+            text-align: center;
+        }
+        .modal-overlay[style*="flex"] .lt-modal { animation: lt-rise 0.35s var(--ease-out); }
+        .lt-modal-grabber { width: 40px; height: 5px; border-radius: 3px; background: #D5DAE1; margin: 0 auto 16px; }
+        .lt-modal-close { position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--fill); color: var(--ink-2); cursor: pointer; }
+        .lt-modal-close:hover { background: var(--fill-hover); }
+        .lt-modal-icon { width: 56px; height: 56px; margin: 4px auto 12px; border-radius: 50%; display: grid; place-items: center; background: var(--blue-tint); color: var(--primary-blue); font-size: 22px; }
+        .lt-modal-icon--danger { background: var(--danger-tint); color: #D93036; }
+        .lt-modal-title { margin: 0; font-size: 20px; font-weight: 800; color: var(--ink); }
+        .lt-modal-text { margin: 6px 0 0; font-size: 14px; font-weight: 500; line-height: 1.45; color: var(--muted); }
+        .lt-modal-text:empty { display: none; }
+        .lt-modal-form { display: grid; gap: 14px; margin-top: 20px; text-align: left; }
+        .lt-modal-form .lt-primary { width: 100%; min-height: 56px; }
+        .lt-modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+        .lt-modal-form .lt-modal-actions { margin-top: 4px; }
+        .lt-modal-form .lt-modal-actions .lt-primary { min-height: 54px; font-size: 14px; letter-spacing: 0.08em; }
+        .lt-modal-stack { display: grid; gap: 10px; margin-top: 4px; }
+        .lt-modal-stack .lt-secondary { min-height: 50px; }
+        .lt-password { text-align: center; font-size: 22px; font-weight: 800; letter-spacing: 0.3em; }
+        .lt-password::placeholder { letter-spacing: 0.3em; }
+
+        /* ---------- Loading + toast ---------- */
+        .lt-spinner { background: rgba(11, 18, 32, 0.45); }
+        .lt-spinner-card { display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 200px; padding: 30px 36px; background: #fff; border-radius: 24px; box-shadow: 0 20px 50px rgba(11, 18, 32, 0.25); }
+        #loading-spinner-text { font-size: 13px; font-weight: 800; letter-spacing: 0.16em; }
+        #messageBox {
+            top: calc(14px + env(safe-area-inset-top));
+            padding: 12px 18px; max-width: calc(100vw - 32px);
+            border-radius: 16px; border: 1px solid var(--line-soft);
+            background: #fff; box-shadow: 0 14px 34px rgba(11, 18, 32, 0.18);
+        }
+        #messageBox span { font-size: 13px; letter-spacing: 0.03em; }
+        #messageBox .flex { gap: 10px; }
+
+        @keyframes lt-rise { from { transform: translateY(24px); } to { transform: translateY(0); } }
+
+        /* ---------- Larger screens: same design as a centred phone-width column ---------- */
+        @media (min-width: 600px) {
+            .modal-overlay { align-items: center; padding: 24px; }
+            .lt-modal { max-width: 400px; padding: 28px; border-radius: var(--r-sheet); }
+            .lt-modal-grabber { display: none; }
+        }
         @media (min-width: 768px) {
-            #project-selection-view .main-card {
-                border-radius: 0;
+            body { background: var(--canvas); }
+            .main-card {
+                min-height: 0;
+                border-radius: var(--r-sheet);
+                border: 1px solid var(--line-soft);
+                box-shadow: 0 24px 60px -24px rgba(11, 18, 32, 0.22);
             }
+            #project-selection-view .main-card { max-width: 480px; margin: 0 auto; padding: 20px 32px 40px; }
+            #tracker-view .main-card.lt-tracker { overflow: hidden; }
+            #map-container { height: 460px; }
+            .lt-sheet { padding: 12px 28px 28px; box-shadow: 0 -10px 30px rgba(11, 18, 32, 0.08); }
+            .lt-page { padding: 32px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
         }
     </style>
 </head>
-<body class="p-3 md:p-6 flex justify-center items-start">
+<body class="md:p-8 flex justify-center items-start">
 
-    <div id="app-container" class="w-full max-w-2xl text-primary-deep">
-        
+    <div id="app-container" class="w-full max-w-2xl">
+
         <!-- View 1: Project Selection -->
         <div id="project-selection-view" class="app-view active">
-            <div class="main-card p-8 md:p-12 relative overflow-hidden">
+            <div class="main-card relative overflow-hidden">
                 <div class="figma-project-toolbar">
                     <button id="refresh-projects-btn" class="figma-icon-button" title="Refresh Projects">
                         <i class="fas fa-arrows-rotate"></i>
@@ -426,21 +593,21 @@
 
         <!-- View: Admin Console Menu -->
         <div id="admin-menu-view" class="app-view">
-             <div class="main-card p-10 text-primary-deep">
-                <div class="flex justify-between items-center mb-10">
-                    <h2 class="text-2xl font-black text-slate-900">Admin Console</h2>
-                    <button id="menu-back-to-selection-btn" class="btn bg-[#F8FAFC] text-slate-500 px-6 py-3 rounded-2xl text-xs font-bold hover:bg-slate-100 uppercase tracking-widest">
+            <div class="main-card lt-page">
+                <div class="lt-page-head">
+                    <h2 class="lt-page-title">Admin Console</h2>
+                    <button id="menu-back-to-selection-btn" class="btn lt-pill uppercase">
                         <i class="fas fa-arrow-left mr-2"></i> Exit
                     </button>
                 </div>
-                <div class="grid gap-6">
-                    <button id="goto-manage-projects-btn" class="btn w-full btn-primary-action p-6 rounded-[2rem] flex items-center gap-5 text-white">
-                        <span class="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center shadow-sm"><i class="fas fa-folder text-xl text-primary-deep"></i></span>
-                        <div class="text-left"><p class="font-bold text-base text-slate-800">Projects</p><p class="text-[10px] uppercase tracking-widest text-slate-400">Configuration</p></div>
+                <div class="lt-rows">
+                    <button id="goto-manage-projects-btn" class="btn lt-row-btn">
+                        <span class="lt-row-icon"><i class="fas fa-folder"></i></span>
+                        <div class="text-left"><p class="lt-row-title">Projects</p><p class="lt-row-sub uppercase">Configuration</p></div>
                     </button>
-                    <button id="goto-dashboards-btn" class="btn w-full bg-slate-900 text-white p-6 rounded-[2rem] flex items-center gap-5">
-                        <span class="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white"><i class="fas fa-chart-bar text-xl"></i></span>
-                        <div class="text-left"><p class="font-bold text-base text-white text-left text-white">Analytics</p><p class="text-[10px] text-slate-400 uppercase tracking-widest text-white">Performance</p></div>
+                    <button id="goto-dashboards-btn" class="btn lt-row-btn lt-row-btn--dark">
+                        <span class="lt-row-icon"><i class="fas fa-chart-bar"></i></span>
+                        <div class="text-left"><p class="lt-row-title">Analytics</p><p class="lt-row-sub uppercase">Performance</p></div>
                     </button>
                 </div>
             </div>
@@ -448,73 +615,67 @@
 
         <!-- View: Manage Projects (Admin) -->
         <div id="admin-view" class="app-view">
-            <div class="main-card p-10 text-slate-900">
-                <div class="flex justify-between items-center mb-8">
-                    <h2 class="text-2xl font-black text-slate-900">Manage Projects</h2>
-                    <button id="back-to-menu-btn" class="btn text-primary-blue font-bold text-sm uppercase tracking-widest">Back</button>
+            <div class="main-card lt-page">
+                <div class="lt-page-head">
+                    <h2 class="lt-page-title">Manage Projects</h2>
+                    <button id="back-to-menu-btn" class="btn lt-link uppercase">Back</button>
                 </div>
-                <form id="add-project-form" class="flex gap-4 mb-10">
-                    <input id="new-project-name" type="text" class="input-field shadow-sm text-slate-800" placeholder="Add new project name..." autocomplete="off" required>
-                    <button type="submit" class="btn btn-primary-action px-8 py-3 rounded-2xl">Add</button>
+                <form id="add-project-form" class="lt-add-form">
+                    <input id="new-project-name" type="text" class="input-field" placeholder="Add new project name..." autocomplete="off" required>
+                    <button type="submit" class="btn lt-primary lt-primary--compact">Add</button>
                 </form>
-                <div id="admin-project-list" class="space-y-4 mb-8"></div>
-                <button id="save-project-order-btn" class="hidden btn bg-slate-900 text-white w-full py-5 rounded-[1.75rem] font-black uppercase tracking-widest shadow-xl">Confirm New Sequence</button>
+                <div id="admin-project-list"></div>
+                <button id="save-project-order-btn" class="hidden btn lt-dark-btn uppercase">Confirm New Sequence</button>
             </div>
         </div>
 
         <!-- View: Analytics Dashboard -->
         <div id="dashboard-view" class="app-view">
-            <div class="main-card p-6 md:p-10 space-y-6 text-primary-deep">
-                <div class="flex justify-between items-center">
-                    <h2 class="text-2xl font-black text-slate-900">Analytics</h2>
-                    <button id="dashboard-back-to-menu-btn" class="btn text-primary-blue font-black uppercase text-xs tracking-widest">Close</button>
+            <div class="main-card lt-page">
+                <div class="lt-page-head">
+                    <h2 class="lt-page-title">Analytics</h2>
+                    <button id="dashboard-back-to-menu-btn" class="btn lt-link uppercase">Close</button>
                 </div>
-                <div class="space-y-1.5">
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Select Project Insights</label>
-                    <select id="dashboard-project-selector" class="w-full p-4 bg-[#F8FAFC] border-2 border-transparent rounded-[1.5rem] outline-none font-bold text-slate-800 focus:border-primary-blue"></select>
+                <div class="lt-dash-field">
+                    <label class="lt-label" for="dashboard-project-selector">Select Project Insights</label>
+                    <select id="dashboard-project-selector" class="input-field lt-select"></select>
                 </div>
-                
-                <div id="dashboard-content" class="hidden space-y-5">
-                    <div class="grid grid-cols-2 gap-4 px-1">
-                        <div class="bg-primary-blue/5 p-4 rounded-2xl border border-primary-blue/10 flex flex-col items-center">
-                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pins</span>
-                            <span id="kpi-total-checkins" class="text-3xl font-black text-primary-blue">0</span>
+
+                <div id="dashboard-content" class="hidden lt-dash">
+                    <div class="lt-kpis">
+                        <div class="lt-kpi">
+                            <span class="lt-kpi-label">Total Pins</span>
+                            <span id="kpi-total-checkins" class="lt-kpi-value">0</span>
                         </div>
-                        <div class="bg-primary-blue/5 p-4 rounded-2xl border border-primary-blue/10 flex flex-col items-center">
-                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Staff</span>
-                            <span id="kpi-total-staff" class="text-3xl font-black text-primary-blue">0</span>
+                        <div class="lt-kpi">
+                            <span class="lt-kpi-label">Total Staff</span>
+                            <span id="kpi-total-staff" class="lt-kpi-value">0</span>
                         </div>
                     </div>
-                    <div id="dashboard-map-container" class="h-[420px] rounded-2xl overflow-hidden border border-slate-200 mt-4"><div id="dashboard-map" class="h-full w-full"></div></div>
-                    
-                    <div class="space-y-3 pt-2">
-                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 text-center text-slate-800">Records by Staff ID</h4>
-                        <div class="table-scroll border-none shadow-none">
-                            <table class="w-full border-collapse">
-                                <thead class="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                    <tr><th class="p-3 text-left font-bold text-slate-800">Staff ID</th><th class="p-3 text-right font-bold text-slate-800">Total Pins</th></tr>
+                    <div id="dashboard-map-container" class="lt-dash-map"><div id="dashboard-map" class="h-full w-full"></div></div>
+
+                    <div>
+                        <h4 class="lt-section-title">Records by Staff ID</h4>
+                        <div class="table-scroll lt-table">
+                            <table>
+                                <thead>
+                                    <tr><th class="text-left">Staff ID</th><th class="text-right">Total Pins</th></tr>
                                 </thead>
-                                <tbody id="dashboard-summary-table" class="divide-y divide-slate-50 text-xs font-semibold text-slate-600"></tbody>
+                                <tbody id="dashboard-summary-table"></tbody>
                             </table>
                         </div>
                     </div>
                 </div>
-                <div id="dashboard-empty-state" class="py-20 text-center space-y-4">
-                    <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-primary-blue opacity-50"><i class="fas fa-chart-pie text-2xl"></i></div>
-                    <p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Select a project above to view insights</p>
+                <div id="dashboard-empty-state" class="lt-empty">
+                    <div class="lt-empty-icon"><i class="fas fa-chart-pie"></i></div>
+                    <p>Select a project above to view insights</p>
                 </div>
             </div>
         </div>
 
         <!-- View 3: Location Tracker (Main) -->
         <div id="tracker-view" class="app-view">
-            <div class="main-card p-4 md:p-6 space-y-4 text-primary-deep">
-                <header class="flex justify-between items-center">
-                    <button id="home-button" class="btn bg-[#F8FAFC] p-3 rounded-2xl text-slate-500 hover:text-primary-blue hover:scale-110 transition-all shadow-sm"><i class="fas fa-house"></i></button>
-                    <div class="text-center flex-grow px-4"><h3 id="tracker-title" class="text-lg font-black text-slate-900 tracking-tight truncate">Project Name</h3></div>
-                    <button id="customizeLabelsBtn" class="btn bg-primary-soft p-3 rounded-2xl text-primary-blue shadow-sm"><i class="fas fa-sliders"></i></button>
-                </header>
-
+            <div class="main-card lt-tracker">
                 <div id="map-container">
                     <div id="map"></div>
                     <div id="searchBox" class="search-container">
@@ -535,124 +696,125 @@
                     </div>
                 </div>
 
-                <div id="address-display" class="bg-blue-50/50 px-5 py-3 rounded-2xl border border-blue-100/50 hidden">
-                    <div class="flex items-center gap-3">
-                        <i class="fas fa-map-pin text-primary-blue text-[10px] shrink-0"></i>
-                        <p id="current-address-text" class="text-[10px] font-bold text-slate-600 truncate">Locating...</p>
-                    </div>
-                </div>
+                <section class="lt-sheet">
+                    <div class="lt-grabber" aria-hidden="true"></div>
+                    <header class="lt-sheet-head">
+                        <button id="home-button" class="btn lt-circle-btn"><i class="fas fa-house"></i></button>
+                        <h3 id="tracker-title" class="lt-sheet-title">Project Name</h3>
+                        <button id="customizeLabelsBtn" class="btn lt-circle-btn lt-circle-btn--blue"><i class="fas fa-sliders"></i></button>
+                    </header>
 
-                <div class="space-y-3">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-1.5">
-                            <div class="flex justify-between items-center px-1 h-5">
-                                <label id="employeeIdLabel" class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Employee ID</label>
-                                <span id="eid-pin-count" class="text-[9px] font-black text-primary-blue bg-primary-blue/10 px-2 py-0.5 rounded-full hidden animate-pulse">0 PINS</span>
-                            </div>
-                            <div class="relative flex items-center">
-                                <input id="employeeIdInput" type="text" class="input-field py-3 pr-10" placeholder="ID" autocomplete="off">
-                                <button id="lockEmployeeIdBtn" class="absolute right-3 text-slate-300 hover:text-primary-blue transition-colors p-1" title="Toggle Lock"><i id="lockIcon" class="fas fa-lock-open text-xs"></i></button>
-                            </div>
-                        </div>
-                        <div class="space-y-1.5">
-                            <div class="flex items-center px-1 h-5"><label id="surveyIdLabel" class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Survey ID</label></div>
-                            <input id="surveyIdInput" type="text" class="input-field py-3" placeholder="ID" autocomplete="off">
+                    <div id="address-display" class="lt-address hidden">
+                        <div class="lt-address-row">
+                            <i class="fas fa-map-pin"></i>
+                            <p id="current-address-text">Locating...</p>
                         </div>
                     </div>
-                </div>
 
-                <div id="normalActionButtons" class="flex gap-3 pt-1 items-center">
-                    <button id="saveButton" class="btn btn-primary-action py-4 px-4 flex-grow text-sm uppercase font-black tracking-widest flex items-center justify-center gap-2 rounded-2xl shadow-lg shadow-blue-200"><i class="fas fa-circle-check"></i><span>SAVE RECORD</span></button>
-                    <!-- UPLOAD BUTTON WITH RESTORED STYLES -->
-                    <button id="uploadButton" class="btn btn-upload-minimal w-14 h-14 flex items-center justify-center rounded-2xl shrink-0">
-                        <i class="fas fa-cloud-arrow-up text-xl text-[#34C759]"></i>
-                    </button>
-                </div>
+                    <div class="lt-fields">
+                        <div>
+                            <div class="lt-label-row">
+                                <label id="employeeIdLabel" class="lt-label" for="employeeIdInput">Employee ID</label>
+                                <span id="eid-pin-count" class="lt-count hidden">0 PINS</span>
+                            </div>
+                            <div class="lt-input-wrap">
+                                <input id="employeeIdInput" type="text" class="input-field lt-input lt-input--lock" placeholder="ID" autocomplete="off">
+                                <button id="lockEmployeeIdBtn" class="lt-lock" title="Toggle Lock"><i id="lockIcon" class="fas fa-lock-open text-xs"></i></button>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="lt-label-row"><label id="surveyIdLabel" class="lt-label" for="surveyIdInput">Survey ID</label></div>
+                            <input id="surveyIdInput" type="text" class="input-field lt-input" placeholder="ID" autocomplete="off">
+                        </div>
+                    </div>
 
-                <div class="space-y-2 pt-4 text-primary-deep">
-                    <div class="flex items-center justify-between px-1 text-[10px] font-black uppercase text-slate-400">
-                        <h4>Recent Sessions</h4>
-                        <button id="exportCsvButton" class="btn bg-[#EFF6FF] text-[#2563EB] py-1.5 px-4 rounded-full hover:bg-blue-100 transition-colors shadow-sm"><i class="fas fa-file-csv mr-1"></i><span>Export CSV</span></button>
+                    <div id="normalActionButtons" class="lt-actions">
+                        <button id="saveButton" class="btn lt-primary"><i class="fas fa-circle-check"></i><span>SAVE RECORD</span></button>
+                        <button id="uploadButton" class="btn lt-upload">
+                            <i class="fas fa-cloud-arrow-up text-xl text-[#34C759]"></i>
+                        </button>
                     </div>
-                    <div class="table-scroll">
-                        <table class="w-full border-collapse">
-                            <thead class="bg-[#F8FAFC] border-b border-slate-100 text-[9px] text-primary-blue uppercase font-black">
-                                <tr><th class="p-3 text-left">No.</th><th id="tableHeaderEmployeeId" class="p-3 text-left">Staff</th><th id="tableHeaderSurveyId" class="p-3 text-left">ID</th><th class="p-3 text-left">Timestamp</th><th class="p-3 text-center">Del</th></tr>
-                            </thead>
-                            <tbody id="savedLocationsTableBody" class="divide-y divide-slate-100 text-[11px] font-semibold text-slate-600"></tbody>
-                        </table>
+
+                    <div>
+                        <div class="lt-section-head">
+                            <h4 class="lt-section-title">Recent Sessions</h4>
+                            <button id="exportCsvButton" class="btn lt-text-btn"><i class="fas fa-file-csv mr-1"></i><span>Export CSV</span></button>
+                        </div>
+                        <div class="table-scroll lt-table">
+                            <table>
+                                <thead>
+                                    <tr><th class="text-left">No.</th><th id="tableHeaderEmployeeId" class="text-left">Staff</th><th id="tableHeaderSurveyId" class="text-left">ID</th><th class="text-left">Timestamp</th><th class="text-center">Del</th></tr>
+                                </thead>
+                                <tbody id="savedLocationsTableBody"></tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
+                </section>
             </div>
         </div>
     </div>
 
     <!-- Modals -->
     <div id="confirmationModal" class="modal-overlay">
-        <div class="bg-white rounded-3xl p-6 w-[280px] shadow-2xl text-center border border-slate-100">
-            <div class="mb-4">
-                <div class="w-10 h-10 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-3"><i class="fas fa-trash-can text-sm"></i></div>
-                <h4 id="modalTitle" class="text-sm font-black text-slate-900 uppercase tracking-wide">Confirm Delete</h4>
-            </div>
-            <div class="mb-5"><p id="modalMessage" class="text-[10px] text-slate-400 font-bold px-2 uppercase tracking-tighter"></p></div>
-            <div class="flex gap-2">
-                <button id="confirmActionButton" class="btn bg-red-500 text-white flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm hover:bg-red-600 transition-colors">Yes, Delete</button>
-                <button id="cancelActionButton" class="btn bg-slate-50 text-slate-400 flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest">Cancel</button>
+        <div class="lt-modal">
+            <div class="lt-modal-grabber" aria-hidden="true"></div>
+            <div class="lt-modal-icon lt-modal-icon--danger"><i class="fas fa-trash-can"></i></div>
+            <h4 id="modalTitle" class="lt-modal-title">Confirm Delete</h4>
+            <p id="modalMessage" class="lt-modal-text"></p>
+            <div class="lt-modal-actions">
+                <button id="confirmActionButton" class="btn lt-danger uppercase">Yes, Delete</button>
+                <button id="cancelActionButton" class="btn lt-secondary uppercase">Cancel</button>
             </div>
         </div>
     </div>
 
     <div id="passwordModal" class="modal-overlay">
-        <div class="bg-white rounded-[2.5rem] p-8 max-w-xs w-full shadow-2xl text-primary-deep border border-slate-50 transform scale-100 relative">
-            <!-- CLOSE BUTTON AT TOP RIGHT -->
-            <button type="button" id="close-password-modal" class="absolute top-6 right-6 text-slate-300 hover:text-red-500 transition-colors p-1" title="Close">
+        <div class="lt-modal">
+            <div class="lt-modal-grabber" aria-hidden="true"></div>
+            <button type="button" id="close-password-modal" class="lt-modal-close" title="Close">
                 <i class="fas fa-times text-lg"></i>
             </button>
-            <div class="text-center mb-6">
-                <div class="relative w-16 h-16 mx-auto mb-4">
-                    <div class="absolute inset-0 bg-blue-500 rounded-2xl opacity-10 animate-pulse"></div>
-                    <div class="relative bg-gradient-to-br from-blue-500 to-primary-blue w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200"><i class="fas fa-unlock-keyhole text-white text-2xl"></i></div>
+            <div class="lt-modal-icon"><i class="fas fa-unlock-keyhole"></i></div>
+            <h4 class="lt-modal-title">Unlock Console</h4>
+            <p class="lt-modal-text">Administrator Access Required</p>
+            <form id="password-form" class="lt-modal-form">
+                <div class="lt-input-wrap">
+                    <input id="password-input" type="password" class="input-field lt-input lt-password" placeholder="••••" required autocomplete="off">
+                    <button type="button" id="togglePasswordBtn" class="lt-lock"><i id="eyeIcon" class="fas fa-eye-slash text-sm"></i></button>
                 </div>
-                <h4 class="text-lg font-black text-slate-900 uppercase tracking-tight">Unlock Console</h4>
-                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Administrator Access Required</p>
-            </div>
-            <form id="password-form" class="space-y-5">
-                <div class="relative group">
-                    <input id="password-input" type="password" class="input-field text-center text-2xl font-black tracking-[0.5em] bg-slate-50 border-2 border-transparent focus:border-primary-blue focus:bg-white focus:ring-4 focus:ring-blue-50 placeholder:tracking-normal placeholder:text-slate-200 pr-12" placeholder="••••" required autocomplete="off">
-                    <button type="button" id="togglePasswordBtn" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-primary-blue transition-colors p-1"><i id="eyeIcon" class="fas fa-eye-slash text-sm"></i></button>
-                </div>
-                <div class="grid gap-3"><button type="submit" class="btn btn-primary-action py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] shadow-lg shadow-blue-100 active:scale-95 transition-all">Verify Key</button></div>
+                <button type="submit" class="btn lt-primary uppercase">Verify Key</button>
             </form>
         </div>
     </div>
 
-    <!-- RENAME MODAL FIXED SIZE -->
     <div id="renameModal" class="modal-overlay">
-        <div class="bg-white rounded-[2.5rem] p-10 max-w-xs w-full shadow-2xl text-center border border-slate-100">
-            <h4 class="text-lg font-black mb-8 text-slate-900 uppercase">Rename Project</h4>
-            <form id="rename-form" class="space-y-6">
-                <input id="rename-input" type="text" class="input-field text-center font-bold text-slate-800" required autocomplete="off">
-                <div class="flex gap-4">
-                    <button type="submit" class="btn btn-primary-action flex-1 py-4 uppercase text-xs">Apply</button>
-                    <button type="button" id="cancel-rename-btn" class="btn bg-slate-50 text-slate-500 flex-1 py-4 uppercase text-xs">Cancel</button>
+        <div class="lt-modal">
+            <div class="lt-modal-grabber" aria-hidden="true"></div>
+            <h4 class="lt-modal-title">Rename Project</h4>
+            <form id="rename-form" class="lt-modal-form">
+                <input id="rename-input" type="text" class="input-field lt-input text-center" required autocomplete="off">
+                <div class="lt-modal-actions">
+                    <button type="submit" class="btn lt-primary uppercase">Apply</button>
+                    <button type="button" id="cancel-rename-btn" class="btn lt-secondary uppercase">Cancel</button>
                 </div>
             </form>
         </div>
     </div>
 
     <div id="customizeLabelsModal" class="modal-overlay">
-        <div class="bg-white rounded-[2.5rem] p-8 max-w-xs w-full shadow-2xl text-primary-deep border border-slate-50">
-            <h4 class="text-lg font-black text-slate-900 uppercase tracking-tight text-center mb-6">Customize Fields</h4>
-            <form id="customize-labels-form" class="space-y-5">
-                <div class="space-y-1.5"><label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Label</label><input id="custom-employee-label" type="text" class="input-field" placeholder="Default: Employee ID"></div>
-                <div class="space-y-1.5"><label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Secondary Label</label><input id="custom-survey-label" type="text" class="input-field" placeholder="Default: Survey ID"></div>
-                <div class="grid gap-3 pt-2"><button type="submit" class="btn btn-primary-action py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-100">Save Changes</button><button type="button" id="cancel-customize-btn" class="btn bg-white border border-slate-100 text-slate-400 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest">Cancel</button></div>
+        <div class="lt-modal">
+            <div class="lt-modal-grabber" aria-hidden="true"></div>
+            <h4 class="lt-modal-title">Customize Fields</h4>
+            <form id="customize-labels-form" class="lt-modal-form">
+                <div><label class="lt-label mb-1.5" for="custom-employee-label">Primary Label</label><input id="custom-employee-label" type="text" class="input-field lt-input" placeholder="Default: Employee ID"></div>
+                <div><label class="lt-label mb-1.5" for="custom-survey-label">Secondary Label</label><input id="custom-survey-label" type="text" class="input-field lt-input" placeholder="Default: Survey ID"></div>
+                <div class="lt-modal-stack"><button type="submit" class="btn lt-primary uppercase">Save Changes</button><button type="button" id="cancel-customize-btn" class="btn lt-secondary uppercase">Cancel</button></div>
             </form>
         </div>
     </div>
 
-    <div id="loadingSpinner" class="fixed inset-0 z-[10000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center hidden transition-opacity duration-300">
-        <div class="bg-white p-12 rounded-[3.5rem] shadow-2xl flex flex-col items-center gap-6 border border-white/20 min-w-[240px]">
+    <div id="loadingSpinner" class="lt-spinner fixed inset-0 z-[10000] flex items-center justify-center hidden">
+        <div class="lt-spinner-card">
             <div id="spinner-animation" class="relative w-14 h-14">
                 <div class="absolute inset-0 border-[5px] border-slate-100 rounded-full"></div>
                 <div class="absolute inset-0 border-[5px] border-primary-blue border-t-transparent rounded-full animate-spin"></div>
