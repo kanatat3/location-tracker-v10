@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker V12.3 (01.10.2026)</title>
+    <title>Location Tracker V12.4 (01.10.2026)</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -1996,7 +1996,7 @@
             document.getElementById("saveButton").onclick = () => {
                 const record = addPendingRecord();
                 if (!record) return;
-                if (record.OutOfRadius) showMessage(`Saved locally - ${record.DistanceKm.toFixed(1)} km away, outside the ${record.RadiusKm} km radius`, "warning");
+                if (record.OutOfRadius) showMessage("Saved locally - outside the allowed area", "warning");   // no radius or distance figures: those are for the admin only
                 else showMessage("Saved Locally", "success");
             };
 
@@ -2063,7 +2063,7 @@
                     
                     await new Promise(r => setTimeout(r, 1000));
                     ui.spinner.classList.add("hidden");
-                    if (outside.length) showMessage(`Uploaded - ${outside.length} outside the radius, ${outside.some(r => r.slackSent) ? "Slack alerted" : "flagged in the Sheet"}`, "warning");
+                    if (outside.length) showMessage(`Uploaded - ${outside.length} outside the allowed area, ${outside.some(r => r.slackSent) ? "Slack alerted" : "flagged in the Sheet"}`, "warning");
                     refreshData(false); // Sync data silently in background after upload
                 } catch (e) {
                     console.error(e);
