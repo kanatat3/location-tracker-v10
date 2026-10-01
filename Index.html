@@ -571,6 +571,15 @@
         #project-selection-view .figma-project-card:nth-child(5n+4) { background: #ECE5FF; }
         #project-selection-view .figma-project-card:nth-child(5n+5) { background: #FFE3EE; }
         #project-selection-view .figma-project-card i { color: #fff; }
+        #project-selection-view .figma-project-card .lt-brand-badge {
+            width: 40px; height: 40px; border-radius: 50%; flex: 0 0 auto;
+            display: grid; place-items: center; overflow: hidden;
+            color: #fff; font-size: 12.5px; font-weight: 800; letter-spacing: 0.02em; line-height: 1;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+        }
+        #project-selection-view .figma-project-card .lt-brand-badge--long { font-size: 10.5px; letter-spacing: 0; }
+        #project-selection-view .figma-project-card .lt-brand-badge img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+        #project-selection-view .figma-project-card .lt-brand-badge--img { box-shadow: 0 0 0 1px rgba(11, 18, 32, 0.08), 0 2px 6px rgba(11, 18, 32, 0.08); }
         #project-selection-view .figma-project-card:nth-child(5n+1) i { background: #007AFF; }
         #project-selection-view .figma-project-card:nth-child(5n+2) i { background: #12A15E; }
         #project-selection-view .figma-project-card:nth-child(5n+3) i { background: #E08A00; }
@@ -856,6 +865,73 @@
         </div>
     </div>
     <div id="messageBox" class="fixed top-10 left-1/2 -translate-x-1/2 z-[10001] px-10 py-4 rounded-[2rem] shadow-2xl font-black transition-all transform opacity-0 pointer-events-none bg-white/90 backdrop-blur-lg border border-slate-50"></div>
+
+    <!-- Company icons on the project list (display only): a project whose name contains a company
+         keyword shows that company's website icon instead of the folder icon. The icon is fetched from
+         the company domain through Google's favicon service; if it fails, is too small (under 32px) or
+         the phone is offline, the coloured initials badge is shown instead. Add companies to BRAND_BADGES. -->
+    <script>
+    (() => {
+        const BRAND_BADGES = [
+            { match: ["SCGC"], label: "SCGC", bg: "#D71920", domain: "www.scg.com" },
+            { match: ["DOW"], label: "DOW", bg: "#C8102E", domain: "www.dow.com" },
+            { match: ["AJINOMOTO"], label: "AJI", bg: "#B5121B", domain: "ajinomoto.co.th" },
+            { match: ["SYS", "สยามยามาโตะ"], label: "SYS", bg: "#1F4E9C", domain: "www.syssteel.com" },
+        ];
+        const MIN_ICON_PX = 32;
+        const iconState = {};                     // domain -> "ok" | "bad" (remembered for this page)
+        const iconUrl = d => "https://www.google.com/s2/favicons?sz=128&domain=" + encodeURIComponent(d);
+        const isLatin = s => /^[A-Za-z0-9]+$/.test(s);
+        const hit = (name, key) => isLatin(key)
+            ? new RegExp("(^|[^A-Za-z0-9])" + key + "([^A-Za-z0-9]|$)", "i").test(name)
+            : name.includes(key);
+        function showInitials(badge, brand) {
+            badge.textContent = brand.label;
+            badge.style.background = brand.bg;
+            badge.classList.remove("lt-brand-badge--img");
+        }
+        function showIcon(badge, brand) {
+            const im = new Image();
+            im.alt = "";
+            im.src = iconUrl(brand.domain);
+            badge.textContent = "";
+            badge.appendChild(im);
+            badge.style.background = "#fff";
+            badge.classList.add("lt-brand-badge--img");
+        }
+        function decorate(card) {
+            if (card.dataset.brandChecked) return;
+            card.dataset.brandChecked = "1";
+            const name = card.querySelector("span")?.textContent || "";
+            const brand = BRAND_BADGES.find(b => b.match.some(k => hit(name, k)));
+            const icon = card.querySelector("i");
+            if (!brand || !icon) return;
+            const badge = document.createElement("span");
+            badge.className = "lt-brand-badge" + (brand.label.length > 3 ? " lt-brand-badge--long" : "");
+            badge.setAttribute("aria-hidden", "true");
+            icon.replaceWith(badge);
+            const state = brand.domain ? iconState[brand.domain] : "bad";
+            if (state === "ok") return showIcon(badge, brand);
+            showInitials(badge, brand);
+            if (state === "bad") return;
+            const probe = new Image();
+            probe.onload = () => {
+                iconState[brand.domain] = probe.naturalWidth >= MIN_ICON_PX ? "ok" : "bad";
+                if (iconState[brand.domain] === "ok" && badge.isConnected) showIcon(badge, brand);
+            };
+            probe.onerror = () => { iconState[brand.domain] = "bad"; };
+            probe.src = iconUrl(brand.domain);
+        }
+        function start() {
+            const list = document.getElementById("project-list");
+            if (!list) return;
+            const run = () => list.querySelectorAll(".figma-project-card").forEach(decorate);
+            new MutationObserver(run).observe(list, { childList: true });
+            run();
+        }
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
+    })();
+    </script>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
