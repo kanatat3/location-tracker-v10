@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><g transform="translate(256 262) scale(1.12) translate(-256 -262)">
+  <polygon points="104,188 196,156 196,398 104,430" fill="#007AFF"/>
+  <polygon points="196,156 316,188 316,430 196,398" fill="#4DA3FF"/>
+  <polygon points="316,188 408,156 408,398 316,430" fill="#007AFF"/>
+  <path d="M258,318 C216.2,255.84 188.07999999999998,224.72 182,170 A76,76 0 1,1 334,170 C327.92,224.72 299.8,255.84 258,318 Z" fill="#12B76A" stroke="#fff" stroke-width="14" stroke-linejoin="round"/>
+  <circle cx="258" cy="170" r="30" fill="#fff"/></g></svg>
