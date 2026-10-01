@@ -868,19 +868,20 @@
 
     <!-- Company icons on the project list (display only): a project whose name contains a company
          keyword shows that company's website icon instead of the folder icon. The icon is fetched from
-         the company domain through Google's favicon service; if it fails, is too small (under 32px) or
+         the company site (icon) or its domain through Google's favicon service; if it fails, is too small (under 32px) or
          the phone is offline, the coloured initials badge is shown instead. Add companies to BRAND_BADGES. -->
     <script>
     (() => {
         const BRAND_BADGES = [
-            { match: ["SCGC"], label: "SCGC", bg: "#D71920", domain: "www.scg.com" },
+            { match: ["SCGC"], label: "SCGC", bg: "#D71920", icon: "https://www.scgchemicals.com/apple-touch-icon.png" },
             { match: ["DOW"], label: "DOW", bg: "#C8102E", domain: "www.dow.com" },
             { match: ["AJINOMOTO"], label: "AJI", bg: "#B5121B", domain: "ajinomoto.co.th" },
             { match: ["SYS", "สยามยามาโตะ"], label: "SYS", bg: "#1F4E9C", domain: "www.syssteel.com" },
         ];
         const MIN_ICON_PX = 32;
-        const iconState = {};                     // domain -> "ok" | "bad" (remembered for this page)
-        const iconUrl = d => "https://www.google.com/s2/favicons?sz=128&domain=" + encodeURIComponent(d);
+        const iconState = {};                     // icon url -> "ok" | "bad" (remembered for this page)
+        // icon: a direct logo URL on the company site; otherwise the site favicon via Google from domain.
+        const iconUrl = b => b.icon || (b.domain ? "https://www.google.com/s2/favicons?sz=128&domain=" + encodeURIComponent(b.domain) : "");
         const isLatin = s => /^[A-Za-z0-9]+$/.test(s);
         const hit = (name, key) => isLatin(key)
             ? new RegExp("(^|[^A-Za-z0-9])" + key + "([^A-Za-z0-9]|$)", "i").test(name)
@@ -893,7 +894,7 @@
         function showIcon(badge, brand) {
             const im = new Image();
             im.alt = "";
-            im.src = iconUrl(brand.domain);
+            im.src = iconUrl(brand);
             badge.textContent = "";
             badge.appendChild(im);
             badge.style.background = "#fff";
@@ -910,17 +911,18 @@
             badge.className = "lt-brand-badge" + (brand.label.length > 3 ? " lt-brand-badge--long" : "");
             badge.setAttribute("aria-hidden", "true");
             icon.replaceWith(badge);
-            const state = brand.domain ? iconState[brand.domain] : "bad";
+            const src = iconUrl(brand);
+            const state = src ? iconState[src] : "bad";
             if (state === "ok") return showIcon(badge, brand);
             showInitials(badge, brand);
             if (state === "bad") return;
             const probe = new Image();
             probe.onload = () => {
-                iconState[brand.domain] = probe.naturalWidth >= MIN_ICON_PX ? "ok" : "bad";
-                if (iconState[brand.domain] === "ok" && badge.isConnected) showIcon(badge, brand);
+                iconState[src] = probe.naturalWidth >= MIN_ICON_PX ? "ok" : "bad";
+                if (iconState[src] === "ok" && badge.isConnected) showIcon(badge, brand);
             };
-            probe.onerror = () => { iconState[brand.domain] = "bad"; };
-            probe.src = iconUrl(brand.domain);
+            probe.onerror = () => { iconState[src] = "bad"; };
+            probe.src = src;
         }
         function start() {
             const list = document.getElementById("project-list");
