@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker V12.2 (01.10.2026)</title>
+    <title>Location Tracker V12.3 (01.10.2026)</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -1178,15 +1178,41 @@
             });
         }
 
-        // Red building = the project's main coordinate, with its radius circles.
-        function addMainCoordinateToGroup(group, projectName) {
+        // Red building = the project's main coordinate; everybody sees it.
+        // The radius circles (and their sizes) are drawn only where showRadius is asked for: the admin's Analytics map.
+        function addMainCoordinateToGroup(group, projectName, showRadius = false) {
             const config = getProjectConfig(projectName);
             if (!config.hasBase) return;
-            addRadiusCirclesToGroup(group, config.baseLat, config.baseLng, config.radiusKms);
-            const radiusText = config.radiusKms.length ? `${config.radiusKms.join(', ')} km` : 'No radius limit';
-            L.marker([config.baseLat, config.baseLng], { icon: getBuildingIcon(), zIndexOffset: 3000 })
-                .bindPopup(`<b>Main coordinate</b><br>${config.baseLat.toFixed(6)}, ${config.baseLng.toFixed(6)}<br><b>Radius:</b> ${radiusText}`)
-                .addTo(group);
+            let popup = `<b>Main coordinate</b><br>${config.baseLat.toFixed(6)}, ${config.baseLng.toFixed(6)}`;
+            if (showRadius) {
+                addRadiusCirclesToGroup(group, config.baseLat, config.baseLng, config.radiusKms);
+                popup += `<br><b>Radius:</b> ${config.radiusKms.length ? `${config.radiusKms.join(', ')} km` : 'No radius limit'}`;
+            }
+            L.marker([config.baseLat, config.baseLng], { icon: getBuildingIcon(), zIndexOffset: 3000 }).bindPopup(popup).addTo(group);
+        }
+
+        // What the admin reads when a pin on the Analytics map is pressed.
+        function buildPinPopup(loc, projectName) {
+            const config = getProjectConfig(projectName);
+            const lat = Number(loc.Latitude), lng = Number(loc.Longitude);
+            const time = new Date(loc.Timestamp);
+            const lines = [
+                `<b>${escapeHtml(customLabels.employeeId)}:</b> ${escapeHtml(loc.EmployeeID || '-')}`,
+                `<b>${escapeHtml(customLabels.surveyId)}:</b> ${escapeHtml(loc.SurveyID || '-')}`,
+                `<b>Time:</b> ${isNaN(time) ? '-' : time.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
+                `<b>Coordinate:</b> ${lat.toFixed(6)}, ${lng.toFixed(6)}`
+            ];
+            if (config.hasBase) {
+                const distanceKm = calculateDistanceKm(config.baseLat, config.baseLng, lat, lng);
+                lines.push(`<b>From main coordinate:</b> ${distanceKm.toFixed(2)} km`);
+                if (loc.OutOfRadius === true || (config.radiusKm !== null && distanceKm > config.radiusKm)) {
+                    lines.push(`<b style="color:#dc2626">Outside the ${escapeHtml(config.radiusKm ?? loc.RadiusKm ?? '')} km radius</b>`);
+                }
+            } else if (loc.OutOfRadius === true) {
+                lines.push(`<b style="color:#dc2626">Outside the radius</b>`);
+            }
+            lines.push(`<a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" rel="noopener">Open in Google Maps</a>`);
+            return lines.join('<br>');
         }
 
         // A closed project takes no new pins: both buttons go quiet and say why.
@@ -1658,11 +1684,11 @@
                 dashboardMarkers.clearLayers();
                 if (ui.dashboardSummaryTable) ui.dashboardSummaryTable.innerHTML = "";
                 const summary = {};
-                addMainCoordinateToGroup(dashboardMarkers, projectName);
+                addMainCoordinateToGroup(dashboardMarkers, projectName, true);
                 data.forEach(loc => {
                     if (loc.Latitude && loc.Longitude) {
                         const marker = L.marker([loc.Latitude, loc.Longitude], { icon: getMarkerIcon('#007AFF') });
-                        marker.bindPopup(`<b>Staff:</b> ${escapeHtml(loc.EmployeeID)}<br><b>Survey:</b> ${escapeHtml(loc.SurveyID || '-')}${loc.OutOfRadius === true ? `<br><b style="color:#dc2626">Outside the ${escapeHtml(loc.RadiusKm || '')} km radius</b>` : ''}`);
+                        marker.bindPopup(buildPinPopup(loc, projectName));
                         marker.addTo(dashboardMarkers);
                         summary[loc.EmployeeID] = (summary[loc.EmployeeID] || 0) + 1;
                     }
