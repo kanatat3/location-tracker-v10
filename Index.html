@@ -18,6 +18,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Google sign-in (admin console) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <style>
         :root {
@@ -114,7 +116,7 @@
         .lt-field + .lt-field { margin-top: 0; }
         .lt-input { min-height: 56px; font-size: 17px; }
         .lt-input-wrap { position: relative; }
-        .lt-input--lock, .lt-password { padding-right: 46px; }
+        .lt-input--lock { padding-right: 46px; }
         .lt-input::placeholder { font-size: 15px; }
         .lt-lock {
             position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
@@ -507,14 +509,17 @@
         .lt-modal-text { margin: 6px 0 0; font-size: 14px; font-weight: 500; line-height: 1.45; color: var(--muted); }
         .lt-modal-text:empty { display: none; }
         .lt-modal-form { display: grid; gap: 14px; margin-top: 20px; text-align: left; }
+        .lt-google-signin { display: flex; justify-content: center; min-height: 44px; margin-top: 20px; }
+        .lt-signin-note { margin: 12px 0 0; font-size: 12px; font-weight: 600; line-height: 1.45; color: var(--muted); overflow-wrap: anywhere; }
+        .lt-signin-note:empty { display: none; }
+        .lt-admin-account { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; }
+        .lt-admin-email { min-width: 0; font-size: 13px; font-weight: 600; color: var(--muted); overflow-wrap: anywhere; }
         .lt-modal-form .lt-primary { width: 100%; min-height: 56px; }
         .lt-modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
         .lt-modal-form .lt-modal-actions { margin-top: 4px; }
         .lt-modal-form .lt-modal-actions .lt-primary { min-height: 54px; font-size: 14px; letter-spacing: 0.08em; }
         .lt-modal-stack { display: grid; gap: 10px; margin-top: 4px; }
         .lt-modal-stack .lt-secondary { min-height: 50px; }
-        .lt-password { text-align: center; font-size: 22px; font-weight: 800; letter-spacing: 0.3em; }
-        .lt-password::placeholder { letter-spacing: 0.3em; }
 
         /* ---------- Loading + toast ---------- */
         .lt-spinner { background: rgba(11, 18, 32, 0.45); }
@@ -647,6 +652,12 @@
                     <button id="goto-dashboards-btn" class="btn lt-row-btn lt-row-btn--dark">
                         <span class="lt-row-icon"><i class="fas fa-chart-bar"></i></span>
                         <div class="text-left"><p class="lt-row-title">Analytics</p><p class="lt-row-sub uppercase">Performance</p></div>
+                    </button>
+                </div>
+                <div class="lt-admin-account">
+                    <span id="admin-account-email" class="lt-admin-email"></span>
+                    <button id="admin-sign-out-btn" class="btn lt-pill uppercase">
+                        <i class="fas fa-right-from-bracket mr-2"></i> Sign out
                     </button>
                 </div>
             </div>
@@ -815,14 +826,9 @@
             </button>
             <div class="lt-modal-icon"><i class="fas fa-unlock-keyhole"></i></div>
             <h4 class="lt-modal-title">Unlock Console</h4>
-            <p class="lt-modal-text">Administrator Access Required</p>
-            <form id="password-form" class="lt-modal-form">
-                <div class="lt-input-wrap">
-                    <input id="password-input" type="password" class="input-field lt-input lt-password" placeholder="••••" required autocomplete="off">
-                    <button type="button" id="togglePasswordBtn" class="lt-lock"><i id="eyeIcon" class="fas fa-eye-slash text-sm"></i></button>
-                </div>
-                <button type="submit" class="btn lt-primary uppercase">Verify Key</button>
-            </form>
+            <p class="lt-modal-text">Sign in with an allowed Google account</p>
+            <div id="google-signin-button" class="lt-google-signin"></div>
+            <p id="google-signin-note" class="lt-signin-note"></p>
         </div>
     </div>
 
@@ -937,7 +943,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyWJlVXi7eVd_W7E4lKKj3VW9RyqsN750HP0G8gk4nL6BacrOvRsEuOpXGNBHezaJCtkA/exec';
+        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxwXRe_J--t6D-cSPNxbLJlp-krPKPeMlmnkVaoFwNeQtcq7kfPwU955YCo3JUm0fUWaA/exec';
         
         let map, dashboardMap, permanentMarkers = L.featureGroup(), dashboardMarkers = L.featureGroup();
         let currentLat = null, currentLng = null, currentAddress = "";
@@ -946,7 +952,12 @@
         let isEmployeeIdLocked = false; 
         let customLabels = JSON.parse(localStorage.getItem('customLabels')) || { employeeId: 'Employee ID', surveyId: 'Survey ID' };
         
+        // OAuth client ID (Web) for "Sign in with Google"; the same value is GOOGLE_CLIENT_ID in the Apps Script properties.
+        const GOOGLE_CLIENT_ID = '728655284245-07qf8crlrqflj71j6vrdesj4g1qjv727.apps.googleusercontent.com';
+        const POST_HEADERS = { 'Content-Type': 'text/plain;charset=utf-8' };
+
         let isAdminAuthenticated = false;
+        let googleSignInReady = false;
         let sessionHiddenProjects = [];
         let visibleProjectLimit = 7;
         
@@ -961,6 +972,74 @@
             msgBox.innerHTML = `<div class="flex items-center gap-4"><i class="fas fa-${icon}"></i><span class="text-[11px] font-black uppercase text-slate-800">${msg}</span></div>`;
             msgBox.style.opacity = "1"; msgBox.style.transform = "translateX(-50%) translateY(0)";
             setTimeout(() => { msgBox.style.opacity = "0"; msgBox.style.transform = "translateX(-50%) translateY(-20px)"; }, 3500);
+        }
+
+        // Admin access = a Google account listed in the AllowedEmails tab of the Sheet.
+        // The server returns a session after sign-in; every admin request sends it back.
+        function getAdminSession() { return localStorage.getItem("admin_session") || ""; }
+
+        function renderAdminAccount() {
+            document.getElementById("admin-account-email").textContent = localStorage.getItem("admin_email") || "";
+        }
+
+        function signOutAdmin() {
+            isAdminAuthenticated = false;
+            localStorage.removeItem("admin_session");
+            localStorage.removeItem("admin_email");
+            renderAdminAccount();
+        }
+
+        function openGoogleSignIn(note) {
+            const noteEl = document.getElementById("google-signin-note");
+            noteEl.textContent = note || "";
+            document.getElementById("passwordModal").style.display = "flex";
+            if (!GOOGLE_CLIENT_ID) { noteEl.textContent = "Google sign-in is not set up yet."; return; }
+            if (!window.google || !google.accounts || !google.accounts.id) {
+                noteEl.textContent = "Google sign-in is not available. Check the internet connection and try again.";
+                return;
+            }
+            if (!googleSignInReady) {
+                google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogleCredential });
+                googleSignInReady = true;
+            }
+            google.accounts.id.renderButton(document.getElementById("google-signin-button"), { theme: "outline", size: "large", shape: "pill", text: "signin_with", width: 260 });
+        }
+
+        async function onGoogleCredential(response) {
+            const noteEl = document.getElementById("google-signin-note");
+            ui.spinner.classList.remove("hidden");
+            try {
+                const res = await fetch(WEB_APP_URL, {
+                    method: "POST",
+                    headers: POST_HEADERS,
+                    body: JSON.stringify({ action: "googleLogin", idToken: response.credential })
+                });
+                const result = await res.json();
+                if (result.success && result.session) {
+                    localStorage.setItem("admin_session", result.session);
+                    localStorage.setItem("admin_email", result.email || "");
+                    isAdminAuthenticated = true;
+                    renderAdminAccount();
+                    document.getElementById("passwordModal").style.display = "none";
+                    window.showView("admin-menu-view");
+                } else {
+                    noteEl.textContent = result.message || "This Google account is not allowed.";
+                    showMessage("Access denied", "error");
+                }
+            } catch (e) {
+                noteEl.textContent = "Could not reach the server. Try again.";
+            }
+            ui.spinner.classList.add("hidden");
+        }
+
+        // The server refuses an admin request when the session expired or the email left the list:
+        // forget the session and ask to sign in again. Returns true when that happened.
+        function handleAdminAuthRequired(result) {
+            if (!result || !result.authRequired) return false;
+            signOutAdmin();
+            window.showView("project-selection-view");
+            openGoogleSignIn("Sign in again to continue.");
+            return true;
         }
 
         function showConfirmation(title, message, onConfirm) {
@@ -1010,10 +1089,11 @@
                     const res = await fetch(WEB_APP_URL, { 
                         method: "POST", 
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                        body: JSON.stringify({ action: "renameProject", oldProjectName: oldName, newProjectName: newName }) 
+                        body: JSON.stringify({ action: "renameProject", oldProjectName: oldName, newProjectName: newName, session: getAdminSession() })
                     });
                     const result = await res.json();
                     if (result.success) { showMessage("Complete", "success"); fetchProjects(); }
+                    else handleAdminAuthRequired(result);
                 } catch(err) { console.error(err); }
                 ui.spinner.classList.add("hidden");
             };
@@ -1034,12 +1114,16 @@
                     const res = await fetch(WEB_APP_URL, { 
                         method: "POST", 
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                        body: JSON.stringify({ action: "hideProject", projectName: trimmedName })
+                        body: JSON.stringify({ action: "hideProject", projectName: trimmedName, session: getAdminSession() })
                     });
                     const result = await res.json();
-                    if (result.success) { 
-                        showMessage("Project Deleted", "success"); 
-                        fetchProjects(); 
+                    if (result.success) {
+                        showMessage("Project Deleted", "success");
+                        fetchProjects();
+                    } else if (handleAdminAuthRequired(result)) {
+                        // Not deleted on the server: bring the project back on this device too.
+                        sessionHiddenProjects = sessionHiddenProjects.filter(p => p !== trimmedName);
+                        fetchProjects();
                     }
                 } catch(e) { console.error(e); }
                 ui.spinner.classList.add("hidden");
@@ -1377,10 +1461,12 @@
                 dashboardSummaryTable: document.getElementById("dashboard-summary-table")
             };
             
-            // Auto-login Admin if previously authenticated on this device
-            if (localStorage.getItem("admin_auth_token") === "authenticated_true") {
+            // Stay signed in on this device; the server still checks the session on every admin request.
+            localStorage.removeItem("admin_auth_token"); // left over from the old password login
+            if (getAdminSession()) {
                 isAdminAuthenticated = true;
             }
+            renderAdminAccount();
             
             fetchProjects();
 
@@ -1415,18 +1501,12 @@
                 const order = listItems.map(item => item.dataset.projectName);
                 ui.spinner.classList.remove("hidden");
                 try {
-                    const res = await fetch(WEB_APP_URL, { method: "POST", headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: "reorderProjects", projectOrder: order }) });
+                    const res = await fetch(WEB_APP_URL, { method: "POST", headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: "reorderProjects", projectOrder: order, session: getAdminSession() }) });
                     const result = await res.json();
                     if (result.success) { showMessage("Complete", "success"); fetchProjects(); document.getElementById('save-project-order-btn').classList.add('hidden'); }
+                    else handleAdminAuthRequired(result);
                 } catch (e) { console.error(e); }
                 ui.spinner.classList.add("hidden");
-            };
-
-            document.getElementById("togglePasswordBtn").onclick = () => {
-                const p = document.getElementById("password-input");
-                const i = document.getElementById("eyeIcon");
-                if (p.type === "password") { p.type = "text"; i.className = "fas fa-eye text-sm"; } 
-                else { p.type = "password"; i.className = "fas fa-eye-slash text-sm"; }
             };
 
             document.getElementById("close-password-modal").onclick = () => { document.getElementById("passwordModal").style.display = "none"; };
@@ -1437,30 +1517,15 @@
                 if (isAdminAuthenticated) {
                     window.showView("admin-menu-view");
                 } else {
-                    document.getElementById("password-input").value = ""; 
-                    document.getElementById("passwordModal").style.display = "flex"; 
+                    openGoogleSignIn();
                 }
             };
 
-            document.getElementById("password-form").onsubmit = async (e) => {
-                e.preventDefault();
-                ui.spinner.classList.remove("hidden");
-                try {
-                    const res = await fetch(WEB_APP_URL, { 
-                        method: "POST", 
-                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
-                        body: JSON.stringify({ action: "verifyPassword", password: document.getElementById("password-input").value }) 
-                    });
-                    const result = await res.json();
-                    if (result.success) { 
-                        isAdminAuthenticated = true; 
-                        localStorage.setItem("admin_auth_token", "authenticated_true"); // Remember authentication
-                        document.getElementById("passwordModal").style.display = "none"; 
-                        window.showView("admin-menu-view"); 
-                    } 
-                    else showMessage("Incorrect Password", "error");
-                } catch(e) {}
-                ui.spinner.classList.add("hidden");
+            document.getElementById("admin-sign-out-btn").onclick = () => {
+                signOutAdmin();
+                if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect();
+                window.showView("project-selection-view");
+                showMessage("Signed out", "info");
             };
 
             document.getElementById("toggleSearchBtn").onclick = () => document.getElementById("searchBox").classList.toggle("expanded");
@@ -1557,14 +1622,14 @@
                     const res = await fetch(WEB_APP_URL, { 
                         method: "POST", 
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
-                        body: JSON.stringify({ action: "addProject", projectName: name }) 
+                        body: JSON.stringify({ action: "addProject", projectName: name, session: getAdminSession() })
                     });
                     const result = await res.json();
                     if (result.success) {
                         document.getElementById("new-project-name").value = "";
                         showMessage("Project added", "success");
                         fetchProjects();
-                    } else showMessage(result.message || "Failed to add", "error");
+                    } else if (!handleAdminAuthRequired(result)) showMessage(result.message || "Failed to add", "error");
                 } catch(e) { console.error(e); }
                 ui.spinner.classList.add("hidden");
             };

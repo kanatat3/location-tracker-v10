@@ -3,16 +3,26 @@
  *
  * Setup (once, in the Apps Script editor bound to the new Sheet):
  *   Project Settings (gear) → Script properties → add
- *     ADMIN_PASSWORD     = password for the admin lock in the app
+ *     GOOGLE_CLIENT_ID   = OAuth client ID (Web) the page uses for "Sign in with Google"
  *     SLACK_WEBHOOK_URL  = (optional) Slack incoming webhook; leave empty to turn alerts off
  *     SPREADSHEET_ID     = (optional) only if this script is NOT bound to the Sheet
  *   Deploy → New deployment → Web app → Execute as: Me, Who has access: Anyone.
  *
+ *
+ * Admin access = Google sign-in. Who may enter is the list in the "AllowedEmails" tab of the Sheet
+ * (one email per row, column A). The tab is created on first use with the script owner's email in it.
+ * Adding or removing a row takes effect at once; no new deployment is needed.
+ *
  * No passwords or webhook URLs live in this file on purpose.
  * API is the same as the V6 backend (LT 2.4.2026.15.19) so existing front ends keep working.
  */
-const BACKEND_VERSION = "v12.0";
+const BACKEND_VERSION = "v12.1";
 const PROJECT_CONFIG_SHEET_NAME = "ProjectConfigs";
+const ALLOWED_EMAILS_SHEET_NAME = "AllowedEmails";
+const RESERVED_SHEET_NAMES = [PROJECT_CONFIG_SHEET_NAME, ALLOWED_EMAILS_SHEET_NAME];
+// Actions that change projects or saved rows: only for a signed-in, allowed Google account.
+const ADMIN_ACTIONS = ["updateProjectConfig", "addProject", "renameProject", "deleteProject", "hideProject", "reorderProjects", "update", "delete"];
+const SESSION_DAYS = 30;
 const DATA_HEADERS = [
   "EmployeeID",
   "SurveyID",
@@ -49,7 +59,7 @@ function doGet(e) {
     if (action === "getProjects") {
       const projectNames = ss.getSheets()
         .filter(sheet => !sheet.isSheetHidden())
-        .filter(sheet => sheet.getName() !== PROJECT_CONFIG_SHEET_NAME)
+        .filter(sheet => !isReservedSheetName_(sheet.getName()))
         .map(sheet => sheet.getName());
       return createJsonResponse({ success: true, data: projectNames });
     }
@@ -59,7 +69,7 @@ function doGet(e) {
     }
 
     if (action === "getData" && project) {
-      const sheet = ss.getSheetByName(project);
+      const sheet = isReservedSheetName_(project) ? null : ss.getSheetByName(project);
       if (!sheet) { throw new Error("Project sheet not found."); }
 
       const dataRange = sheet.getDataRange();
@@ -128,16 +138,28 @@ function doPost(e) {
     const action = request.action;
     const ss = getSpreadsheet_();
 
+    if (ADMIN_ACTIONS.indexOf(action) !== -1 && !getSessionEmail_(request.session)) {
+      return createJsonResponse({ success: false, authRequired: true, message: "Sign in with an allowed Google account." });
+    }
+
     switch (action) {
       case "notifySlackAnomaly": {
         const sent = sendSlackMessage(request.message || "เจอความผิดปกติในการปักหมุดพิกัด");
         return createJsonResponse({ success: true, sent: sent });
       }
 
+      // The admin password is gone; old pages that still ask for it are always refused.
       case "verifyPassword": {
-        const providedPassword = request.password;
-        const storedPassword = PropertiesService.getScriptProperties().getProperty("ADMIN_PASSWORD");
-        return createJsonResponse({ success: !!(storedPassword && providedPassword && providedPassword === storedPassword) });
+        return createJsonResponse({ success: false, message: "Password login was replaced by Google sign-in." });
+      }
+
+      case "googleLogin": {
+        const email = verifyGoogleIdToken_(request.idToken);
+        if (!isEmailAllowed_(email)) {
+          return createJsonResponse({ success: false, email: email, message: "This Google account is not allowed: " + email });
+        }
+        const expiresAt = Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000;
+        return createJsonResponse({ success: true, email: email, session: signSession_(email, expiresAt), expiresAt: expiresAt });
       }
 
       case "getProjectConfigs": {
@@ -152,6 +174,7 @@ function doPost(e) {
       case "addProject": {
         const name = String(request.projectName || "").trim();
         if (!name) { throw new Error("Project name is required."); }
+        if (isReservedSheetName_(name)) { throw new Error("That name is reserved."); }
         if (ss.getSheetByName(name)) { throw new Error(`A project with the name '${name}' already exists.`); }
         const newSheet = ss.insertSheet(name);
         newSheet.appendRow(DATA_HEADERS);
@@ -163,7 +186,7 @@ function doPost(e) {
         const oldName = String(request.oldProjectName || "").trim();
         const newName = String(request.newProjectName || "").trim();
         if (!oldName || !newName) { throw new Error("Old and new project names are required."); }
-        if (newName === PROJECT_CONFIG_SHEET_NAME) { throw new Error("That name is reserved."); }
+        if (isReservedSheetName_(newName) || isReservedSheetName_(oldName)) { throw new Error("That name is reserved."); }
         if (ss.getSheetByName(newName)) { throw new Error(`A project with the name '${newName}' already exists.`); }
         const sheetToRename = ss.getSheetByName(oldName);
         if (!sheetToRename) { throw new Error(`Project '${oldName}' not found.`); }
@@ -177,7 +200,7 @@ function doPost(e) {
       case "hideProject": {
         const projectName = request.projectName;
         if (!projectName) throw new Error("Project name is required.");
-        if (projectName === PROJECT_CONFIG_SHEET_NAME) throw new Error("That sheet cannot be hidden.");
+        if (isReservedSheetName_(projectName)) throw new Error("That sheet cannot be hidden.");
         const sheet = ss.getSheetByName(projectName);
         if (sheet) sheet.hideSheet();
         return createJsonResponse({ success: true, message: `Project '${projectName}' has been hidden.` });
@@ -189,7 +212,7 @@ function doPost(e) {
           throw new Error("A valid project order array is required.");
         }
         projectOrder.forEach((projectName, index) => {
-          const sheet = ss.getSheetByName(projectName);
+          const sheet = isReservedSheetName_(projectName) ? null : ss.getSheetByName(projectName);
           if (sheet) {
             ss.setActiveSheet(sheet);
             ss.moveActiveSheet(index + 1);
@@ -239,10 +262,95 @@ function doPost(e) {
 
 function getProjectSheet_(ss, project) {
   if (!project) { throw new Error("Project name is required for this action."); }
-  if (project === PROJECT_CONFIG_SHEET_NAME) { throw new Error("Invalid project."); }
+  if (isReservedSheetName_(project)) { throw new Error("Invalid project."); }
   const sheet = ss.getSheetByName(project);
   if (!sheet) { throw new Error("Project sheet '" + project + "' not found."); }
   return sheet;
+}
+
+function isReservedSheetName_(name) {
+  return RESERVED_SHEET_NAMES.indexOf(String(name).trim()) !== -1;
+}
+
+// ---- Google sign-in for admins ----
+
+function getAllowedEmailsSheet_() {
+  const ss = getSpreadsheet_();
+  let sheet = ss.getSheetByName(ALLOWED_EMAILS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(ALLOWED_EMAILS_SHEET_NAME);
+    sheet.appendRow(["Email", "Note"]);
+    const owner = String(Session.getEffectiveUser().getEmail() || "").trim().toLowerCase();
+    if (owner) sheet.appendRow([owner, "owner (added automatically)"]);
+  }
+  return sheet;
+}
+
+function isEmailAllowed_(email) {
+  const target = String(email || "").trim().toLowerCase();
+  if (!target) return false;
+  const values = getAllowedEmailsSheet_().getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0] || "").trim().toLowerCase() === target) return true;
+  }
+  return false;
+}
+
+// Asks Google whether the ID token from the page is genuine and was issued for this app.
+function verifyGoogleIdToken_(idToken) {
+  const clientId = PropertiesService.getScriptProperties().getProperty("GOOGLE_CLIENT_ID");
+  if (!clientId) throw new Error("Google sign-in is not set up yet (GOOGLE_CLIENT_ID).");
+  if (!idToken || typeof idToken !== "string") throw new Error("Google sign-in is required.");
+
+  const response = UrlFetchApp.fetch("https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(idToken), { muteHttpExceptions: true });
+  if (response.getResponseCode() !== 200) throw new Error("Google sign-in could not be verified.");
+
+  const info = JSON.parse(response.getContentText());
+  const issuerOk = info.iss === "accounts.google.com" || info.iss === "https://accounts.google.com";
+  const fresh = Number(info.exp) * 1000 > Date.now();
+  if (info.aud !== clientId || !issuerOk || !fresh || String(info.email_verified) !== "true" || !info.email) {
+    throw new Error("Google sign-in could not be verified.");
+  }
+  return String(info.email).trim().toLowerCase();
+}
+
+function getSessionSecret_() {
+  const props = PropertiesService.getScriptProperties();
+  let secret = props.getProperty("SESSION_SECRET");
+  if (!secret) {
+    secret = Utilities.getUuid() + Utilities.getUuid();
+    props.setProperty("SESSION_SECRET", secret);
+  }
+  return secret;
+}
+
+function sessionSignature_(payload) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload, getSessionSecret_()));
+}
+
+function signSession_(email, expiresAt) {
+  const payload = email + "|" + expiresAt;
+  return Utilities.base64EncodeWebSafe(payload) + "." + sessionSignature_(payload);
+}
+
+// Returns the email behind a session token, or null when it is forged, expired,
+// or the email has since been removed from the AllowedEmails tab.
+function getSessionEmail_(session) {
+  if (!session || typeof session !== "string") return null;
+  const parts = session.split(".");
+  if (parts.length !== 2) return null;
+  let payload;
+  try {
+    payload = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString();
+  } catch (error) {
+    return null;
+  }
+  if (sessionSignature_(payload) !== parts[1]) return null;
+  const cut = payload.lastIndexOf("|");
+  const email = payload.slice(0, cut);
+  const expiresAt = Number(payload.slice(cut + 1));
+  if (cut < 1 || !(expiresAt > Date.now())) return null;
+  return isEmailAllowed_(email) ? email : null;
 }
 
 function buildDataRow_(data, timestamp) {

@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import vm from "node:vm";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -47,23 +48,62 @@ function makeSpreadsheet() {
   return ss;
 }
 
-function load(props = {}) {
+const OWNER = "owner@example.com";
+const CLIENT_ID = "client-1.apps.googleusercontent.com";
+const webSafe = buf => Buffer.from(buf).toString("base64").replace(/\+/g, "-").replace(/\//g, "_");
+// Same format as signSession_ in Code.gs, for building expired / forged tokens.
+function craftSession(email, expiresAt, secret) {
+  const payload = email + "|" + expiresAt;
+  return webSafe(Buffer.from(payload)) + "." + webSafe(crypto.createHmac("sha256", secret).update(payload).digest());
+}
+
+// By default the fake signs in as the script owner and sends that session with every POST,
+// so the admin actions behave as for a signed-in admin; rawPost sends exactly what it is given.
+function load(props = {}, { clientId = CLIENT_ID } = {}) {
+  if (clientId && props.GOOGLE_CLIENT_ID === undefined) props.GOOGLE_CLIENT_ID = clientId;
   const ss = makeSpreadsheet();
   const slackCalls = [];
+  const tokens = {};
+  let tokenSeq = 0;
+  const issueToken = (email, over = {}) => {
+    const id = "tok-" + (++tokenSeq);
+    tokens[id] = { status: 200, claims: { aud: CLIENT_ID, iss: "https://accounts.google.com", email, email_verified: "true", exp: String(Math.floor(Date.now() / 1000) + 3600), ...over } };
+    return id;
+  };
   const ctx = {
     SpreadsheetApp: { getActiveSpreadsheet: () => ss, openById: () => ss },
     PropertiesService: { getScriptProperties: () => ({ getProperty: k => props[k] ?? null, setProperty: (k, v) => { props[k] = v; } }) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     ContentService: { MimeType: { JSON: "json" }, createTextOutput: t => ({ text: t, setMimeType() { return this; } }) },
-    UrlFetchApp: { fetch: (u, o) => slackCalls.push(JSON.parse(o.payload).text) },
+    UrlFetchApp: {
+      fetch: (u, o) => {
+        const prefix = "https://oauth2.googleapis.com/tokeninfo?id_token=";
+        if (u.startsWith(prefix)) {
+          const t = tokens[decodeURIComponent(u.slice(prefix.length))];
+          return { getResponseCode: () => (t ? t.status : 400), getContentText: () => JSON.stringify(t ? t.claims : { error: "invalid_token" }) };
+        }
+        slackCalls.push(JSON.parse(o.payload).text);
+      },
+    },
+    Session: { getEffectiveUser: () => ({ getEmail: () => OWNER }) },
+    Utilities: {
+      getUuid: () => crypto.randomUUID(),
+      computeHmacSha256Signature: (value, key) => Array.from(crypto.createHmac("sha256", key).update(value).digest()).map(b => (b > 127 ? b - 256 : b)),
+      base64EncodeWebSafe: d => webSafe(typeof d === "string" ? Buffer.from(d, "utf8") : Buffer.from(d.map(b => b & 255))),
+      base64DecodeWebSafe: t => Array.from(Buffer.from(String(t).replace(/-/g, "+").replace(/_/g, "/"), "base64")),
+      newBlob: bytes => ({ getDataAsString: () => Buffer.from(bytes.map(b => b & 255)).toString("utf8") }),
+    },
     Logger: { log() {} },
     console,
   };
   vm.createContext(ctx);
   vm.runInContext(src, ctx);
   const get = q => JSON.parse(ctx.doGet({ parameter: q }).text);
-  const post = b => JSON.parse(ctx.doPost({ postData: { contents: JSON.stringify(b) } }).text);
-  return { ss, get, post, slackCalls, props };
+  const rawPost = b => JSON.parse(ctx.doPost({ postData: { contents: JSON.stringify(b) } }).text);
+  const login = email => rawPost({ action: "googleLogin", idToken: issueToken(email) });
+  const session = clientId ? login(OWNER).session : undefined;
+  const post = b => rawPost({ session, ...b });
+  return { ss, get, post, rawPost, login, issueToken, session, slackCalls, props };
 }
 
 let pass = 0, fail = 0;
@@ -71,8 +111,8 @@ function check(name, cond, extra = "") { if (cond) pass++; else { fail++; consol
 
 // --- basic flow
 {
-  const { ss, get, post, slackCalls } = load({ ADMIN_PASSWORD: "pw-test" });
-  check("version", get({ action: "version" }).data.version === "v12.0");
+  const { ss, get, post, slackCalls } = load();
+  check("version", get({ action: "version" }).data.version === "v12.1");
   check("addProject", post({ action: "addProject", projectName: "  Alpha  " }).success);
   check("addProject trims name", !!ss.getSheetByName("Alpha"));
   check("duplicate project rejected", post({ action: "addProject", projectName: "Alpha" }).success === false);
@@ -118,17 +158,92 @@ function check(name, cond, extra = "") { if (cond) pass++; else { fail++; consol
   check("ProjectConfigs cannot be hidden", post({ action: "hideProject", projectName: "ProjectConfigs" }).success === false);
   check("config follows rename", (post({ action: "renameProject", oldProjectName: "Alpha", newProjectName: "Alpha2" }), get({ action: "getProjectConfigs" }).data[0].projectName === "Alpha2"));
 
-  check("verifyPassword right", post({ action: "verifyPassword", password: "pw-test" }).success === true);
-  check("verifyPassword wrong", post({ action: "verifyPassword", password: "nope" }).success === false);
+  check("verifyPassword always refused", post({ action: "verifyPassword", password: "pw-test" }).success === false && post({ action: "verifyPassword", password: "" }).success === false);
   check("slack off without webhook", post({ action: "notifySlackAnomaly", message: "x" }).sent === false && slackCalls.length === 0);
   check("unknown action", /Invalid action/.test(post({ action: "zzz" }).message));
   check("bad GET", get({ action: "zzz" }).success === false);
 }
 
-// --- no password configured: nobody unlocks
+// --- Google sign-in: who gets in
 {
-  const { post } = load({});
-  check("no ADMIN_PASSWORD -> locked", post({ action: "verifyPassword", password: "" }).success === false && post({ action: "verifyPassword", password: "anything" }).success === false);
+  const { ss, get, rawPost, login, issueToken, session } = load();
+  const tab = ss.getSheetByName("AllowedEmails");
+  check("AllowedEmails tab created with the owner", !!tab && tab.rows[0][0] === "Email" && tab.rows[1][0] === OWNER, JSON.stringify(tab && tab.rows));
+  check("owner login gives a session", typeof session === "string" && session.includes("."));
+  check("login reply has email + expiry", (() => { const r = login(OWNER); return r.success && r.email === OWNER && r.expiresAt > Date.now() + 29 * 864e5; })());
+  check("email match ignores case and spaces", rawPost({ action: "googleLogin", idToken: issueToken("  Owner@Example.COM ") }).success === true);
+
+  const stranger = login("stranger@gmail.com");
+  check("email not in the list is refused", stranger.success === false && !stranger.session && /stranger@gmail\.com/.test(stranger.message), JSON.stringify(stranger));
+  tab.appendRow(["  Friend@Gmail.com ", "added by hand"]);
+  const friend = login("friend@gmail.com");
+  check("email added to the tab gets in", friend.success === true);
+  check("friend session works", rawPost({ action: "addProject", projectName: "ByFriend", session: friend.session }).success === true);
+  tab.rows.splice(2, 1);
+  const afterRemoval = rawPost({ action: "addProject", projectName: "ByFriend2", session: friend.session });
+  check("removing the email ends that session at once", afterRemoval.success === false && afterRemoval.authRequired === true && !ss.getSheetByName("ByFriend2"));
+
+  const bad = (name, over) => check(name, rawPost({ action: "googleLogin", idToken: issueToken(OWNER, over) }).success === false);
+  bad("token for another app refused", { aud: "someone-else.apps.googleusercontent.com" });
+  bad("unverified email refused", { email_verified: "false" });
+  bad("expired Google token refused", { exp: String(Math.floor(Date.now() / 1000) - 10) });
+  bad("wrong issuer refused", { iss: "https://evil.example" });
+  check("unknown Google token refused", rawPost({ action: "googleLogin", idToken: "made-up" }).success === false);
+  check("missing Google token refused", rawPost({ action: "googleLogin" }).success === false);
+
+  // admin actions need the session; saving a point does not
+  rawPost({ action: "addProject", projectName: "Open", session });
+  for (const body of [
+    { action: "addProject", projectName: "NoAuth" },
+    { action: "renameProject", oldProjectName: "Open", newProjectName: "Renamed" },
+    { action: "hideProject", projectName: "Open" },
+    { action: "deleteProject", projectName: "Open" },
+    { action: "reorderProjects", projectOrder: ["Open"] },
+    { action: "updateProjectConfig", projectName: "Open", config: {} },
+    { action: "update", project: "Open", id: 2, data: {} },
+    { action: "delete", project: "Open", id: 2 },
+  ]) {
+    const r = rawPost(body);
+    check(body.action + " without sign-in refused", r.success === false && r.authRequired === true, JSON.stringify(r));
+  }
+  check("nothing changed without sign-in", !ss.getSheetByName("NoAuth") && !ss.getSheetByName("Renamed") && !ss.getSheetByName("Open").hidden);
+  check("saving a point needs no sign-in", rawPost({ action: "add", project: "Open", data: { name: "1", surveyId: "2", lat: 1, lng: 2 } }).success === true);
+  check("reading needs no sign-in", get({ action: "getData", project: "Open" }).data.length === 1 && get({ action: "getProjects" }).success);
+
+  check("garbage session refused", rawPost({ action: "addProject", projectName: "X1", session: "abc" }).authRequired === true && rawPost({ action: "addProject", projectName: "X1", session: "a.b" }).authRequired === true && rawPost({ action: "addProject", projectName: "X1", session: 5 }).authRequired === true);
+  const [, sig] = session.split(".");
+  const forged = webSafe(Buffer.from("stranger@gmail.com|" + (Date.now() + 864e5))) + "." + sig;
+  check("session with a swapped email refused", rawPost({ action: "addProject", projectName: "X2", session: forged }).authRequired === true);
+
+  // the tab is not a project
+  check("AllowedEmails not listed as project", !get({ action: "getProjects" }).data.includes("AllowedEmails"));
+  check("AllowedEmails not readable as project", get({ action: "getData", project: "AllowedEmails" }).success === false);
+  check("cannot save a point into AllowedEmails", rawPost({ action: "add", project: "AllowedEmails", data: {} }).success === false);
+  check("AllowedEmails cannot be hidden / renamed / reused", rawPost({ action: "hideProject", projectName: "AllowedEmails", session }).success === false
+    && rawPost({ action: "renameProject", oldProjectName: "AllowedEmails", newProjectName: "Z", session }).success === false
+    && rawPost({ action: "renameProject", oldProjectName: "Open", newProjectName: "AllowedEmails", session }).success === false
+    && rawPost({ action: "addProject", projectName: "AllowedEmails", session }).success === false
+    && tab.name === "AllowedEmails" && !tab.hidden);
+  rawPost({ action: "reorderProjects", projectOrder: ["AllowedEmails", "Open"], session });
+  check("reorder leaves AllowedEmails alone", ss.sheets[0].name !== "AllowedEmails");
+}
+
+// --- sessions: expiry and signing key
+{
+  const secret = "test-secret";
+  const { rawPost } = load({ SESSION_SECRET: secret });
+  check("valid crafted session accepted", rawPost({ action: "addProject", projectName: "S1", session: craftSession(OWNER, Date.now() + 60000, secret) }).success === true);
+  check("expired session refused", rawPost({ action: "addProject", projectName: "S2", session: craftSession(OWNER, Date.now() - 1000, secret) }).authRequired === true);
+  check("session signed with another key refused", rawPost({ action: "addProject", projectName: "S3", session: craftSession(OWNER, Date.now() + 60000, "other") }).authRequired === true);
+  check("session for an email outside the list refused", rawPost({ action: "addProject", projectName: "S4", session: craftSession("stranger@gmail.com", Date.now() + 60000, secret) }).authRequired === true);
+}
+
+// --- sign-in not configured: nobody gets in
+{
+  const { rawPost, issueToken, props } = load({}, { clientId: null });
+  const r = rawPost({ action: "googleLogin", idToken: issueToken(OWNER) });
+  check("no GOOGLE_CLIENT_ID -> locked", r.success === false && /not set up/.test(r.message), JSON.stringify(r));
+  check("signing key is generated, not hard-coded", (rawPost({ action: "addProject", projectName: "Q", session: "a.b" }), typeof props.SESSION_SECRET === "string" && props.SESSION_SECRET.length >= 32));
 }
 
 // --- slack on when webhook set
@@ -139,6 +254,7 @@ function check(name, cond, extra = "") { if (cond) pass++; else { fail++; consol
 
 // --- no secrets in source
 check("no hard-coded password/webhook", !/hooks\.slack\.com|adminPassword\s*=\s*"/.test(src));
+check("no admin password or hard-coded email left", !/ADMIN_PASSWORD/.test(src) && !/[\w.]+@[\w-]+\.\w+/.test(src));
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
