@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker V12.1 (01.10.2026)</title>
+    <title>Location Tracker V12.2 (01.10.2026)</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -469,6 +469,36 @@
         #admin-project-list button { width: 40px; height: 40px; border-radius: 12px; background: var(--fill); color: var(--ink-2); }
         #admin-project-list button:first-child:hover { background: var(--primary-blue); color: #fff; }
         #admin-project-list button:last-child:hover { background: var(--danger); color: #fff; }
+        /* Project settings: status chips, closed tag, main-coordinate marker, settings + map picker windows */
+        #admin-project-list .lt-project-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+        .lt-chip { font-style: normal; font-size: 11px; font-weight: 700; color: var(--ink-2); background: var(--fill); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+        .lt-chip--closed, .lt-closed-tag { color: #B42318; background: #FEE4E2; }
+        .lt-closed-tag { flex: 0 0 auto; font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; }
+        .figma-project-card.is-closed > span { opacity: 0.6; }
+        .lt-building-marker {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: #DC2626; color: #fff; font-size: 15px;
+            display: grid; place-items: center;
+            border: 3px solid #fff; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.45);
+        }
+        .lt-modal.lt-modal--wide { max-width: 520px; text-align: left; max-height: 92vh; max-height: 92dvh; overflow-y: auto; }
+        .lt-config-eyebrow { margin: 0 0 2px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary-blue); }
+        .lt-config-name { padding-right: 48px; overflow-wrap: anywhere; }
+        .lt-config-body { display: grid; gap: 12px; margin-top: 16px; }
+        .lt-config-section { border: 1.5px solid var(--line); border-radius: 16px; padding: 14px; display: grid; gap: 10px; }
+        .lt-config-title { margin: 0; font-size: 14px; font-weight: 800; color: var(--ink); }
+        .lt-config-title em { font-style: normal; font-weight: 600; color: var(--muted); }
+        .lt-config-help { margin: 3px 0 0; font-size: 12px; font-weight: 500; line-height: 1.45; color: var(--muted); }
+        .lt-config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .lt-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; cursor: pointer; }
+        .lt-switch-row input { width: 24px; height: 24px; flex: 0 0 auto; accent-color: var(--primary-blue); }
+        .lt-tint-btn { min-height: 48px; padding: 0 16px; border: 0; border-radius: 14px; background: var(--blue-tint); color: #0057B8; font-size: 14px; font-weight: 800; }
+        .lt-tint-btn:hover { background: #DCEBFF; }
+        .lt-picker-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+        .lt-picker-map { height: min(44vh, 340px); border-radius: 16px; overflow: hidden; border: 1.5px solid var(--line); }
+        #admin-map-picker-map { height: 100%; width: 100%; background: #E5E9EE; }
+        .lt-config-body .lt-primary { min-height: 56px; }
+
         .project-admin-item.dragging { opacity: 0.55; background-color: var(--primary-light); border: 2px dashed var(--primary-blue); z-index: 1000; }
 
         .lt-select {
@@ -860,6 +890,73 @@
         </div>
     </div>
 
+    <div id="projectConfigModal" class="modal-overlay">
+        <div class="lt-modal lt-modal--wide">
+            <div class="lt-modal-grabber" aria-hidden="true"></div>
+            <button type="button" id="project-config-close" class="lt-modal-close" title="Close"><i class="fas fa-times text-lg"></i></button>
+            <p class="lt-config-eyebrow">Project settings</p>
+            <h4 id="project-config-title" class="lt-modal-title lt-config-name">Project</h4>
+            <div class="lt-config-body">
+                <section class="lt-config-section">
+                    <div>
+                        <h5 class="lt-config-title">Main coordinate <em>(optional)</em></h5>
+                        <p class="lt-config-help">Type the latitude and longitude, or choose the spot on the map. Leave empty when the project has no fixed location.</p>
+                    </div>
+                    <div class="lt-config-grid">
+                        <input data-config-field="baseLat" type="number" step="any" inputmode="decimal" class="input-field lt-input" placeholder="Latitude" aria-label="Latitude">
+                        <input data-config-field="baseLng" type="number" step="any" inputmode="decimal" class="input-field lt-input" placeholder="Longitude" aria-label="Longitude">
+                    </div>
+                    <button id="project-config-pick-map" type="button" class="btn lt-tint-btn"><i class="fas fa-map-location-dot mr-2"></i>Choose from map</button>
+                </section>
+                <section class="lt-config-section">
+                    <div>
+                        <h5 class="lt-config-title">Radius in km <em>(optional)</em></h5>
+                        <p class="lt-config-help">One or more circles separated by commas, for example 3, 5, 10. The widest circle is the limit: a pin beyond it is flagged and reported to Slack. Leave empty for no limit.</p>
+                    </div>
+                    <input data-config-field="radiusKm" type="text" list="radius-presets" class="input-field lt-input" placeholder="No limit" aria-label="Radius in km" autocomplete="off">
+                </section>
+                <label class="lt-config-section lt-switch-row">
+                    <div>
+                        <h5 class="lt-config-title">Close project</h5>
+                        <p class="lt-config-help">Nobody can add new pins while the project is closed.</p>
+                    </div>
+                    <input data-config-field="isClosed" type="checkbox" aria-label="Close project">
+                </label>
+                <button id="project-config-save" type="button" class="btn lt-primary uppercase">Save changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminMapPickerModal" class="modal-overlay">
+        <div class="lt-modal lt-modal--wide">
+            <div class="lt-modal-grabber" aria-hidden="true"></div>
+            <button type="button" id="admin-map-picker-close" class="lt-modal-close" title="Close"><i class="fas fa-times text-lg"></i></button>
+            <p class="lt-config-eyebrow">Pick main coordinate</p>
+            <h4 id="admin-map-picker-project" class="lt-modal-title lt-config-name">Project</h4>
+            <div class="lt-config-body">
+                <div class="lt-picker-search">
+                    <input id="adminMapSearchInput" type="text" class="input-field lt-input" placeholder="Search address..." autocomplete="off">
+                    <button id="adminMapSearchButton" type="button" class="btn lt-tint-btn">Find</button>
+                </div>
+                <div class="lt-picker-map"><div id="admin-map-picker-map"></div></div>
+                <div class="lt-config-grid">
+                    <input id="admin-map-picker-lat" type="number" step="any" inputmode="decimal" class="input-field lt-input" placeholder="Latitude" aria-label="Latitude">
+                    <input id="admin-map-picker-lng" type="number" step="any" inputmode="decimal" class="input-field lt-input" placeholder="Longitude" aria-label="Longitude">
+                </div>
+                <div class="lt-config-grid">
+                    <button type="button" id="admin-map-use-current" class="btn lt-secondary">Use my GPS</button>
+                    <button type="button" id="admin-map-picker-apply" class="btn lt-secondary lt-danger" style="background: var(--primary-blue);">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <datalist id="radius-presets">
+        <option value="5"></option>
+        <option value="10"></option>
+        <option value="5, 10"></option>
+        <option value="3, 5, 10"></option>
+    </datalist>
+
     <div id="renameModal" class="modal-overlay">
         <div class="lt-modal">
             <div class="lt-modal-grabber" aria-hidden="true"></div>
@@ -986,6 +1083,13 @@
 
         let isAdminAuthenticated = false;
         let googleSignInReady = false;
+
+        // Project settings (main coordinate, radius circles, closed) come from the server with the project list;
+        // the copy in localStorage only bridges the moment before the server answers.
+        let projectConfigs = {};
+        try { projectConfigs = JSON.parse(localStorage.getItem('projectConfigs') || '{}') || {}; } catch (e) { projectConfigs = {}; }
+        let projectConfigModalProjectName = null;
+        let adminPickerMap = null, adminPickerMarker = null;
         let sessionHiddenProjects = [];
         let visibleProjectLimit = 7;
         
@@ -1000,6 +1104,222 @@
             msgBox.innerHTML = `<div class="flex items-center gap-4"><i class="fas fa-${icon}"></i><span class="text-[11px] font-black uppercase text-slate-800">${msg}</span></div>`;
             msgBox.style.opacity = "1"; msgBox.style.transform = "translateX(-50%) translateY(0)";
             setTimeout(() => { msgBox.style.opacity = "0"; msgBox.style.transform = "translateX(-50%) translateY(-20px)"; }, 3500);
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? "").replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[ch]));
+        }
+
+        // "3, 5 10" -> [3, 5, 10]; empty -> [] (no radius limit)
+        function parseOptionalRadiusKms(value) {
+            const rawValues = Array.isArray(value) ? value : String(value ?? '').split(/[,|/\s]+/);
+            const radii = rawValues.map(v => Number(v)).filter(v => Number.isFinite(v) && v > 0);
+            return [...new Set(radii.map(v => Number(v.toFixed(3))))].sort((a, b) => a - b);
+        }
+
+        function getProjectConfig(projectName) {
+            const config = projectConfigs[projectName] || {};
+            const radiusKms = parseOptionalRadiusKms(config.radiusKms ?? config.radiusKm);
+            const coordinate = value => value === null || value === undefined || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
+            const baseLat = coordinate(config.baseLat), baseLng = coordinate(config.baseLng);
+            return {
+                baseLat, baseLng,
+                hasBase: baseLat !== null && baseLng !== null,
+                radiusKms,
+                radiusKm: radiusKms.length ? Math.max(...radiusKms) : null,
+                isClosed: config.isClosed === true
+            };
+        }
+
+        // Takes the server's list as the truth. Returns true when something changed.
+        function applyRemoteProjectConfigs(rawConfigs) {
+            if (!Array.isArray(rawConfigs)) return false;
+            const next = {};
+            rawConfigs.forEach(record => {
+                if (record && record.projectName) next[String(record.projectName)] = { baseLat: record.baseLat, baseLng: record.baseLng, radiusKms: record.radiusKms, isClosed: record.isClosed === true };
+            });
+            const changed = JSON.stringify(next) !== JSON.stringify(projectConfigs);
+            projectConfigs = next;
+            localStorage.setItem('projectConfigs', JSON.stringify(projectConfigs));
+            return changed;
+        }
+
+        function calculateDistanceKm(lat1, lng1, lat2, lng2) {
+            const toRad = value => value * Math.PI / 180;
+            const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+            const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+            return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        // null when the project has no main coordinate or no radius. The widest circle is the limit.
+        function getRadiusAlert(lat, lng, projectName = currentProjectName) {
+            const config = getProjectConfig(projectName);
+            if (!config.hasBase || !config.radiusKms.length) return null;
+            const distanceKm = calculateDistanceKm(config.baseLat, config.baseLng, Number(lat), Number(lng));
+            return { distanceKm, radiusKm: config.radiusKm, radiusKms: config.radiusKms, outOfRadius: distanceKm > config.radiusKm };
+        }
+
+        function getBuildingIcon() {
+            return L.divIcon({ html: '<div class="lt-building-marker"><i class="fas fa-building"></i></div>', className: '', iconSize: [36, 36], iconAnchor: [18, 18], popupAnchor: [0, -18] });
+        }
+
+        function addRadiusCirclesToGroup(group, lat, lng, radiusKms) {
+            const palette = ['#93C5FD', '#60A5FA', '#38BDF8', '#A5B4FC', '#7DD3FC'];
+            radiusKms.forEach((radiusKm, index) => {
+                L.circle([lat, lng], {
+                    radius: radiusKm * 1000,
+                    color: palette[index % palette.length],
+                    weight: index === radiusKms.length - 1 ? 2.5 : 1.8,
+                    opacity: 0.72,
+                    fillColor: palette[index % palette.length],
+                    fillOpacity: 0.045,
+                    interactive: false
+                }).addTo(group);
+            });
+        }
+
+        // Red building = the project's main coordinate, with its radius circles.
+        function addMainCoordinateToGroup(group, projectName) {
+            const config = getProjectConfig(projectName);
+            if (!config.hasBase) return;
+            addRadiusCirclesToGroup(group, config.baseLat, config.baseLng, config.radiusKms);
+            const radiusText = config.radiusKms.length ? `${config.radiusKms.join(', ')} km` : 'No radius limit';
+            L.marker([config.baseLat, config.baseLng], { icon: getBuildingIcon(), zIndexOffset: 3000 })
+                .bindPopup(`<b>Main coordinate</b><br>${config.baseLat.toFixed(6)}, ${config.baseLng.toFixed(6)}<br><b>Radius:</b> ${radiusText}`)
+                .addTo(group);
+        }
+
+        // A closed project takes no new pins: both buttons go quiet and say why.
+        function updateClosedProjectState() {
+            const closed = !!currentProjectName && getProjectConfig(currentProjectName).isClosed;
+            const uploadBtn = document.getElementById("uploadButton"), saveBtn = document.getElementById("saveButton");
+            [uploadBtn, saveBtn].forEach(btn => {
+                btn.disabled = closed;
+                btn.classList.toggle("opacity-40", closed);
+                btn.classList.toggle("pointer-events-none", closed);
+            });
+            uploadBtn.querySelector("span").textContent = closed ? "PROJECT CLOSED" : "UPLOAD";
+        }
+
+        // Records waiting to upload are kept per project on this device, so they survive a reload
+        // and never travel into another project.
+        function getPendingCacheKey(projectName = currentProjectName) { return projectName ? `pending_data_${projectName}` : null; }
+        function loadPendingLocations(projectName = currentProjectName) {
+            const key = getPendingCacheKey(projectName);
+            try { pendingLocations = key ? (JSON.parse(localStorage.getItem(key) || "[]") || []) : []; } catch (e) { pendingLocations = []; }
+        }
+        function savePendingLocations(projectName = currentProjectName) {
+            const key = getPendingCacheKey(projectName);
+            if (key) localStorage.setItem(key, JSON.stringify(pendingLocations));
+        }
+
+        // ----- Project settings window (admin) -----
+        window.openProjectConfigModal = function(projectName) {
+            const modal = document.getElementById('projectConfigModal');
+            const config = getProjectConfig(projectName);
+            projectConfigModalProjectName = projectName;
+            document.getElementById('project-config-title').textContent = projectName;
+            modal.querySelector('[data-config-field="baseLat"]').value = config.baseLat ?? '';
+            modal.querySelector('[data-config-field="baseLng"]').value = config.baseLng ?? '';
+            modal.querySelector('[data-config-field="radiusKm"]').value = config.radiusKms.join(', ');
+            modal.querySelector('[data-config-field="isClosed"]').checked = config.isClosed;
+            modal.style.display = 'flex';
+        };
+
+        async function saveProjectConfig() {
+            const projectName = projectConfigModalProjectName;
+            const modal = document.getElementById('projectConfigModal');
+            if (!projectName) return;
+            const latText = modal.querySelector('[data-config-field="baseLat"]').value.trim();
+            const lngText = modal.querySelector('[data-config-field="baseLng"]').value.trim();
+            const radiusText = modal.querySelector('[data-config-field="radiusKm"]').value.trim();
+            if ((latText === "") !== (lngText === "")) return showMessage("Enter both latitude and longitude", "error");
+            const baseLat = latText === "" ? null : Number(latText), baseLng = lngText === "" ? null : Number(lngText);
+            if (baseLat !== null && (!Number.isFinite(baseLat) || !Number.isFinite(baseLng) || Math.abs(baseLat) > 90 || Math.abs(baseLng) > 180)) return showMessage("Invalid coordinate", "error");
+            const radiusKms = parseOptionalRadiusKms(radiusText);
+            if (radiusText !== "" && !radiusKms.length) return showMessage("Radius must be numbers, e.g. 3, 5, 10", "error");
+            const config = { baseLat, baseLng, radiusKms, isClosed: modal.querySelector('[data-config-field="isClosed"]').checked };
+
+            ui.spinner.classList.remove("hidden");
+            try {
+                const res = await fetch(WEB_APP_URL, { method: "POST", headers: POST_HEADERS, body: JSON.stringify({ action: "updateProjectConfig", projectName, config, session: getAdminSession() }) });
+                const result = await res.json();
+                if (result.success) {
+                    applyRemoteProjectConfigs(result.data);
+                    modal.style.display = "none";
+                    renderProjects(allProjects);
+                    renderAdminProjectList(allProjects);
+                    showMessage("Settings saved", "success");
+                } else {
+                    if (result.authRequired) modal.style.display = "none";
+                    if (!handleAdminAuthRequired(result)) showMessage(result.message || "Could not save settings", "error");
+                }
+            } catch (e) {
+                console.error(e);
+                showMessage("Could not save settings - check the connection", "error");
+            }
+            ui.spinner.classList.add("hidden");
+        }
+
+        // ----- Map picker for the main coordinate -----
+        function setAdminPickerCoordinate(lat, lng, moveMap = true) {
+            document.getElementById("admin-map-picker-lat").value = Number(lat).toFixed(6);
+            document.getElementById("admin-map-picker-lng").value = Number(lng).toFixed(6);
+            placeAdminPickerMarker(lat, lng, moveMap);
+        }
+
+        function placeAdminPickerMarker(lat, lng, moveMap) {
+            if (!adminPickerMap) return;
+            if (!adminPickerMarker) {
+                adminPickerMarker = L.marker([lat, lng], { icon: getMarkerIcon('red'), draggable: true }).addTo(adminPickerMap);
+                adminPickerMarker.on("dragend", () => { const pos = adminPickerMarker.getLatLng(); setAdminPickerCoordinate(pos.lat, pos.lng, false); });
+            } else adminPickerMarker.setLatLng([lat, lng]);
+            if (moveMap) adminPickerMap.setView([lat, lng], Math.max(adminPickerMap.getZoom(), 15));
+        }
+
+        function openAdminMapPicker() {
+            const configModal = document.getElementById("projectConfigModal");
+            const latText = configModal.querySelector('[data-config-field="baseLat"]').value, lngText = configModal.querySelector('[data-config-field="baseLng"]').value;
+            document.getElementById("admin-map-picker-project").textContent = projectConfigModalProjectName || "";
+            document.getElementById("adminMapSearchInput").value = "";
+            document.getElementById("adminMapPickerModal").style.display = "flex";
+            if (!adminPickerMap) {
+                adminPickerMap = L.map("admin-map-picker-map", { zoomControl: true }).setView([13.75, 100.5], 6);
+                L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(adminPickerMap);
+                adminPickerMap.on("click", (e) => setAdminPickerCoordinate(e.latlng.lat, e.latlng.lng, false));
+            }
+            setTimeout(() => {
+                adminPickerMap.invalidateSize();
+                if (latText !== "" && lngText !== "" && Number.isFinite(Number(latText)) && Number.isFinite(Number(lngText))) {
+                    setAdminPickerCoordinate(Number(latText), Number(lngText));
+                } else {
+                    document.getElementById("admin-map-picker-lat").value = "";
+                    document.getElementById("admin-map-picker-lng").value = "";
+                    if (adminPickerMarker) { adminPickerMap.removeLayer(adminPickerMarker); adminPickerMarker = null; }
+                    adminPickerMap.setView([13.75, 100.5], 6);
+                }
+            }, 150);
+        }
+
+        function applyAdminPickerCoordinate() {
+            const latText = document.getElementById("admin-map-picker-lat").value.trim(), lngText = document.getElementById("admin-map-picker-lng").value.trim();
+            const lat = Number(latText), lng = Number(lngText);
+            if (latText === "" || lngText === "" || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return showMessage("Choose a point on the map first", "error");
+            const configModal = document.getElementById("projectConfigModal");
+            configModal.querySelector('[data-config-field="baseLat"]').value = lat.toFixed(6);
+            configModal.querySelector('[data-config-field="baseLng"]').value = lng.toFixed(6);
+            document.getElementById("adminMapPickerModal").style.display = "none";
+        }
+
+        async function searchAdminMap() {
+            const query = document.getElementById("adminMapSearchInput").value.trim();
+            if (!query) return;
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&accept-language=th`);
+                const results = await res.json();
+                if (results.length) setAdminPickerCoordinate(parseFloat(results[0].lat), parseFloat(results[0].lon));
+                else showMessage("Location not found", "warning");
+            } catch (e) { showMessage("Search failed - check the connection", "error"); }
         }
 
         // Admin access = a Google account listed in the AllowedEmails tab of the Sheet.
@@ -1164,6 +1484,8 @@
                 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png' : 
                 (color === 'red') ?
                 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png' :
+                (color === 'darkgray') ?
+                'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png' :
                 (color === '#1a237e') ? 
                 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-black.png' : 
                 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png';
@@ -1194,7 +1516,7 @@
             }
         }
 
-        async function fetchProjects() {
+        async function fetchProjects(silent = false) {
             const btn = document.getElementById("refresh-projects-btn");
             if (btn) btn.classList.add("animate-spin", "text-primary-blue");
 
@@ -1218,13 +1540,15 @@
                     return isVisible && !hasHiddenPrefix && !sessionHiddenProjects.includes(name.trim());
                 }).map(p => (typeof p === 'object' && p !== null) ? p.name : String(p));
 
-                if (JSON.stringify(newProjects) !== JSON.stringify(allProjects)) {
+                const configsChanged = applyRemoteProjectConfigs(result.configs);
+                if (configsChanged || JSON.stringify(newProjects) !== JSON.stringify(allProjects)) {
                     allProjects = newProjects;
                     localStorage.setItem('cache_projects', JSON.stringify(allProjects));
                     renderProjects(allProjects);
                     renderAdminProjectList(allProjects);
                 }
-                if (btn) showMessage("Projects updated", "success");
+                if (configsChanged && currentProjectName && map) { updateClosedProjectState(); renderTable(); }
+                if (btn && !silent) showMessage("Projects updated", "success");
             } catch(e) { 
                 console.error(e); 
                 if(!allProjects.length) showMessage("Connection Error", "error"); 
@@ -1247,9 +1571,24 @@
             const visibleProjects = list.slice(0, visibleProjectLimit);
             visibleProjects.forEach(p => {
                 const card = document.createElement("div");
-                card.className = "figma-project-card";
-                card.innerHTML = `<i class="far fa-folder"></i><span>${p}</span>`;
-                card.onclick = () => { currentProjectName = p; document.getElementById("tracker-title").textContent = p; window.showView("tracker-view"); initMap(); refreshData(); };
+                const closed = getProjectConfig(p).isClosed;
+                card.className = "figma-project-card" + (closed ? " is-closed" : "");
+                card.innerHTML = `<i class="far fa-folder"></i><span>${p}</span>` + (closed ? '<em class="lt-closed-tag">Closed</em>' : '');
+                card.onclick = () => {
+                    if (getProjectConfig(p).isClosed) return showMessage("Project closed", "warning");
+                    currentProjectName = p;
+                    document.getElementById("tracker-title").textContent = p;
+                    window.showView("tracker-view");
+                    initMap();
+                    // Start from this project's own records (never the previous project's), then load.
+                    savedLocations = [];
+                    loadPendingLocations(p);
+                    updateClosedProjectState();
+                    renderTable();
+                    const config = getProjectConfig(p);
+                    if (config.hasBase) map.setView([config.baseLat, config.baseLng], 13);
+                    refreshData();
+                };
                 listEl.appendChild(card);
             });
             if (viewMoreBtn) {
@@ -1271,9 +1610,21 @@
                 row.className = "flex justify-between items-center p-5 bg-white border border-slate-100 rounded-2xl shadow-sm mb-3 cursor-grab project-admin-item text-slate-800 hover:scale-[1.05] transition-transform";
                 row.draggable = true;
                 row.dataset.projectName = p;
-                row.innerHTML = `<div class="flex items-center gap-3 pointer-events-none"><i class="fas fa-grip-vertical text-slate-200"></i><i class="fas fa-folder text-primary-blue"></i><span class="font-bold text-slate-800 text-sm">${p}</span></div>`;
+                const config = getProjectConfig(p);
+                const chips = [
+                    config.isClosed ? '<em class="lt-chip lt-chip--closed"><i class="fas fa-lock mr-1"></i>Closed</em>' : '',
+                    config.hasBase ? `<em class="lt-chip"><i class="fas fa-building mr-1"></i>${config.baseLat.toFixed(4)}, ${config.baseLng.toFixed(4)}</em>` : '',
+                    config.radiusKms.length ? `<em class="lt-chip"><i class="fas fa-circle-dot mr-1"></i>${config.radiusKms.join(', ')} km</em>` : ''
+                ].join('');
+                row.innerHTML = `<div class="flex items-center gap-3 pointer-events-none min-w-0"><i class="fas fa-grip-vertical text-slate-200"></i><i class="fas fa-folder text-primary-blue"></i><div class="min-w-0"><span class="font-bold text-slate-800 text-sm">${p}</span>${chips ? `<div class="lt-project-meta">${chips}</div>` : ''}</div></div>`;
                 const acts = document.createElement("div");
-                acts.className = "flex gap-2 relative z-20";
+                acts.className = "flex gap-2 relative z-20 shrink-0 ml-2";
+                const settings = document.createElement("button");
+                settings.className = "w-10 h-10 bg-slate-50 text-slate-400 rounded-xl hover:bg-primary-blue hover:text-white transition-all flex items-center justify-center";
+                settings.title = "Project settings";
+                settings.innerHTML = `<i class="fas fa-sliders text-xs"></i>`;
+                settings.onclick = (e) => { e.stopPropagation(); window.openProjectConfigModal(p); };
+                acts.appendChild(settings);
                 const ren = document.createElement("button");
                 ren.className = "w-10 h-10 bg-slate-50 text-slate-400 rounded-xl hover:bg-primary-blue hover:text-white transition-all flex items-center justify-center";
                 ren.innerHTML = `<i class="fas fa-pencil-alt text-xs"></i>`;
@@ -1307,10 +1658,11 @@
                 dashboardMarkers.clearLayers();
                 if (ui.dashboardSummaryTable) ui.dashboardSummaryTable.innerHTML = "";
                 const summary = {};
+                addMainCoordinateToGroup(dashboardMarkers, projectName);
                 data.forEach(loc => {
                     if (loc.Latitude && loc.Longitude) {
                         const marker = L.marker([loc.Latitude, loc.Longitude], { icon: getMarkerIcon('#007AFF') });
-                        marker.bindPopup(`<b>Staff:</b> ${loc.EmployeeID}<br><b>Survey:</b> ${loc.SurveyID || '-'}`);
+                        marker.bindPopup(`<b>Staff:</b> ${escapeHtml(loc.EmployeeID)}<br><b>Survey:</b> ${escapeHtml(loc.SurveyID || '-')}${loc.OutOfRadius === true ? `<br><b style="color:#dc2626">Outside the ${escapeHtml(loc.RadiusKm || '')} km radius</b>` : ''}`);
                         marker.addTo(dashboardMarkers);
                         summary[loc.EmployeeID] = (summary[loc.EmployeeID] || 0) + 1;
                     }
@@ -1323,7 +1675,7 @@
                         ui.dashboardSummaryTable.appendChild(row);
                     });
                 }
-                if (data.length > 0 && dashboardMap) {
+                if (dashboardMarkers.getLayers().length > 0 && dashboardMap) {
                     setTimeout(() => { dashboardMap.invalidateSize(); dashboardMap.fitBounds(dashboardMarkers.getBounds().pad(0.1)); }, 200);
                 }
             } catch(e) { console.error(e); }
@@ -1426,7 +1778,7 @@
             document.getElementById("lat").textContent = lat.toFixed(6);
             document.getElementById("lng").textContent = lng.toFixed(6);
             if (!selectionMarker) {
-                selectionMarker = L.marker([lat, lng], { icon: getMarkerIcon('red') }).addTo(map);
+                selectionMarker = L.marker([lat, lng], { icon: getMarkerIcon('darkgray'), zIndexOffset: 2500 }).addTo(map);
             } else { selectionMarker.setLatLng([lat, lng]); }
             updateAddress(lat, lng);
         }
@@ -1444,6 +1796,7 @@
             const all = [...savedLocations, ...pendingLocations].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp));
             ui.savedTable.innerHTML = "";
             permanentMarkers.clearLayers();
+            addMainCoordinateToGroup(permanentMarkers, currentProjectName);
             const currentEID = ui.employeeId ? ui.employeeId.value.trim() : "";
             document.getElementById("total-pin-count").textContent = `TOTAL ${all.length}`;
             if (currentEID !== "") {
@@ -1456,12 +1809,15 @@
             
             all.forEach((loc, i) => {
                 const isP = loc.isPending, isMe = currentEID !== "" && loc.EmployeeID === currentEID;
-                let markerColor = isP ? 'yellow' : (isMe ? '#1a237e' : '#007AFF');
+                const outOfRadius = loc.OutOfRadius === true;
+                // Blue = saved in the Sheet, grey = waiting to upload on this device.
+                let markerColor = isP ? 'darkgray' : '#007AFF';
                 const marker = L.marker([loc.Latitude, loc.Longitude], { icon: getMarkerIcon(markerColor), zIndexOffset: isMe ? 2000 : (isP ? 1000 : 0) }).addTo(permanentMarkers);
                 const row = document.createElement("tr");
-                row.className = isMe ? "bg-blue-50/50" : (isP ? "bg-red-50/20" : "hover:bg-slate-50 transition-colors");
+                row.className = outOfRadius ? "bg-red-50/60" : (isMe ? "bg-blue-50/50" : (isP ? "bg-red-50/20" : "hover:bg-slate-50 transition-colors"));
                 const ts = new Date(loc.Timestamp).toLocaleString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
                 row.innerHTML = `<td class="p-3 text-slate-400 font-mono text-[9px]">${all.length - i}</td><td class="p-3 font-black text-[10px] ${isMe ? 'text-primary-blue' : 'text-slate-900'}">${loc.EmployeeID}${isP ? ' ⏳' : ''}</td><td class="p-3 text-slate-500 font-bold text-[10px]">${loc.SurveyID || '-'}</td><td class="p-3 text-slate-400 font-bold text-[9px]">${ts}</td>`;
+                if (outOfRadius) row.cells[1].insertAdjacentHTML("beforeend", ' <i class="fas fa-triangle-exclamation text-red-500" title="Outside the radius"></i>');
                 row.onclick = () => { map.setView([loc.Latitude, loc.Longitude], 18); };
                 ui.savedTable.appendChild(row);
             });
@@ -1537,6 +1893,27 @@
                 }
             };
 
+            document.getElementById("project-config-close").onclick = () => { document.getElementById("projectConfigModal").style.display = "none"; };
+            document.getElementById("project-config-save").onclick = () => saveProjectConfig();
+            document.getElementById("project-config-pick-map").onclick = () => openAdminMapPicker();
+            document.getElementById("admin-map-picker-close").onclick = () => { document.getElementById("adminMapPickerModal").style.display = "none"; };
+            document.getElementById("admin-map-picker-apply").onclick = () => applyAdminPickerCoordinate();
+            document.getElementById("adminMapSearchButton").onclick = () => searchAdminMap();
+            document.getElementById("adminMapSearchInput").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); searchAdminMap(); } });
+            document.getElementById("admin-map-use-current").onclick = () => {
+                showMessage("Loading", "info");
+                navigator.geolocation.getCurrentPosition(pos => {
+                    setAdminPickerCoordinate(pos.coords.latitude, pos.coords.longitude);
+                    showMessage("Complete", "success");
+                }, () => showMessage("GPS Failure", "error"), { enableHighAccuracy: true });
+            };
+            ["admin-map-picker-lat", "admin-map-picker-lng"].forEach(id => {
+                document.getElementById(id).addEventListener("input", () => {
+                    const latText = document.getElementById("admin-map-picker-lat").value, lngText = document.getElementById("admin-map-picker-lng").value;
+                    if (latText !== "" && lngText !== "" && Number.isFinite(Number(latText)) && Number.isFinite(Number(lngText)) && Math.abs(Number(latText)) <= 90 && Math.abs(Number(lngText)) <= 180) placeAdminPickerMarker(Number(latText), Number(lngText), true);
+                });
+            });
+
             document.getElementById("admin-sign-out-btn").onclick = () => {
                 signOutAdmin();
                 if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect();
@@ -1562,6 +1939,7 @@
             // Adds the entry on screen to the records waiting on this device. Returns false (and says why) when it cannot.
             function addPendingRecord() {
                 const eid = ui.employeeId.value.trim(), sid = ui.surveyId.value.trim();
+                if (getProjectConfig(currentProjectName).isClosed) { showMessage("Project closed - no new pins", "warning"); return false; }
                 if (!eid || !sid || currentLat === null) { showMessage("ID or Pin Required", "warning"); return false; }
                 
                 const all = [...savedLocations, ...pendingLocations];
@@ -1574,20 +1952,33 @@
                     showMessage("This location is already pinned", "warning"); return false;
                 }
 
-                pendingLocations.push({ ID: `p_${Date.now()}`, EmployeeID: eid, SurveyID: sid, Latitude: currentLat, Longitude: currentLng, Timestamp: new Date().toISOString(), isPending: true });
+                const radiusAlert = getRadiusAlert(currentLat, currentLng);
+                const record = {
+                    ID: `p_${Date.now()}`, EmployeeID: eid, SurveyID: sid, Latitude: currentLat, Longitude: currentLng, Timestamp: new Date().toISOString(), isPending: true,
+                    OutOfRadius: radiusAlert ? radiusAlert.outOfRadius : false,
+                    DistanceKm: radiusAlert ? Number(radiusAlert.distanceKm.toFixed(3)) : null,
+                    RadiusKm: radiusAlert ? radiusAlert.radiusKm : null,
+                    RadiusKms: radiusAlert ? radiusAlert.radiusKms : []
+                };
+                pendingLocations.push(record);
+                savePendingLocations();
                 if (!isEmployeeIdLocked) ui.employeeId.value = "";
                 ui.surveyId.value = ""; renderTable();
-                return true;
+                return record;
             }
 
             document.getElementById("saveButton").onclick = () => {
-                if (addPendingRecord()) showMessage("Saved Locally", "success");
+                const record = addPendingRecord();
+                if (!record) return;
+                if (record.OutOfRadius) showMessage(`Saved locally - ${record.DistanceKm.toFixed(1)} km away, outside the ${record.RadiusKm} km radius`, "warning");
+                else showMessage("Saved Locally", "success");
             };
 
             // Upload = save what is typed (if anything) and send every waiting record straight away.
             document.getElementById("uploadButton").onclick = async () => {
                 // (The Employee ID usually stays filled and locked, so the Survey ID tells whether a new entry was typed.)
                 const typed = ui.surveyId.value.trim() !== "";
+                if (getProjectConfig(currentProjectName).isClosed) return showMessage("Project closed - no new pins", "warning");
                 if ((typed || !pendingLocations.length) && !addPendingRecord()) return;
                 
                 // Reset Spinner to Loading
@@ -1613,19 +2004,25 @@
                             body: JSON.stringify({
                                 action: "add",
                                 project: currentProjectName,
-                                data: { name: loc.EmployeeID, surveyId: loc.SurveyID, lat: loc.Latitude, lng: loc.Longitude, timestamp: loc.Timestamp }
+                                data: { name: loc.EmployeeID, surveyId: loc.SurveyID, lat: loc.Latitude, lng: loc.Longitude, timestamp: loc.Timestamp,
+                                        outOfRadius: loc.OutOfRadius === true, distanceKm: loc.DistanceKm, radiusKm: loc.RadiusKm, radiusKms: loc.RadiusKms || [] }
                             })
-                        }).then(res => res.json()).then(result => result.success === true).catch(() => false)
+                        }).then(res => res.json()).catch(() => ({ success: false }))
                     );
 
                     // A record leaves the waiting list only when the server confirmed it.
-                    const sent = await Promise.all(uploadPromises);
-                    const failed = sending.filter((loc, i) => !sent[i]);
+                    const results = await Promise.all(uploadPromises);
+                    const failed = sending.filter((loc, i) => results[i].success !== true);
                     pendingLocations = pendingLocations.filter(loc => !sending.includes(loc) || failed.includes(loc));
+                    savePendingLocations();
+                    // The server measures the distance itself and sends the Slack alert for pins outside the radius.
+                    const outside = results.filter(r => r.success === true && r.outOfRadius === true);
                     if (failed.length) {
                         ui.spinner.classList.add("hidden");
                         renderTable();
-                        showMessage(`Upload failed (${failed.length}) - press Upload again`, "error");
+                        const reason = (results.find(r => r.success !== true && r.message) || {}).message;
+                        showMessage(reason ? `Upload failed (${failed.length}) - ${reason}` : `Upload failed (${failed.length}) - press Upload again`, "error");
+                        if (reason && /closed/i.test(reason)) fetchProjects(true);   // pick up the new settings without hiding this message
                         if (failed.length < sending.length) refreshData(false);
                         return;
                     }
@@ -1639,7 +2036,8 @@
                     }
                     
                     await new Promise(r => setTimeout(r, 1000));
-                    ui.spinner.classList.add("hidden"); 
+                    ui.spinner.classList.add("hidden");
+                    if (outside.length) showMessage(`Uploaded - ${outside.length} outside the radius, ${outside.some(r => r.slackSent) ? "Slack alerted" : "flagged in the Sheet"}`, "warning");
                     refreshData(false); // Sync data silently in background after upload
                 } catch (e) {
                     console.error(e);

@@ -4,7 +4,9 @@
  * Setup (once, in the Apps Script editor bound to the new Sheet):
  *   Project Settings (gear) → Script properties → add
  *     GOOGLE_CLIENT_ID   = OAuth client ID (Web) the page uses for "Sign in with Google"
- *     SLACK_WEBHOOK_URL  = (optional) Slack incoming webhook; leave empty to turn alerts off
+ *     SLACK_WEBHOOK_URL  = (optional) Slack incoming webhook for "pin outside the radius" alerts
+ *     SLACK_ALERT_URL + SLACK_ALERT_SECRET = (optional) the Slack relay web app and its secret, used when
+ *                          SLACK_WEBHOOK_URL is empty. With none of them set, alerts are off.
  *     SPREADSHEET_ID     = (optional) only if this script is NOT bound to the Sheet
  *   Deploy → New deployment → Web app → Execute as: Me, Who has access: Anyone.
  *
@@ -13,10 +15,15 @@
  * (one email per row, column A). The tab is created on first use with the script owner's email in it.
  * Adding or removing a row takes effect at once; no new deployment is needed.
  *
+ * Project settings (ProjectConfigs tab, edited from the admin screen): main coordinate, one or more radius
+ * circles (the widest one is the limit) and a Closed switch. When a pin arrives the server itself measures
+ * the distance to the main coordinate, marks the row OutOfRadius and sends the Slack alert; a closed project
+ * accepts no new pins.
+ *
  * No passwords or webhook URLs live in this file on purpose.
  * API is the same as the V6 backend (LT 2.4.2026.15.19) so existing front ends keep working.
  */
-const BACKEND_VERSION = "v12.1";
+const BACKEND_VERSION = "v12.2";
 const PROJECT_CONFIG_SHEET_NAME = "ProjectConfigs";
 const ALLOWED_EMAILS_SHEET_NAME = "AllowedEmails";
 const RESERVED_SHEET_NAMES = [PROJECT_CONFIG_SHEET_NAME, ALLOWED_EMAILS_SHEET_NAME];
@@ -61,7 +68,7 @@ function doGet(e) {
         .filter(sheet => !sheet.isSheetHidden())
         .filter(sheet => !isReservedSheetName_(sheet.getName()))
         .map(sheet => sheet.getName());
-      return createJsonResponse({ success: true, data: projectNames });
+      return createJsonResponse({ success: true, data: projectNames, configs: getProjectConfigs_() });
     }
 
     if (action === "getProjectConfigs") {
@@ -143,9 +150,9 @@ function doPost(e) {
     }
 
     switch (action) {
+      // Retired: the alert is now sent by "add" itself, so nobody can post free text to Slack through this app.
       case "notifySlackAnomaly": {
-        const sent = sendSlackMessage(request.message || "เจอความผิดปกติในการปักหมุดพิกัด");
-        return createJsonResponse({ success: true, sent: sent });
+        return createJsonResponse({ success: true, sent: false });
       }
 
       // The admin password is gone; old pages that still ask for it are always refused.
@@ -223,11 +230,44 @@ function doPost(e) {
 
       case "add": {
         const sheet = getProjectSheet_(ss, request.project);
-        ensureProjectDataHeaders_(sheet);
+        const config = getProjectConfig_(request.project);
+        if (config && config.isClosed) { throw new Error("This project is closed. New pins cannot be added."); }
         const data = request.data || {};
+        const lat = Number(data.lat), lng = Number(data.lng);
+        if (data.lat === "" || data.lat === null || data.lng === "" || data.lng === null
+            || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+          throw new Error("A valid coordinate is required.");
+        }
+        ensureProjectDataHeaders_(sheet);
         const savedTimestamp = parseClientTimestamp_(data.timestamp || data.Timestamp || data.savedAt) || new Date();
+
+        // The server decides whether the pin is outside the radius; what the page says is not trusted.
+        const alert = getRadiusAlert_(config, lat, lng);
+        if (alert) {
+          data.outOfRadius = alert.outOfRadius;
+          data.distanceKm = alert.distanceKm;
+          data.radiusKm = alert.radiusKm;
+          data.radiusKms = alert.radiusKms;
+          data.slackAlertRequired = alert.outOfRadius;
+          data.slackMessage = alert.outOfRadius ? buildSlackAnomalyMessage_(request.project, data, lat, lng, alert) : "";
+        }
         sheet.appendRow(buildDataRow_(data, savedTimestamp));
-        return createJsonResponse({ success: true, message: "Data added." });
+
+        let slackSent = false;
+        if (alert && alert.outOfRadius) {
+          try {
+            slackSent = sendSlackAlert_(data.slackMessage, request.project, data);
+          } catch (slackError) {
+            Logger.log("Slack alert failed: " + slackError);
+          }
+        }
+        return createJsonResponse({
+          success: true, message: "Data added.",
+          outOfRadius: !!(alert && alert.outOfRadius),
+          distanceKm: alert ? alert.distanceKm : null,
+          radiusKm: alert ? alert.radiusKm : null,
+          slackSent: slackSent
+        });
       }
 
       case "update": {
@@ -442,11 +482,10 @@ function parseRadiusKms_(value) {
     .map(function(v) { return Number(v); })
     .filter(function(v) { return Number.isFinite(v) && v > 0; });
 
-  const unique = Array.from(new Set(radii.map(function(v) {
+  // An empty list means "no radius limit".
+  return Array.from(new Set(radii.map(function(v) {
     return Number(v.toFixed(3));
   }))).sort(function(a, b) { return a - b; });
-
-  return unique.length ? unique : [5];
 }
 
 function getProjectConfigs_() {
@@ -463,10 +502,49 @@ function getProjectConfigs_() {
         baseLat: row[1] === "" ? null : Number(row[1]),
         baseLng: row[2] === "" ? null : Number(row[2]),
         radiusKms: radiusKms,
-        radiusKm: Math.max.apply(null, radiusKms),
+        radiusKm: radiusKms.length ? Math.max.apply(null, radiusKms) : null,
         isClosed: row[4] === true || String(row[4]).toLowerCase() === "true"
       };
     });
+}
+
+function getProjectConfig_(projectName) {
+  const target = String(projectName || "").trim();
+  const found = getProjectConfigs_().filter(function(config) { return config.projectName.trim() === target; });
+  return found.length ? found[0] : null;
+}
+
+function distanceKm_(lat1, lng1, lat2, lng2) {
+  const toRad = function(value) { return value * Math.PI / 180; };
+  const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+  const a = Math.pow(Math.sin(dLat / 2), 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.pow(Math.sin(dLng / 2), 2);
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// null when the project has no main coordinate or no radius; otherwise the distance and whether the pin
+// lies beyond the widest circle.
+function getRadiusAlert_(config, lat, lng) {
+  if (!config || config.baseLat === null || config.baseLng === null || !Number.isFinite(config.baseLat) || !Number.isFinite(config.baseLng) || !config.radiusKms.length) return null;
+  const distanceKm = distanceKm_(config.baseLat, config.baseLng, lat, lng);
+  return {
+    distanceKm: Number(distanceKm.toFixed(3)),
+    radiusKm: config.radiusKm,
+    radiusKms: config.radiusKms,
+    outOfRadius: distanceKm > config.radiusKm
+  };
+}
+
+function buildSlackAnomalyMessage_(projectName, data, lat, lng, alert) {
+  return [
+    "*เจอความผิดปกติในการปักหมุดพิกัด*",
+    "Project: " + (projectName || "-"),
+    "Employee ID: " + (data.name || "-"),
+    "Survey ID: " + (data.surveyId || "-"),
+    "Coordinate: " + lat.toFixed(6) + ", " + lng.toFixed(6),
+    "Distance: " + alert.distanceKm.toFixed(2) + " km",
+    "Max Radius: " + Number(alert.radiusKm).toFixed(2) + " km",
+    "Map: https://www.google.com/maps?q=" + lat + "," + lng
+  ].join("\n");
 }
 
 function updateProjectConfig_(projectName, config) {
@@ -477,6 +555,12 @@ function updateProjectConfig_(projectName, config) {
   const targetName = String(projectName).trim();
   const radiusKms = parseRadiusKms_(config.radiusKms || config.radiusKm);
   const blank = v => v === null || v === "" || v === undefined;
+  if (isReservedSheetName_(targetName) || !getSpreadsheet_().getSheetByName(targetName)) throw new Error("Project '" + targetName + "' not found.");
+  if (blank(config.baseLat) !== blank(config.baseLng)) throw new Error("Enter both latitude and longitude, or leave both empty.");
+  if (!blank(config.baseLat)) {
+    const lat = Number(config.baseLat), lng = Number(config.baseLng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) throw new Error("Invalid coordinate.");
+  }
 
   const rowValues = [
     targetName,
@@ -510,19 +594,35 @@ function renameProjectConfig_(oldProjectName, newProjectName) {
   }
 }
 
-// Returns true when the message went to Slack; false when no webhook is set (alerts off).
-function sendSlackMessage(message) {
-  const webhookUrl = PropertiesService.getScriptProperties().getProperty("SLACK_WEBHOOK_URL");
-  if (!webhookUrl) {
-    Logger.log("Slack alert skipped (SLACK_WEBHOOK_URL not set): " + message);
+// Sends the "pin outside the radius" alert. Returns true when Slack (or the relay) accepted it,
+// false when no destination is set (alerts off) or it answered with an error.
+function sendSlackAlert_(message, projectName, data) {
+  const props = PropertiesService.getScriptProperties();
+  const webhookUrl = props.getProperty("SLACK_WEBHOOK_URL");
+  const relayUrl = props.getProperty("SLACK_ALERT_URL");
+  let response;
+
+  if (webhookUrl) {
+    response = UrlFetchApp.fetch(webhookUrl, {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify({ text: message }),
+      muteHttpExceptions: true
+    });
+  } else if (relayUrl) {
+    response = UrlFetchApp.fetch(relayUrl, {
+      method: "post",
+      contentType: "text/plain;charset=utf-8",
+      payload: JSON.stringify({
+        action: "notifySlackAnomaly", project: projectName, message: message, data: data,
+        secret: props.getProperty("SLACK_ALERT_SECRET") || ""
+      }),
+      muteHttpExceptions: true
+    });
+  } else {
+    Logger.log("Slack alert skipped (no SLACK_WEBHOOK_URL / SLACK_ALERT_URL): " + message);
     return false;
   }
-
-  UrlFetchApp.fetch(webhookUrl, {
-    method: "post",
-    contentType: "application/json",
-    payload: JSON.stringify({ text: message }),
-    muteHttpExceptions: true
-  });
-  return true;
+  const code = response.getResponseCode();
+  return code >= 200 && code < 400;
 }

@@ -63,6 +63,7 @@ function load(props = {}, { clientId = CLIENT_ID } = {}) {
   if (clientId && props.GOOGLE_CLIENT_ID === undefined) props.GOOGLE_CLIENT_ID = clientId;
   const ss = makeSpreadsheet();
   const slackCalls = [];
+  const slackState = { status: 200, throws: false };
   const tokens = {};
   let tokenSeq = 0;
   const issueToken = (email, over = {}) => {
@@ -82,7 +83,10 @@ function load(props = {}, { clientId = CLIENT_ID } = {}) {
           const t = tokens[decodeURIComponent(u.slice(prefix.length))];
           return { getResponseCode: () => (t ? t.status : 400), getContentText: () => JSON.stringify(t ? t.claims : { error: "invalid_token" }) };
         }
-        slackCalls.push(JSON.parse(o.payload).text);
+        const body = JSON.parse(o.payload);
+        slackCalls.push({ url: u, text: body.text ?? body.message, body });
+        if (slackState.throws) throw new Error("network down");
+        return { getResponseCode: () => slackState.status, getContentText: () => "" };
       },
     },
     Session: { getEffectiveUser: () => ({ getEmail: () => OWNER }) },
@@ -103,7 +107,7 @@ function load(props = {}, { clientId = CLIENT_ID } = {}) {
   const login = email => rawPost({ action: "googleLogin", idToken: issueToken(email) });
   const session = clientId ? login(OWNER).session : undefined;
   const post = b => rawPost({ session, ...b });
-  return { ss, get, post, rawPost, login, issueToken, session, slackCalls, props };
+  return { ss, get, post, rawPost, login, issueToken, session, slackCalls, slackState, props };
 }
 
 let pass = 0, fail = 0;
@@ -112,7 +116,7 @@ function check(name, cond, extra = "") { if (cond) pass++; else { fail++; consol
 // --- basic flow
 {
   const { ss, get, post, slackCalls } = load();
-  check("version", get({ action: "version" }).data.version === "v12.1");
+  check("version", get({ action: "version" }).data.version === "v12.2");
   check("addProject", post({ action: "addProject", projectName: "  Alpha  " }).success);
   check("addProject trims name", !!ss.getSheetByName("Alpha"));
   check("duplicate project rejected", post({ action: "addProject", projectName: "Alpha" }).success === false);
@@ -159,7 +163,7 @@ function check(name, cond, extra = "") { if (cond) pass++; else { fail++; consol
   check("config follows rename", (post({ action: "renameProject", oldProjectName: "Alpha", newProjectName: "Alpha2" }), get({ action: "getProjectConfigs" }).data[0].projectName === "Alpha2"));
 
   check("verifyPassword always refused", post({ action: "verifyPassword", password: "pw-test" }).success === false && post({ action: "verifyPassword", password: "" }).success === false);
-  check("slack off without webhook", post({ action: "notifySlackAnomaly", message: "x" }).sent === false && slackCalls.length === 0);
+  check("free-text Slack action is retired", post({ action: "notifySlackAnomaly", message: "x" }).sent === false && slackCalls.length === 0);
   check("unknown action", /Invalid action/.test(post({ action: "zzz" }).message));
   check("bad GET", get({ action: "zzz" }).success === false);
 }
@@ -246,14 +250,95 @@ function check(name, cond, extra = "") { if (cond) pass++; else { fail++; consol
   check("signing key is generated, not hard-coded", (rawPost({ action: "addProject", projectName: "Q", session: "a.b" }), typeof props.SESSION_SECRET === "string" && props.SESSION_SECRET.length >= 32));
 }
 
-// --- slack on when webhook set
+// --- project settings: main coordinate, radius circles, closed
+const BASE = { baseLat: 13.7563, baseLng: 100.5018 };          // Bangkok
+const INSIDE = { lat: 13.7650, lng: 100.5380 };                 // ~4 km away
+const OUTSIDE = { lat: 13.9000, lng: 100.5018 };                // ~16 km away
 {
-  const { post, slackCalls } = load({ SLACK_WEBHOOK_URL: "https://example.invalid/hook" });
-  check("slack sends when set", post({ action: "notifySlackAnomaly", message: "hello" }).sent === true && slackCalls[0] === "hello");
+  const { ss, get, post, rawPost, slackCalls } = load({ SLACK_WEBHOOK_URL: "https://example.invalid/hook" });
+  post({ action: "addProject", projectName: "Site" });
+  post({ action: "addProject", projectName: "Free" });
+
+  check("no settings yet: no limit, not closed", get({ action: "getProjectConfigs" }).data.length === 0);
+  const saved = post({ action: "updateProjectConfig", projectName: "Site", config: { ...BASE, radiusKms: "10, 3 5", isClosed: false } });
+  const cfg = saved.data.find(c => c.projectName === "Site");
+  check("several circles kept, sorted", cfg.radiusKms.join() === "3,5,10" && cfg.radiusKm === 10 && cfg.baseLat === BASE.baseLat && cfg.isClosed === false, JSON.stringify(cfg));
+  check("getProjects carries the settings", (() => { const r = get({ action: "getProjects" }); return r.data.includes("Site") && r.configs.find(c => c.projectName === "Site").radiusKm === 10; })());
+  check("settings need sign-in", rawPost({ action: "updateProjectConfig", projectName: "Site", config: { isClosed: true } }).authRequired === true);
+  check("settings for an unknown project refused", post({ action: "updateProjectConfig", projectName: "Nope", config: {} }).success === false
+    && post({ action: "updateProjectConfig", projectName: "AllowedEmails", config: {} }).success === false);
+  check("half a coordinate refused", post({ action: "updateProjectConfig", projectName: "Site", config: { baseLat: 13.7 } }).success === false);
+  check("impossible coordinate refused", post({ action: "updateProjectConfig", projectName: "Site", config: { baseLat: 130, baseLng: 100 } }).success === false
+    && post({ action: "updateProjectConfig", projectName: "Site", config: { baseLat: "abc", baseLng: 100 } }).success === false);
+  check("refused settings left the saved ones alone", get({ action: "getProjectConfigs" }).data.find(c => c.projectName === "Site").radiusKm === 10);
+
+  // a pin inside the widest circle
+  const inside = rawPost({ action: "add", project: "Site", data: { name: "0861", surveyId: "001", ...INSIDE } });
+  check("pin inside the radius: saved, no alert", inside.success && inside.outOfRadius === false && inside.slackSent === false && slackCalls.length === 0, JSON.stringify(inside));
+  let row = get({ action: "getData", project: "Site" }).data[0];
+  check("inside row is measured by the server", row.OutOfRadius === false && row.DistanceKm > 3.5 && row.DistanceKm < 4.5 && row.RadiusKm === 10 && row.RadiusKms.join() === "3,5,10" && row.SlackAlertRequired === false, JSON.stringify(row));
+
+  // a pin outside, with the page claiming it is fine
+  const outside = rawPost({ action: "add", project: "Site", data: { name: "0861", surveyId: "002", ...OUTSIDE, outOfRadius: false, distanceKm: 0.1, slackAlertRequired: false } });
+  check("pin outside the radius: saved and flagged whatever the page claims", outside.success && outside.outOfRadius === true && outside.distanceKm > 15 && outside.distanceKm < 17 && outside.radiusKm === 10, JSON.stringify(outside));
+  row = get({ action: "getData", project: "Site" }).data[1];
+  check("outside row marked in the Sheet", row.OutOfRadius === true && row.DistanceKm > 15 && row.SlackAlertRequired === true && /0861/.test(row.SlackMessage) && /002/.test(row.SlackMessage), JSON.stringify(row));
+  check("Slack alert sent once with project, IDs, distance", outside.slackSent === true && slackCalls.length === 1 && slackCalls[0].url === "https://example.invalid/hook"
+    && /Project: Site/.test(slackCalls[0].text) && /Employee ID: 0861/.test(slackCalls[0].text) && /Survey ID: 002/.test(slackCalls[0].text) && /Max Radius: 10\.00 km/.test(slackCalls[0].text), JSON.stringify(slackCalls));
+
+  // a project without settings keeps working as before
+  const free = rawPost({ action: "add", project: "Free", data: { name: "1", surveyId: "2", ...OUTSIDE } });
+  check("project without a main coordinate: no limit, no alert", free.success && free.outOfRadius === false && slackCalls.length === 1 && get({ action: "getData", project: "Free" }).data[0].RadiusKms.length === 0);
+  post({ action: "updateProjectConfig", projectName: "Free", config: { ...BASE, radiusKms: "" } });
+  check("main coordinate without a radius: still no limit", rawPost({ action: "add", project: "Free", data: { name: "1", surveyId: "3", ...OUTSIDE } }).outOfRadius === false && slackCalls.length === 1);
+
+  // bad coordinates never reach the Sheet
+  const before = ss.getSheetByName("Site").rows.length;
+  check("pin without a usable coordinate refused", rawPost({ action: "add", project: "Site", data: { name: "1", surveyId: "9" } }).success === false
+    && rawPost({ action: "add", project: "Site", data: { name: "1", surveyId: "9", lat: "x", lng: 100 } }).success === false
+    && rawPost({ action: "add", project: "Site", data: { name: "1", surveyId: "9", lat: 95, lng: 100 } }).success === false
+    && rawPost({ action: "add", project: "Site", data: { name: "1", surveyId: "9", lat: "", lng: "" } }).success === false
+    && ss.getSheetByName("Site").rows.length === before);
+
+  // closing a project
+  post({ action: "updateProjectConfig", projectName: "Site", config: { ...BASE, radiusKms: [3, 5, 10], isClosed: true } });
+  const closed = rawPost({ action: "add", project: "Site", data: { name: "0861", surveyId: "003", ...INSIDE } });
+  check("closed project accepts no new pins", closed.success === false && /closed/i.test(closed.message) && ss.getSheetByName("Site").rows.length === before, JSON.stringify(closed));
+  check("closed project can still be read", get({ action: "getData", project: "Site" }).data.length === 2 && get({ action: "getProjects" }).data.includes("Site"));
+  post({ action: "updateProjectConfig", projectName: "Site", config: { ...BASE, radiusKms: [3, 5, 10], isClosed: false } });
+  check("reopened project accepts pins again", rawPost({ action: "add", project: "Site", data: { name: "0861", surveyId: "003", ...INSIDE } }).success === true);
+  check("settings follow a rename", (post({ action: "renameProject", oldProjectName: "Site", newProjectName: "Site 2" }), rawPost({ action: "add", project: "Site 2", data: { name: "1", surveyId: "4", ...OUTSIDE } }).outOfRadius === true));
+}
+
+// --- Slack destinations and failures
+{
+  const { post, rawPost, slackCalls } = load({});
+  post({ action: "addProject", projectName: "Site" });
+  post({ action: "updateProjectConfig", projectName: "Site", config: { ...BASE, radiusKms: [5] } });
+  const r = rawPost({ action: "add", project: "Site", data: { name: "1", surveyId: "1", ...OUTSIDE } });
+  check("no Slack destination set: pin saved, alert marked as not sent", r.success && r.outOfRadius === true && r.slackSent === false && slackCalls.length === 0);
+}
+{
+  const { post, rawPost, slackCalls } = load({ SLACK_ALERT_URL: "https://example.invalid/relay", SLACK_ALERT_SECRET: "s3cret" });
+  post({ action: "addProject", projectName: "Site" });
+  post({ action: "updateProjectConfig", projectName: "Site", config: { ...BASE, radiusKms: [5] } });
+  const r = rawPost({ action: "add", project: "Site", data: { name: "7", surveyId: "8", ...OUTSIDE } });
+  check("relay destination gets the alert with its secret", r.slackSent === true && slackCalls.length === 1 && slackCalls[0].url === "https://example.invalid/relay"
+    && slackCalls[0].body.secret === "s3cret" && slackCalls[0].body.action === "notifySlackAnomaly" && slackCalls[0].body.project === "Site" && /Employee ID: 7/.test(slackCalls[0].text), JSON.stringify(slackCalls));
+}
+{
+  const { ss, post, rawPost, slackCalls, slackState } = load({ SLACK_WEBHOOK_URL: "https://example.invalid/hook" });
+  post({ action: "addProject", projectName: "Site" });
+  post({ action: "updateProjectConfig", projectName: "Site", config: { ...BASE, radiusKms: [5] } });
+  slackState.status = 500;
+  const a = rawPost({ action: "add", project: "Site", data: { name: "1", surveyId: "1", ...OUTSIDE } });
+  slackState.throws = true;
+  const b = rawPost({ action: "add", project: "Site", data: { name: "1", surveyId: "2", ...OUTSIDE } });
+  check("Slack trouble never loses the pin", a.success && a.slackSent === false && b.success && b.slackSent === false && ss.getSheetByName("Site").rows.length === 3 && slackCalls.length === 2);
 }
 
 // --- no secrets in source
-check("no hard-coded password/webhook", !/hooks\.slack\.com|adminPassword\s*=\s*"/.test(src));
+check("no hard-coded password/webhook", !/hooks\.slack\.com|adminPassword\s*=\s*"|script\.google\.com\/macros/.test(src));
 check("no admin password or hard-coded email left", !/ADMIN_PASSWORD/.test(src) && !/[\w.]+@[\w-]+\.\w+/.test(src));
 
 console.log(`${pass} passed, ${fail} failed`);
