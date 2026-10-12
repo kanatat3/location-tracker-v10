@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker V12.4 (01.10.2026)</title>
+    <title>Location Tracker V12.5 (12.10.2026)</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -141,7 +141,7 @@
             padding: 0 20px;
             border: 0;
             border-radius: 18px;
-            background: var(--primary-blue);
+            background: var(--primary-hover);   /* white text needs 4.5:1; #007AFF alone gives 4.0 */
             color: #fff;
             font-size: 16px;
             font-weight: 800;
@@ -150,7 +150,7 @@
             box-shadow: 0 12px 26px -10px rgba(0, 122, 255, 0.65);
             transition: background-color 0.15s, transform 0.12s, box-shadow 0.15s;
         }
-        .lt-primary:hover { background: var(--primary-hover); }
+        .lt-primary:hover { background: var(--primary-deep); }
         .lt-primary i { font-size: 18px; }
         .lt-primary--compact { flex: 0 0 auto; min-height: 52px; padding: 0 22px; letter-spacing: 0; font-size: 15px; box-shadow: none; }
 
@@ -204,7 +204,7 @@
         .lt-pill:hover { background: var(--fill-hover); }
         .lt-link {
             min-height: 44px; padding: 0 6px; border: 0; background: none;
-            color: var(--primary-blue); font-size: 14px; font-weight: 800; letter-spacing: 0.06em;
+            color: var(--primary-hover); font-size: 14px; font-weight: 800; letter-spacing: 0.06em;
         }
         .lt-text-btn {
             min-height: 40px; padding: 0 4px; border: 0; background: none;
@@ -303,6 +303,7 @@
         }
         #map, #dashboard-map { height: 100%; width: 100%; background: #E5E9EE; }
         #map .leaflet-bottom { bottom: 28px; }
+        #tracker-view { --float-h: 0px; }
 
         .search-container {
             position: absolute; top: 14px; left: 14px; z-index: 1002;
@@ -482,7 +483,7 @@
             border: 3px solid #fff; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.45);
         }
         .lt-modal.lt-modal--wide { max-width: 520px; text-align: left; max-height: 92vh; max-height: 92dvh; overflow-y: auto; }
-        .lt-config-eyebrow { margin: 0 0 2px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary-blue); }
+        .lt-config-eyebrow { margin: 0 0 2px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary-hover); }
         .lt-config-name { padding-right: 48px; overflow-wrap: anywhere; }
         .lt-config-body { display: grid; gap: 12px; margin-top: 16px; }
         .lt-config-section { border: 1.5px solid var(--line); border-radius: 16px; padding: 14px; display: grid; gap: 10px; }
@@ -498,6 +499,28 @@
         .lt-picker-map { height: min(44vh, 340px); border-radius: 16px; overflow: hidden; border: 1.5px solid var(--line); }
         #admin-map-picker-map { height: 100%; width: 100%; background: #E5E9EE; }
         .lt-config-body .lt-primary { min-height: 56px; }
+
+        /* Report-to-admin column in Recent Sessions */
+        .lt-flag-btn { width: 34px; height: 34px; border-radius: 10px; border: 0; background: var(--fill); color: var(--ink-2); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; cursor: pointer; }
+        .lt-flag-btn:hover { background: #FEF0C7; color: #B54708; }
+        .lt-sheet .lt-table th:nth-child(5) { width: 46px; }
+        .lt-report-record { display: grid; gap: 4px; padding: 12px 14px; border-radius: 14px; background: var(--fill); font-size: 13px; color: var(--ink-2); text-align: left; }
+        .lt-report-record b { color: var(--ink); }
+        .lt-choice { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 14px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--ink); }
+        .lt-choice input { width: 20px; height: 20px; accent-color: var(--primary-blue); flex: 0 0 auto; }
+        .lt-choice:has(input:checked) { border-color: var(--primary-blue); background: var(--blue-tint); }
+        .lt-textarea { width: 100%; min-height: 84px; padding: 12px 16px; border: 1.5px solid var(--line); border-radius: var(--r-field); background: #fff; font: inherit; font-size: 15px; resize: vertical; }
+        /* Requests page (admin) */
+        .lt-request-list { display: grid; gap: 12px; }
+        .lt-request { display: grid; gap: 8px; padding: 16px; border: 1.5px solid var(--line); border-radius: 18px; background: #fff; }
+        .lt-request-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .lt-request-title { margin: 0; font-size: 16px; font-weight: 800; color: var(--ink); }
+        .lt-request-meta { margin: 0; font-size: 13px; color: var(--muted); font-weight: 500; line-height: 1.5; }
+        .lt-request-note { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--fill); font-size: 14px; color: var(--ink-2); white-space: pre-wrap; }
+        .lt-request-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .lt-request-actions .btn { min-height: 44px; padding: 0 16px; border-radius: 12px; font-size: 14px; font-weight: 800; }
+        .lt-badge { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 7px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 12px; font-weight: 800; margin-left: auto; }
+        .lt-badge:empty { display: none; }
 
         .project-admin-item.dragging { opacity: 0.55; background-color: var(--primary-light); border: 2px dashed var(--primary-blue); z-index: 1000; }
 
@@ -570,6 +593,33 @@
 
         @keyframes lt-rise { from { transform: translateY(24px); } to { transform: translateY(0); } }
 
+        /* ---------- Phones and tablets: full-screen map with a small floating entry panel ---------- */
+        @media (max-width: 999px) {
+            #tracker-view .main-card.lt-tracker { position: relative; }
+            #map-container { height: 100vh; height: 100dvh; }
+            #map .leaflet-bottom, #currentLocationButton, .map-hud { bottom: calc(var(--float-h) + 24px); }
+            .lt-sheet { position: relative; margin-top: 0; padding-top: 14px; border-radius: 0; box-shadow: none; }
+            .lt-sheet .lt-grabber { display: none; }
+            .lt-top {
+                position: absolute; left: 10px; right: 10px; bottom: 100%; margin-bottom: 10px;
+                padding: 12px 14px 14px; background: rgba(255, 255, 255, 0.96);
+                border-radius: 22px; box-shadow: 0 10px 32px rgba(11, 18, 32, 0.22);
+                z-index: var(--z-sheet);
+            }
+            .lt-top .lt-sheet-head { grid-template-columns: 40px minmax(0, 1fr) 40px; gap: 8px; margin-bottom: 8px; }
+            .lt-top .lt-circle-btn { width: 40px; height: 40px; }
+            .lt-top .lt-sheet-title { font-size: 16px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .lt-top .lt-address { margin-bottom: 8px; }
+            .lt-top .lt-address-row { padding: 8px 10px; }
+            .lt-top .lt-address-row p { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .lt-top .lt-fields { gap: 8px; margin-bottom: 8px; }
+            .lt-top .lt-label { font-size: 12px; }
+            .lt-top .input-field { min-height: 46px; }
+            .lt-top .lt-actions { gap: 8px; margin-bottom: 0; }
+            .lt-top .lt-primary, .lt-top .lt-save { min-height: 52px; border-radius: 16px; }
+            .lt-top .lt-primary { font-size: 15px; }
+        }
+
         /* ---------- Larger screens: the layout grows with the screen ---------- */
         @media (min-width: 600px) {
             .modal-overlay { align-items: center; padding: 24px; }
@@ -588,7 +638,6 @@
             #project-selection-view .main-card { max-width: 1100px; margin: 0 auto; padding: 20px 32px 40px; }
             #project-list.figma-project-list { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
             #tracker-view .main-card.lt-tracker { overflow: hidden; }
-            #map-container { height: clamp(360px, 52dvh, 640px); }
             .lt-sheet { padding: 12px 28px 28px; box-shadow: 0 -10px 30px rgba(11, 18, 32, 0.08); }
             .lt-page { padding: 32px; max-width: 960px; margin: 0 auto; }
             #dashboard-view .lt-page { max-width: 1200px; }
@@ -710,12 +759,37 @@
                         <span class="lt-row-icon"><i class="fas fa-chart-bar"></i></span>
                         <div class="text-left"><p class="lt-row-title">Analytics</p><p class="lt-row-sub uppercase">Performance</p></div>
                     </button>
+                    <button id="goto-requests-btn" class="btn lt-row-btn">
+                        <span class="lt-row-icon"><i class="fas fa-flag"></i></span>
+                        <div class="text-left"><p class="lt-row-title">Requests</p><p class="lt-row-sub uppercase">From the field</p></div>
+                        <span id="requests-badge" class="lt-badge"></span>
+                    </button>
+                    <button id="customizeLabelsBtn" class="btn lt-row-btn">
+                        <span class="lt-row-icon"><i class="fas fa-sliders"></i></span>
+                        <div class="text-left"><p class="lt-row-title">Field labels</p><p class="lt-row-sub uppercase">Employee ID / Survey ID</p></div>
+                    </button>
                 </div>
                 <div class="lt-admin-account">
                     <span id="admin-account-email" class="lt-admin-email"></span>
                     <button id="admin-sign-out-btn" class="btn lt-pill uppercase">
                         <i class="fas fa-right-from-bracket mr-2"></i> Sign out
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Requests from the field (Admin) -->
+        <div id="requests-view" class="app-view">
+            <div class="main-card lt-page">
+                <div class="lt-page-head">
+                    <h2 class="lt-page-title">Requests</h2>
+                    <button id="requests-back-to-menu-btn" class="btn lt-link uppercase">Close</button>
+                </div>
+                <p class="lt-config-help" style="margin: 0 0 16px;">Records that field workers flagged. Fix the record in the project or the Sheet, then press Done.</p>
+                <div id="requests-list" class="lt-request-list"></div>
+                <div id="requests-empty" class="lt-empty">
+                    <div class="lt-empty-icon"><i class="fas fa-flag"></i></div>
+                    <p>No open requests</p>
                 </div>
             </div>
         </div>
@@ -805,10 +879,11 @@
 
                 <section class="lt-sheet">
                     <div class="lt-grabber" aria-hidden="true"></div>
+                    <div id="tracker-top" class="lt-top">
                     <header class="lt-sheet-head">
-                        <button id="home-button" class="btn lt-circle-btn"><i class="fas fa-house"></i></button>
+                        <button id="home-button" class="btn lt-circle-btn" title="Back to projects"><i class="fas fa-house"></i></button>
                         <h3 id="tracker-title" class="lt-sheet-title">Project Name</h3>
-                        <button id="customizeLabelsBtn" class="btn lt-circle-btn lt-circle-btn--blue"><i class="fas fa-sliders"></i></button>
+                        <span aria-hidden="true"></span>
                     </header>
 
                     <div id="address-display" class="lt-address hidden">
@@ -839,6 +914,7 @@
                         <button id="uploadButton" class="btn lt-primary" title="Save this record and upload now"><i class="fas fa-cloud-arrow-up"></i><span>UPLOAD</span></button>
                         <button id="saveButton" class="btn lt-save" title="Save on this device only"><i class="fas fa-circle-check"></i><span>Save</span></button>
                     </div>
+                    </div>
 
                     <div>
                         <div class="lt-section-head">
@@ -851,7 +927,7 @@
                         <div class="table-scroll lt-table">
                             <table>
                                 <thead>
-                                    <tr><th class="text-left">No.</th><th id="tableHeaderEmployeeId" class="text-left">Staff</th><th id="tableHeaderSurveyId" class="text-left">ID</th><th class="text-left">Timestamp</th></tr>
+                                    <tr><th class="text-left">No.</th><th id="tableHeaderEmployeeId" class="text-left">Staff</th><th id="tableHeaderSurveyId" class="text-left">ID</th><th class="text-left">Timestamp</th><th class="text-center" title="Report to admin"><i class="fas fa-flag" aria-hidden="true"></i><span class="sr-only">Report</span></th></tr>
                                 </thead>
                                 <tbody id="savedLocationsTableBody"></tbody>
                             </table>
@@ -945,7 +1021,7 @@
                 </div>
                 <div class="lt-config-grid">
                     <button type="button" id="admin-map-use-current" class="btn lt-secondary">Use my GPS</button>
-                    <button type="button" id="admin-map-picker-apply" class="btn lt-secondary lt-danger" style="background: var(--primary-blue);">Apply</button>
+                    <button type="button" id="admin-map-picker-apply" class="btn lt-secondary lt-danger" style="background: var(--primary-hover);">Apply</button>
                 </div>
             </div>
         </div>
@@ -956,6 +1032,30 @@
         <option value="5, 10"></option>
         <option value="3, 5, 10"></option>
     </datalist>
+
+    <div id="reportModal" class="modal-overlay">
+        <div class="lt-modal lt-modal--wide">
+            <div class="lt-modal-grabber" aria-hidden="true"></div>
+            <button type="button" id="report-close" class="lt-modal-close" title="Close"><i class="fas fa-times text-lg"></i></button>
+            <p class="lt-config-eyebrow">Report to admin</p>
+            <h4 class="lt-modal-title lt-config-name">What should be done with this record?</h4>
+            <form id="report-form" class="lt-config-body">
+                <div id="report-record" class="lt-report-record"></div>
+                <div class="lt-config-body" style="margin-top: 0;" role="radiogroup" aria-label="Request">
+                    <label class="lt-choice"><input type="radio" name="report-request" value="delete">Delete this record</label>
+                    <label class="lt-choice"><input type="radio" name="report-request" value="wrong_employee">Wrong Employee ID</label>
+                    <label class="lt-choice"><input type="radio" name="report-request" value="wrong_survey">Wrong Survey ID</label>
+                    <label class="lt-choice"><input type="radio" name="report-request" value="wrong_location">Wrong location</label>
+                    <label class="lt-choice"><input type="radio" name="report-request" value="other">Other</label>
+                </div>
+                <div>
+                    <label class="lt-label" for="report-note" style="margin-bottom: 6px;">Note for the admin <em style="font-style: normal; font-weight: 500;">(what it should be)</em></label>
+                    <textarea id="report-note" class="lt-textarea" maxlength="500" placeholder="e.g. Survey ID should be 108"></textarea>
+                </div>
+                <button type="submit" id="report-send" class="btn lt-primary uppercase"><i class="fas fa-paper-plane"></i><span>Send to admin</span></button>
+            </form>
+        </div>
+    </div>
 
     <div id="renameModal" class="modal-overlay">
         <div class="lt-modal">
@@ -1070,12 +1170,19 @@
     <script>
         const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxwXRe_J--t6D-cSPNxbLJlp-krPKPeMlmnkVaoFwNeQtcq7kfPwU955YCo3JUm0fUWaA/exec';
         
+        // Google tiles stop at zoom 20; the last two levels stretch them so a single building can be aimed at.
+        const MAP_TILES = 'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+        const MAP_MAX_ZOOM = 22;
+        const MAP_TILE_OPTIONS = { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], maxZoom: MAP_MAX_ZOOM, maxNativeZoom: 20 };
         let map, dashboardMap, permanentMarkers = L.featureGroup(), dashboardMarkers = L.featureGroup();
         let currentLat = null, currentLng = null, currentAddress = "";
         let savedLocations = [], pendingLocations = [], allProjects = [], currentProjectName = null;
         let loadedProjects = new Set();
         let isEmployeeIdLocked = false; 
+        // Field labels come from the server (set by the admin); localStorage only bridges the first load.
         let customLabels = JSON.parse(localStorage.getItem('customLabels')) || { employeeId: 'Employee ID', surveyId: 'Survey ID' };
+        let reportTarget = null;
+        let openRequests = [];
         
         // OAuth client ID (Web) for "Sign in with Google"; the same value is GOOGLE_CLIENT_ID in the Apps Script properties.
         const GOOGLE_CLIENT_ID = '728655284245-07qf8crlrqflj71j6vrdesj4g1qjv727.apps.googleusercontent.com';
@@ -1310,8 +1417,8 @@
             document.getElementById("adminMapSearchInput").value = "";
             document.getElementById("adminMapPickerModal").style.display = "flex";
             if (!adminPickerMap) {
-                adminPickerMap = L.map("admin-map-picker-map", { zoomControl: true }).setView([13.75, 100.5], 6);
-                L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(adminPickerMap);
+                adminPickerMap = L.map("admin-map-picker-map", { zoomControl: true, maxZoom: MAP_MAX_ZOOM }).setView([13.75, 100.5], 6);
+                L.tileLayer(MAP_TILES, MAP_TILE_OPTIONS).addTo(adminPickerMap);
                 adminPickerMap.on("click", (e) => setAdminPickerCoordinate(e.latlng.lat, e.latlng.lng, false));
             }
             setTimeout(() => {
@@ -1396,6 +1503,7 @@
                     renderAdminAccount();
                     document.getElementById("passwordModal").style.display = "none";
                     window.showView("admin-menu-view");
+                    loadRequests(false);
                 } else {
                     noteEl.textContent = result.message || "This Google account is not allowed.";
                     showMessage("Access denied", "error");
@@ -1414,6 +1522,99 @@
             window.showView("project-selection-view");
             openGoogleSignIn("Sign in again to continue.");
             return true;
+        }
+
+        // ----- Field worker: report a saved record to the admin -----
+        function openReportModal(loc) {
+            reportTarget = loc;
+            const when = new Date(loc.Timestamp);
+            document.getElementById("report-record").innerHTML =
+                `<span><b>${escapeHtml(customLabels.employeeId)}:</b> ${escapeHtml(loc.EmployeeID || '-')}</span>` +
+                `<span><b>${escapeHtml(customLabels.surveyId)}:</b> ${escapeHtml(loc.SurveyID || '-')}</span>` +
+                `<span><b>Time:</b> ${isNaN(when) ? '-' : when.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>` +
+                `<span><b>Coordinate:</b> ${Number(loc.Latitude).toFixed(6)}, ${Number(loc.Longitude).toFixed(6)}</span>`;
+            document.querySelectorAll('input[name="report-request"]').forEach(r => { r.checked = false; });
+            document.getElementById("report-note").value = "";
+            document.getElementById("reportModal").style.display = "flex";
+        }
+
+        async function sendReport(e) {
+            e.preventDefault();
+            if (!reportTarget) return;
+            const choice = document.querySelector('input[name="report-request"]:checked');
+            const note = document.getElementById("report-note").value.trim();
+            if (!choice) return showMessage("Choose what should be done", "warning");
+            if (choice.value === "other" && !note) return showMessage("Please write what should be changed", "warning");
+            const btn = document.getElementById("report-send");
+            btn.disabled = true;
+            try {
+                const res = await fetch(WEB_APP_URL, { method: "POST", headers: POST_HEADERS, body: JSON.stringify({
+                    action: "reportRecord", project: currentProjectName, request: choice.value, note,
+                    record: { EmployeeID: reportTarget.EmployeeID, SurveyID: reportTarget.SurveyID, Latitude: reportTarget.Latitude, Longitude: reportTarget.Longitude, Timestamp: reportTarget.Timestamp },
+                    reportedBy: ui.employeeId ? ui.employeeId.value.trim() : ""
+                }) });
+                const result = await res.json();
+                if (result.success) {
+                    document.getElementById("reportModal").style.display = "none";
+                    showMessage("Sent to the admin", "success");
+                } else showMessage(result.message || "Could not send", "error");
+            } catch (err) {
+                showMessage("Could not send - check the connection", "error");
+            }
+            btn.disabled = false;
+        }
+
+        // ----- Admin: requests from the field -----
+        function renderRequests(list) {
+            openRequests = Array.isArray(list) ? list : [];
+            const badge = document.getElementById("requests-badge");
+            badge.textContent = openRequests.length ? String(openRequests.length) : "";
+            const box = document.getElementById("requests-list");
+            document.getElementById("requests-empty").classList.toggle("hidden", openRequests.length > 0);
+            box.innerHTML = "";
+            openRequests.forEach(r => {
+                const card = document.createElement("article");
+                card.className = "lt-request";
+                card.dataset.id = r.ID;
+                const when = new Date(r.Timestamp), recordWhen = new Date(r.RecordTimestamp);
+                const fmt = d => isNaN(d) ? '-' : d.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                card.innerHTML = `
+                    <div class="lt-request-head">
+                        <div class="min-w-0"><h4 class="lt-request-title">${escapeHtml(r.RequestText || r.Request)}</h4><p class="lt-request-meta">${escapeHtml(r.Project)}</p></div>
+                        <span class="lt-chip">${escapeHtml(fmt(when))}</span>
+                    </div>
+                    <p class="lt-request-meta"><b>${escapeHtml(customLabels.employeeId)}:</b> ${escapeHtml(r.EmployeeID || '-')} &nbsp; <b>${escapeHtml(customLabels.surveyId)}:</b> ${escapeHtml(r.SurveyID || '-')}<br>
+                        <b>Record time:</b> ${escapeHtml(fmt(recordWhen))} &nbsp; <b>Coordinate:</b> ${Number(r.Latitude).toFixed(6)}, ${Number(r.Longitude).toFixed(6)}<br>
+                        <b>Reported by:</b> ${escapeHtml(r.ReportedBy || '-')}</p>
+                    ${r.Note ? `<p class="lt-request-note">${escapeHtml(r.Note)}</p>` : ''}
+                    <div class="lt-request-actions">
+                        <a class="btn lt-secondary" style="display:inline-flex;align-items:center;" href="https://www.google.com/maps?q=${Number(r.Latitude)},${Number(r.Longitude)}" target="_blank" rel="noopener"><i class="fas fa-map-location-dot mr-2"></i>Open in Google Maps</a>
+                        <button type="button" class="btn lt-primary lt-request-done" style="flex: 0 0 auto; min-height: 44px; font-size: 14px; letter-spacing: 0.04em;"><i class="fas fa-check"></i><span>Done</span></button>
+                    </div>`;
+                card.querySelector(".lt-request-done").onclick = () => resolveRequest(r.ID);
+                box.appendChild(card);
+            });
+        }
+
+        async function loadRequests(showSpinner) {
+            if (showSpinner) ui.spinner.classList.remove("hidden");
+            try {
+                const res = await fetch(`${WEB_APP_URL}?action=getReports&t=${Date.now()}`);
+                const result = await res.json();
+                if (result.success) renderRequests(result.data);
+            } catch (e) { console.error(e); }
+            if (showSpinner) ui.spinner.classList.add("hidden");
+        }
+
+        async function resolveRequest(id) {
+            ui.spinner.classList.remove("hidden");
+            try {
+                const res = await fetch(WEB_APP_URL, { method: "POST", headers: POST_HEADERS, body: JSON.stringify({ action: "resolveReport", id, session: getAdminSession() }) });
+                const result = await res.json();
+                if (result.success) { renderRequests(result.data); showMessage("Marked as done", "success"); }
+                else if (!handleAdminAuthRequired(result)) showMessage(result.message || "Could not update", "error");
+            } catch (e) { showMessage("Could not update - check the connection", "error"); }
+            ui.spinner.classList.add("hidden");
         }
 
         function showConfirmation(title, message, onConfirm) {
@@ -1536,8 +1737,8 @@
 
         function initDashboardMap() {
             if (!dashboardMap) {
-                dashboardMap = L.map("dashboard-map", { zoomControl: true }).setView([13.75, 100.5], 6);
-                L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(dashboardMap);
+                dashboardMap = L.map("dashboard-map", { zoomControl: true, maxZoom: MAP_MAX_ZOOM }).setView([13.75, 100.5], 6);
+                L.tileLayer(MAP_TILES, MAP_TILE_OPTIONS).addTo(dashboardMap);
                 dashboardMarkers.addTo(dashboardMap);
             }
         }
@@ -1567,6 +1768,12 @@
                 }).map(p => (typeof p === 'object' && p !== null) ? p.name : String(p));
 
                 const configsChanged = applyRemoteProjectConfigs(result.configs);
+                if (result.labels && result.labels.employeeId && result.labels.surveyId && (result.labels.employeeId !== customLabels.employeeId || result.labels.surveyId !== customLabels.surveyId)) {
+                    customLabels = { employeeId: String(result.labels.employeeId), surveyId: String(result.labels.surveyId) };
+                    localStorage.setItem('customLabels', JSON.stringify(customLabels));
+                    updateLabels();
+                    if (currentProjectName && map) renderTable();
+                }
                 if (configsChanged || JSON.stringify(newProjects) !== JSON.stringify(allProjects)) {
                     allProjects = newProjects;
                     localStorage.setItem('cache_projects', JSON.stringify(allProjects));
@@ -1648,15 +1855,20 @@
                 const settings = document.createElement("button");
                 settings.className = "w-10 h-10 bg-slate-50 text-slate-400 rounded-xl hover:bg-primary-blue hover:text-white transition-all flex items-center justify-center";
                 settings.title = "Project settings";
+                settings.setAttribute("aria-label", `Settings for ${p}`);
                 settings.innerHTML = `<i class="fas fa-sliders text-xs"></i>`;
                 settings.onclick = (e) => { e.stopPropagation(); window.openProjectConfigModal(p); };
                 acts.appendChild(settings);
                 const ren = document.createElement("button");
                 ren.className = "w-10 h-10 bg-slate-50 text-slate-400 rounded-xl hover:bg-primary-blue hover:text-white transition-all flex items-center justify-center";
+                ren.title = "Rename project";
+                ren.setAttribute("aria-label", `Rename ${p}`);
                 ren.innerHTML = `<i class="fas fa-pencil-alt text-xs"></i>`;
                 ren.onclick = (e) => { e.stopPropagation(); window.renameProjectPrompt(p); };
                 const del = document.createElement("button");
                 del.className = "w-10 h-10 bg-slate-50 text-slate-400 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center";
+                del.title = "Delete (hide) project";
+                del.setAttribute("aria-label", `Delete ${p}`);
                 del.innerHTML = `<i class="fas fa-trash text-xs"></i>`;
                 del.onclick = (e) => { e.stopPropagation(); window.deleteProjectPrompt(p); };
                 acts.appendChild(ren); acts.appendChild(del);
@@ -1738,7 +1950,7 @@
                     setTimeout(() => { 
                         map.invalidateSize(); 
                         if (permanentMarkers.getLayers().length > 0) {
-                            map.fitBounds(permanentMarkers.getBounds().pad(0.2)); 
+                            fitTrackerBounds();
                         }
                     }, 150);
                 }
@@ -1757,7 +1969,7 @@
                     if (savedLocations.length > 0 && map) {
                         map.invalidateSize();
                         if (permanentMarkers.getLayers().length > 0) {
-                            map.fitBounds(permanentMarkers.getBounds().pad(0.2));
+                            fitTrackerBounds();
                         }
                     }
                 }
@@ -1809,13 +2021,30 @@
             updateAddress(lat, lng);
         }
 
+        // On phones the entry panel floats over the bottom of the map; its height is kept in --float-h
+        // so the map controls sit above it and pins are not hidden behind it.
+        function trackerFloatHeight() {
+            const top = document.getElementById("tracker-top");
+            if (!top || window.innerWidth >= 1000) return 0;
+            return top.offsetHeight + 10;
+        }
+        function updateFloatHeight() {
+            document.getElementById("tracker-view").style.setProperty("--float-h", trackerFloatHeight() + "px");
+        }
+        function fitTrackerBounds() {
+            map.fitBounds(permanentMarkers.getBounds().pad(0.2), { paddingBottomRight: [0, trackerFloatHeight()], paddingTopLeft: [0, 20] });
+        }
+
         function initMap() {
             if (!map) {
-                map = L.map("map", { zoomControl: false }).setView([13.75, 100.5], 13);
-                L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
+                map = L.map("map", { zoomControl: false, maxZoom: MAP_MAX_ZOOM }).setView([13.75, 100.5], 13);
+                L.tileLayer(MAP_TILES, MAP_TILE_OPTIONS).addTo(map);
                 permanentMarkers.addTo(map);
                 map.on("click", (e) => updateDisplay(e.latlng.lat, e.latlng.lng));
+                if (window.ResizeObserver) new ResizeObserver(updateFloatHeight).observe(document.getElementById("tracker-top"));
+                window.addEventListener("resize", updateFloatHeight);
             }
+            updateFloatHeight();
         }
 
         function renderTable() {
@@ -1844,6 +2073,19 @@
                 const ts = new Date(loc.Timestamp).toLocaleString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
                 row.innerHTML = `<td class="p-3 text-slate-400 font-mono text-[9px]">${all.length - i}</td><td class="p-3 font-black text-[10px] ${isMe ? 'text-primary-blue' : 'text-slate-900'}">${loc.EmployeeID}${isP ? ' ⏳' : ''}</td><td class="p-3 text-slate-500 font-bold text-[10px]">${loc.SurveyID || '-'}</td><td class="p-3 text-slate-400 font-bold text-[9px]">${ts}</td>`;
                 if (outOfRadius) row.cells[1].insertAdjacentHTML("beforeend", ' <i class="fas fa-triangle-exclamation text-red-500" title="Outside the radius"></i>');
+                const flagCell = document.createElement("td");
+                flagCell.className = "p-2 text-center";
+                if (!isP) {
+                    const flag = document.createElement("button");
+                    flag.type = "button";
+                    flag.className = "lt-flag-btn";
+                    flag.title = "Report this record to the admin";
+                    flag.setAttribute("aria-label", `Report record ${loc.EmployeeID} / ${loc.SurveyID || '-'} to the admin`);
+                    flag.innerHTML = '<i class="fas fa-flag"></i>';
+                    flag.onclick = (e) => { e.stopPropagation(); openReportModal(loc); };
+                    flagCell.appendChild(flag);
+                }
+                row.appendChild(flagCell);
                 row.onclick = () => { map.setView([loc.Latitude, loc.Longitude], 18); };
                 ui.savedTable.appendChild(row);
             });
@@ -1865,6 +2107,7 @@
                 isAdminAuthenticated = true;
             }
             renderAdminAccount();
+            updateLabels();   // cached labels show at once; the server copy arrives with the project list
             
             fetchProjects();
 
@@ -1911,9 +2154,10 @@
             document.getElementById("home-button").onclick = () => { ui.employeeId.value = ""; window.showView("project-selection-view"); };
             document.getElementById("refresh-projects-btn").onclick = () => fetchProjects();
             
-            document.getElementById("manage-projects-btn").onclick = () => { 
+            document.getElementById("manage-projects-btn").onclick = () => {
                 if (isAdminAuthenticated) {
                     window.showView("admin-menu-view");
+                    loadRequests(false);
                 } else {
                     openGoogleSignIn();
                 }
@@ -2117,13 +2361,31 @@
             document.getElementById("cancelActionButton").onclick = () => document.getElementById("confirmationModal").style.display = "none";
             document.getElementById("customizeLabelsBtn").onclick = () => { document.getElementById("custom-employee-label").value = customLabels.employeeId; document.getElementById("custom-survey-label").value = customLabels.surveyId; document.getElementById("customizeLabelsModal").style.display = "flex"; };
             document.getElementById("cancel-customize-btn").onclick = () => document.getElementById("customizeLabelsModal").style.display = "none";
-            document.getElementById("customize-labels-form").onsubmit = (e) => {
+            document.getElementById("customize-labels-form").onsubmit = async (e) => {
                 e.preventDefault();
-                customLabels.employeeId = document.getElementById("custom-employee-label").value.trim() || 'Employee ID';
-                customLabels.surveyId = document.getElementById("custom-survey-label").value.trim() || 'Survey ID';
-                localStorage.setItem('customLabels', JSON.stringify(customLabels));
-                updateLabels(); document.getElementById("customizeLabelsModal").style.display = "none";
+                const employeeId = document.getElementById("custom-employee-label").value.trim() || 'Employee ID';
+                const surveyId = document.getElementById("custom-survey-label").value.trim() || 'Survey ID';
+                ui.spinner.classList.remove("hidden");
+                try {
+                    const res = await fetch(WEB_APP_URL, { method: "POST", headers: POST_HEADERS, body: JSON.stringify({ action: "updateLabels", employeeId, surveyId, session: getAdminSession() }) });
+                    const result = await res.json();
+                    if (result.success) {
+                        customLabels = result.labels || { employeeId, surveyId };
+                        localStorage.setItem('customLabels', JSON.stringify(customLabels));
+                        updateLabels();
+                        document.getElementById("customizeLabelsModal").style.display = "none";
+                        showMessage("Labels saved for everyone", "success");
+                    } else {
+                        if (result.authRequired) document.getElementById("customizeLabelsModal").style.display = "none";
+                        if (!handleAdminAuthRequired(result)) showMessage(result.message || "Could not save labels", "error");
+                    }
+                } catch (err) { showMessage("Could not save labels - check the connection", "error"); }
+                ui.spinner.classList.add("hidden");
             };
+            document.getElementById("goto-requests-btn").onclick = () => { window.showView("requests-view"); loadRequests(true); };
+            document.getElementById("requests-back-to-menu-btn").onclick = () => window.showView("admin-menu-view");
+            document.getElementById("report-close").onclick = () => { document.getElementById("reportModal").style.display = "none"; };
+            document.getElementById("report-form").onsubmit = sendReport;
             
             const sIn = document.getElementById("locationSearchInput"), sBox = document.getElementById("search-suggestions");
             let deb;

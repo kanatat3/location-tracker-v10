@@ -116,7 +116,7 @@ function check(name, cond, extra = "") { if (cond) pass++; else { fail++; consol
 // --- basic flow
 {
   const { ss, get, post, slackCalls } = load();
-  check("version", get({ action: "version" }).data.version === "v12.2");
+  check("version", get({ action: "version" }).data.version === "v12.3");
   check("addProject", post({ action: "addProject", projectName: "  Alpha  " }).success);
   check("addProject trims name", !!ss.getSheetByName("Alpha"));
   check("duplicate project rejected", post({ action: "addProject", projectName: "Alpha" }).success === false);
@@ -308,6 +308,47 @@ const OUTSIDE = { lat: 13.9000, lng: 100.5018 };                // ~16 km away
   post({ action: "updateProjectConfig", projectName: "Site", config: { ...BASE, radiusKms: [3, 5, 10], isClosed: false } });
   check("reopened project accepts pins again", rawPost({ action: "add", project: "Site", data: { name: "0861", surveyId: "003", ...INSIDE } }).success === true);
   check("settings follow a rename", (post({ action: "renameProject", oldProjectName: "Site", newProjectName: "Site 2" }), rawPost({ action: "add", project: "Site 2", data: { name: "1", surveyId: "4", ...OUTSIDE } }).outOfRadius === true));
+}
+
+// --- field labels: set by the admin, served to everyone
+{
+  const { get, post, rawPost } = load();
+  check("default labels", (() => { const l = get({ action: "getProjects" }).labels; return l.employeeId === "Employee ID" && l.surveyId === "Survey ID"; })());
+  check("labels need sign-in", rawPost({ action: "updateLabels", employeeId: "Staff" }).authRequired === true);
+  const r = post({ action: "updateLabels", employeeId: "  Staff code  ", surveyId: "" });
+  check("admin sets labels; empty falls back to the default", r.success && r.labels.employeeId === "Staff code" && r.labels.surveyId === "Survey ID", JSON.stringify(r));
+  check("labels are served with the project list", get({ action: "getProjects" }).labels.employeeId === "Staff code");
+  check("labels are cut to 40 characters", post({ action: "updateLabels", employeeId: "x".repeat(80), surveyId: "y" }).labels.employeeId.length === 40);
+}
+
+// --- field reports: a worker flags a record, the admin closes it
+{
+  const { ss, get, post, rawPost, slackCalls } = load({ SLACK_WEBHOOK_URL: "https://example.invalid/hook" });
+  post({ action: "addProject", projectName: "Site" });
+  const record = { EmployeeID: "0861", SurveyID: "007", Latitude: 13.7465, Longitude: 100.5348, Timestamp: "2026-10-01T06:14:12.416Z" };
+  check("no reports yet", get({ action: "getReports" }).data.length === 0);
+  check("report needs a known project", rawPost({ action: "reportRecord", project: "Nope", record, request: "delete" }).success === false
+    && rawPost({ action: "reportRecord", project: "Reports", record, request: "delete" }).success === false);
+  check("report needs a known request type", rawPost({ action: "reportRecord", project: "Site", record, request: "zap" }).success === false);
+  check("'other' needs a note", rawPost({ action: "reportRecord", project: "Site", record, request: "other", note: "  " }).success === false);
+  check("report needs the record", rawPost({ action: "reportRecord", project: "Site", record: { EmployeeID: "1" }, request: "delete" }).success === false);
+  check("nothing stored by refused reports", !ss.getSheetByName("Reports") || ss.getSheetByName("Reports").rows.length <= 1);
+
+  const sent = rawPost({ action: "reportRecord", project: "Site", record, request: "delete", note: "pressed twice", reportedBy: "0861" });
+  check("worker report stored without sign-in", sent.success && sent.id === 2 && sent.slackSent === true, JSON.stringify(sent));
+  check("Slack told what the worker wants", slackCalls.length === 1 && /Request: Delete this record/.test(slackCalls[0].text) && /Project: Site/.test(slackCalls[0].text) && /Survey ID: 007/.test(slackCalls[0].text) && /Note: pressed twice/.test(slackCalls[0].text), JSON.stringify(slackCalls));
+  check("Reports tab is reserved, not a project", !get({ action: "getProjects" }).data.includes("Reports") && rawPost({ action: "add", project: "Reports", data: { name: "1", surveyId: "1", lat: 1, lng: 1 } }).success === false);
+  rawPost({ action: "reportRecord", project: "Site", record: { ...record, SurveyID: "008" }, request: "wrong_location", reportedBy: "0861" });
+  let open = get({ action: "getReports" }).data;
+  check("open reports listed with the record details", open.length === 2 && open[0].EmployeeID === "0861" && open[0].SurveyID === "007" && open[0].RequestText === "Delete this record" && open[0].Note === "pressed twice"
+    && open[0].ReportedBy === "0861" && open[0].status === "open" && open[0].RecordTimestamp === "2026-10-01T06:14:12.416Z" && open[1].Request === "wrong_location", JSON.stringify(open));
+  check("resolving needs sign-in", rawPost({ action: "resolveReport", id: 2 }).authRequired === true);
+  check("unknown report refused", post({ action: "resolveReport", id: 99 }).success === false && post({ action: "resolveReport", id: 1 }).success === false);
+  const done = post({ action: "resolveReport", id: 2 });
+  check("admin closes a report; the rest stay open", done.success && done.data.length === 1 && done.data[0].ID === 3, JSON.stringify(done));
+  const all = get({ action: "getReports", status: "all" }).data;
+  check("closed report keeps who closed it and when", all.length === 2 && all[0].status === "done" && all[0].ResolvedBy === OWNER && all[0].ResolvedAt !== "", JSON.stringify(all[0]));
+  check("getReports defaults to open ones", get({ action: "getReports" }).data.length === 1);
 }
 
 // --- Slack destinations and failures

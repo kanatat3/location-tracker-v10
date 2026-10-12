@@ -23,12 +23,17 @@
  * No passwords or webhook URLs live in this file on purpose.
  * API is the same as the V6 backend (LT 2.4.2026.15.19) so existing front ends keep working.
  */
-const BACKEND_VERSION = "v12.2";
+const BACKEND_VERSION = "v12.3";
 const PROJECT_CONFIG_SHEET_NAME = "ProjectConfigs";
 const ALLOWED_EMAILS_SHEET_NAME = "AllowedEmails";
-const RESERVED_SHEET_NAMES = [PROJECT_CONFIG_SHEET_NAME, ALLOWED_EMAILS_SHEET_NAME];
+const REPORTS_SHEET_NAME = "Reports";
+const RESERVED_SHEET_NAMES = [PROJECT_CONFIG_SHEET_NAME, ALLOWED_EMAILS_SHEET_NAME, REPORTS_SHEET_NAME];
+// What a field worker can ask the admin to do with a saved record.
+const REPORT_REQUESTS = { delete: "Delete this record", wrong_employee: "Wrong Employee ID", wrong_survey: "Wrong Survey ID", wrong_location: "Wrong location", other: "Other" };
+const REPORT_HEADERS = ["Timestamp", "Project", "EmployeeID", "SurveyID", "Latitude", "Longitude", "RecordTimestamp", "Request", "Note", "ReportedBy", "Status", "ResolvedAt", "ResolvedBy"];
+const DEFAULT_LABELS = { employeeId: "Employee ID", surveyId: "Survey ID" };
 // Actions that change projects or saved rows: only for a signed-in, allowed Google account.
-const ADMIN_ACTIONS = ["updateProjectConfig", "addProject", "renameProject", "deleteProject", "hideProject", "reorderProjects", "update", "delete"];
+const ADMIN_ACTIONS = ["updateProjectConfig", "addProject", "renameProject", "deleteProject", "hideProject", "reorderProjects", "update", "delete", "resolveReport", "updateLabels"];
 const SESSION_DAYS = 30;
 const DATA_HEADERS = [
   "EmployeeID",
@@ -68,11 +73,17 @@ function doGet(e) {
         .filter(sheet => !sheet.isSheetHidden())
         .filter(sheet => !isReservedSheetName_(sheet.getName()))
         .map(sheet => sheet.getName());
-      return createJsonResponse({ success: true, data: projectNames, configs: getProjectConfigs_() });
+      return createJsonResponse({ success: true, data: projectNames, configs: getProjectConfigs_(), labels: getLabels_() });
     }
 
     if (action === "getProjectConfigs") {
       return createJsonResponse({ success: true, data: getProjectConfigs_() });
+    }
+
+    if (action === "getReports") {
+      const status = String(e.parameter.status || "open").toLowerCase();
+      const reports = getReports_().filter(r => status === "all" || r.status === status);
+      return createJsonResponse({ success: true, data: reports });
     }
 
     if (action === "getData" && project) {
@@ -176,6 +187,49 @@ function doPost(e) {
       case "updateProjectConfig": {
         updateProjectConfig_(request.projectName, request.config || {});
         return createJsonResponse({ success: true, data: getProjectConfigs_() });
+      }
+
+      // Field labels are set once by the admin and apply to every device.
+      case "updateLabels": {
+        const clean = (value, fallback) => String(value || "").trim().slice(0, 40) || fallback;
+        const labels = { employeeId: clean(request.employeeId, DEFAULT_LABELS.employeeId), surveyId: clean(request.surveyId, DEFAULT_LABELS.surveyId) };
+        PropertiesService.getScriptProperties().setProperty("CUSTOM_LABELS", JSON.stringify(labels));
+        return createJsonResponse({ success: true, labels: labels });
+      }
+
+      // A field worker flags a saved record for the admin (open to everyone, like "add").
+      case "reportRecord": {
+        const project = String(request.project || "").trim();
+        if (!project || isReservedSheetName_(project) || !ss.getSheetByName(project)) throw new Error("Project not found.");
+        const requestKey = String(request.request || "");
+        if (!REPORT_REQUESTS[requestKey]) throw new Error("Choose what should be done with the record.");
+        const note = String(request.note || "").trim().slice(0, 500);
+        if (requestKey === "other" && !note) throw new Error("Please describe what should be changed.");
+        const record = request.record || {};
+        const lat = Number(record.Latitude), lng = Number(record.Longitude);
+        if (!record.EmployeeID || !Number.isFinite(lat) || !Number.isFinite(lng)) throw new Error("The record is incomplete.");
+        const reportedBy = String(request.reportedBy || "").trim().slice(0, 60);
+        const sheet = getReportsSheet_();
+        sheet.appendRow([new Date(), project, "'" + String(record.EmployeeID), "'" + String(record.SurveyID || ""), lat, lng,
+          parseClientTimestamp_(record.Timestamp) || "", requestKey, note, "'" + reportedBy, "open", "", ""]);
+        let slackSent = false;
+        try {
+          slackSent = sendSlackAlert_(buildReportMessage_(project, record, requestKey, note, reportedBy, lat, lng), project, record);
+        } catch (slackError) {
+          Logger.log("Slack report failed: " + slackError);
+        }
+        return createJsonResponse({ success: true, message: "Sent to the admin.", id: sheet.getLastRow(), slackSent: slackSent });
+      }
+
+      case "resolveReport": {
+        const rowId = Number(request.id);
+        const sheet = getReportsSheet_();
+        if (!Number.isInteger(rowId) || rowId < 2 || rowId > sheet.getLastRow()) throw new Error("Report not found.");
+        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        sheet.getRange(rowId, headers.indexOf("Status") + 1).setValue("done");
+        sheet.getRange(rowId, headers.indexOf("ResolvedAt") + 1).setValue(new Date());
+        sheet.getRange(rowId, headers.indexOf("ResolvedBy") + 1).setValue(getSessionEmail_(request.session) || "");
+        return createJsonResponse({ success: true, data: getReports_().filter(r => r.status === "open") });
       }
 
       case "addProject": {
@@ -313,6 +367,68 @@ function isReservedSheetName_(name) {
 }
 
 // ---- Google sign-in for admins ----
+
+function getLabels_() {
+  try {
+    const stored = JSON.parse(PropertiesService.getScriptProperties().getProperty("CUSTOM_LABELS") || "null");
+    if (stored && stored.employeeId && stored.surveyId) return { employeeId: String(stored.employeeId), surveyId: String(stored.surveyId) };
+  } catch (error) {}
+  return { employeeId: DEFAULT_LABELS.employeeId, surveyId: DEFAULT_LABELS.surveyId };
+}
+
+function getReportsSheet_() {
+  const ss = getSpreadsheet_();
+  let sheet = ss.getSheetByName(REPORTS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(REPORTS_SHEET_NAME);
+    sheet.appendRow(REPORT_HEADERS);
+  }
+  return sheet;
+}
+
+function getReports_() {
+  const sheet = getReportsSheet_();
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return [];
+  const headers = values[0];
+  const col = name => headers.indexOf(name);
+  const text = v => String(v === null || v === undefined ? "" : v).replace(/^'/, "");
+  return values.slice(1).map(function(row, index) {
+    const requestKey = text(row[col("Request")]);
+    return {
+      ID: index + 2,
+      Timestamp: formatTimestampForClient_(row[col("Timestamp")]),
+      Project: text(row[col("Project")]),
+      EmployeeID: text(row[col("EmployeeID")]),
+      SurveyID: text(row[col("SurveyID")]),
+      Latitude: Number(row[col("Latitude")]),
+      Longitude: Number(row[col("Longitude")]),
+      RecordTimestamp: formatTimestampForClient_(row[col("RecordTimestamp")]),
+      Request: requestKey,
+      RequestText: REPORT_REQUESTS[requestKey] || requestKey,
+      Note: text(row[col("Note")]),
+      ReportedBy: text(row[col("ReportedBy")]),
+      status: text(row[col("Status")]).toLowerCase() || "open",
+      ResolvedAt: formatTimestampForClient_(row[col("ResolvedAt")]),
+      ResolvedBy: text(row[col("ResolvedBy")])
+    };
+  }).filter(r => r.Project);
+}
+
+function buildReportMessage_(project, record, requestKey, note, reportedBy, lat, lng) {
+  return [
+    "*คำขอจากภาคสนาม (field request)*",
+    "Project: " + project,
+    "Request: " + REPORT_REQUESTS[requestKey],
+    "Employee ID: " + (record.EmployeeID || "-"),
+    "Survey ID: " + (record.SurveyID || "-"),
+    "Record time: " + (record.Timestamp || "-"),
+    "Coordinate: " + lat.toFixed(6) + ", " + lng.toFixed(6),
+    "Note: " + (note || "-"),
+    "Reported by: " + (reportedBy || "-"),
+    "Map: https://www.google.com/maps?q=" + lat + "," + lng
+  ].join("\n");
+}
 
 function getAllowedEmailsSheet_() {
   const ss = getSpreadsheet_();
