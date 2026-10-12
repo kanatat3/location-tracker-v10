@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker V12.7 (12.10.2026)</title>
+    <title>Location Tracker V12.8 (12.10.2026)</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -10,8 +10,6 @@
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
@@ -571,9 +569,6 @@
         .lt-filter[hidden] { display: none; }
         .lt-records-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
         .lt-records-note { font-size: 12px; font-weight: 600; color: var(--muted); }
-        /* Clusters use the app blue instead of the library's green/yellow/orange */
-        .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background-color: rgba(0, 98, 204, 0.22); }
-        .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div { background-color: var(--primary-hover); color: #fff; font: 700 12px "Plus Jakarta Sans", sans-serif; }
 
         .project-admin-item.dragging { opacity: 0.55; background-color: var(--primary-light); border: 2px dashed var(--primary-blue); z-index: 1000; }
 
@@ -1243,7 +1238,6 @@
     </script>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <script>
         const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxwXRe_J--t6D-cSPNxbLJlp-krPKPeMlmnkVaoFwNeQtcq7kfPwU955YCo3JUm0fUWaA/exec';
         
@@ -1252,15 +1246,8 @@
         const MAP_MAX_ZOOM = 22;
         const MAP_TILE_OPTIONS = { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], maxZoom: MAP_MAX_ZOOM, maxNativeZoom: 20 };
         let map, dashboardMap, permanentMarkers = L.featureGroup(), dashboardMarkers = L.featureGroup();
-        // Big projects (hundreds of pins) are grouped into numbered clusters that split as you zoom in.
-        // Small projects keep plain pins. Without the cluster library the pins are simply drawn one by one.
-        const CLUSTER_FROM = 60;
         const RECORDS_SHOWN = 20;
         let recordsShowAll = false, recordsOnlyMine = false;
-        function makePinGroup(count) {
-            if (count < CLUSTER_FROM || typeof L.markerClusterGroup !== "function") return null;
-            return L.markerClusterGroup({ maxClusterRadius: 50, disableClusteringAtZoom: 18, showCoverageOnHover: false, spiderfyOnMaxZoom: true, chunkedLoading: true });
-        }
         let currentLat = null, currentLng = null, currentAddress = "";
         let savedLocations = [], pendingLocations = [], allProjects = [], currentProjectName = null;
         let loadedProjects = new Set();
@@ -2039,13 +2026,11 @@
                 if (ui.dashboardSummaryTable) ui.dashboardSummaryTable.innerHTML = "";
                 const summary = {};
                 addMainCoordinateToGroup(dashboardMarkers, projectName, true);
-                const dashCluster = makePinGroup(data.length);
-                if (dashCluster) dashCluster.addTo(dashboardMarkers);
                 data.forEach(loc => {
                     if (loc.Latitude && loc.Longitude) {
                         const marker = L.marker([loc.Latitude, loc.Longitude], { icon: getMarkerIcon('#007AFF') });
                         marker.bindPopup(buildPinPopup(loc, projectName));
-                        marker.addTo(dashCluster || dashboardMarkers);
+                        marker.addTo(dashboardMarkers);
                         summary[loc.EmployeeID] = (summary[loc.EmployeeID] || 0) + 1;
                     }
                 });
@@ -2207,11 +2192,6 @@
                 }
             } else if (document.getElementById("eid-pin-count")) document.getElementById("eid-pin-count").classList.add("hidden");
             
-            // Saved pins (blue) cluster in big projects; waiting pins (grey) always stay visible on their own.
-            const savedCount = all.filter(l => !l.isPending).length;
-            const pinCluster = makePinGroup(savedCount);
-            if (pinCluster) pinCluster.addTo(permanentMarkers);
-
             // The list shows the newest RECORDS_SHOWN rows (all waiting rows always), "Mine" narrows it to the typed Employee ID.
             const filterBox = document.getElementById("records-filter");
             filterBox.hidden = currentEID === "";
@@ -2230,7 +2210,7 @@
                 const outOfRadius = loc.OutOfRadius === true;
                 // Blue = saved in the Sheet, grey = waiting to upload on this device.
                 let markerColor = isP ? 'darkgray' : '#007AFF';
-                const marker = L.marker([loc.Latitude, loc.Longitude], { icon: getMarkerIcon(markerColor), zIndexOffset: isMe ? 2000 : (isP ? 1000 : 0) }).addTo(isP || !pinCluster ? permanentMarkers : pinCluster);
+                const marker = L.marker([loc.Latitude, loc.Longitude], { icon: getMarkerIcon(markerColor), zIndexOffset: isMe ? 2000 : (isP ? 1000 : 0) }).addTo(permanentMarkers);
                 if (!visible.includes(loc)) return;
                 const row = document.createElement("tr");
                 row.className = outOfRadius ? "bg-red-50/60" : (isMe ? "bg-blue-50/50" : (isP ? "bg-red-50/20" : "hover:bg-slate-50 transition-colors"));
