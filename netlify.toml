@@ -1,0 +1,9 @@
+# The site is the repo root (Index.html). The build command is the verify gate:
+# a failing lint, backend test, e2e test or accessibility check stops the deploy.
+[build]
+  publish = "."
+  command = "npm ci && npx playwright install chromium && npm run verify"
+
+[build.environment]
+  NODE_VERSION = "20"
+  CI = "1"
