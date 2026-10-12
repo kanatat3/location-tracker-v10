@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker V12.6 (12.10.2026)</title>
+    <title>Location Tracker V12.7 (12.10.2026)</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -10,6 +10,8 @@
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
@@ -155,19 +157,21 @@
         .lt-primary--compact { flex: 0 0 auto; min-height: 52px; padding: 0 22px; letter-spacing: 0; font-size: 15px; box-shadow: none; }
 
         /* Small "save on this device only" button next to the big Upload button */
+        /* Save is the quiet secondary action: no box, so UPLOAD is the one obvious button */
         .lt-save {
             flex: 0 0 auto;
-            min-height: 60px; padding: 0 16px;
+            min-height: 60px; min-width: 72px; padding: 0 10px;
             border-radius: 18px;
-            background: #fff;
-            border: 1.5px solid var(--line);
+            background: transparent;
+            border: 0;
             color: var(--ink-2);
-            font-size: 14px; font-weight: 800;
-            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-            transition: background-color 0.15s, border-color 0.15s, transform 0.12s;
+            font-size: 14px; font-weight: 700;
+            display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+            transition: background-color 0.15s, transform 0.12s;
         }
+        .lt-save small { font-size: 11px; font-weight: 600; color: var(--muted); }
         .lt-save:hover { background: var(--fill); }
-        .lt-save i { font-size: 16px; color: var(--primary-blue); }
+        .lt-save i { font-size: 16px; color: var(--primary-hover); }
 
         .lt-secondary, .lt-danger {
             min-height: 54px; padding: 0 16px; border: 0; border-radius: 16px;
@@ -557,6 +561,19 @@
         .lt-hint i { color: var(--primary-hover); }
         .lt-top .lt-hint { margin-bottom: 8px; padding: 8px 12px; font-size: 13px; }
         .lt-empty-row td { padding: 20px 16px !important; text-align: center; color: var(--muted); font-weight: 500; font-size: 14px; line-height: 1.45; }
+
+        /* Records list: newest first, a short list by default */
+        .lt-records-more { display: flex; justify-content: center; margin-top: 8px; }
+        .lt-records-more[hidden] { display: none; }
+        .lt-filter { display: inline-flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--fill); }
+        .lt-filter button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; color: var(--ink-2); font-size: 13px; font-weight: 700; cursor: pointer; }
+        .lt-filter button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(11, 18, 32, 0.12); }
+        .lt-filter[hidden] { display: none; }
+        .lt-records-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+        .lt-records-note { font-size: 12px; font-weight: 600; color: var(--muted); }
+        /* Clusters use the app blue instead of the library's green/yellow/orange */
+        .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background-color: rgba(0, 98, 204, 0.22); }
+        .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div { background-color: var(--primary-hover); color: #fff; font: 700 12px "Plus Jakarta Sans", sans-serif; }
 
         .project-admin-item.dragging { opacity: 0.55; background-color: var(--primary-light); border: 2px dashed var(--primary-blue); z-index: 1000; }
 
@@ -954,7 +971,7 @@
 
                     <div id="normalActionButtons" class="lt-actions">
                         <button id="uploadButton" class="btn lt-primary" title="Save this record and upload now"><i class="fas fa-cloud-arrow-up"></i><span>UPLOAD</span></button>
-                        <button id="saveButton" class="btn lt-save" title="Save on this device only"><i class="fas fa-circle-check"></i><span>Save</span></button>
+                        <button id="saveButton" class="btn lt-save" title="Save on this device only, send later"><i class="fas fa-floppy-disk" aria-hidden="true"></i><span>Save</span><small>this phone</small></button>
                     </div>
                     <div id="sync-status" class="lt-sync hidden" role="status" aria-live="polite">
                         <i id="sync-status-icon" class="fas fa-cloud-arrow-up" aria-hidden="true"></i>
@@ -971,6 +988,13 @@
                             </div>
                             <button id="exportCsvButton" class="btn lt-text-btn"><i class="fas fa-file-csv mr-1"></i><span>Export CSV</span></button>
                         </div>
+                        <div class="lt-records-tools">
+                            <div id="records-filter" class="lt-filter" role="group" aria-label="Which records" hidden>
+                                <button type="button" id="records-filter-mine" aria-pressed="false">Mine</button>
+                                <button type="button" id="records-filter-all" aria-pressed="true">Everyone</button>
+                            </div>
+                            <span id="records-note" class="lt-records-note"></span>
+                        </div>
                         <div class="table-scroll lt-table">
                             <table>
                                 <thead>
@@ -978,6 +1002,9 @@
                                 </thead>
                                 <tbody id="savedLocationsTableBody"></tbody>
                             </table>
+                        </div>
+                        <div id="records-more" class="lt-records-more" hidden>
+                            <button type="button" id="records-more-btn" class="btn lt-text-btn"></button>
                         </div>
                     </div>
                 </section>
@@ -1216,6 +1243,7 @@
     </script>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <script>
         const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxwXRe_J--t6D-cSPNxbLJlp-krPKPeMlmnkVaoFwNeQtcq7kfPwU955YCo3JUm0fUWaA/exec';
         
@@ -1224,6 +1252,15 @@
         const MAP_MAX_ZOOM = 22;
         const MAP_TILE_OPTIONS = { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], maxZoom: MAP_MAX_ZOOM, maxNativeZoom: 20 };
         let map, dashboardMap, permanentMarkers = L.featureGroup(), dashboardMarkers = L.featureGroup();
+        // Big projects (hundreds of pins) are grouped into numbered clusters that split as you zoom in.
+        // Small projects keep plain pins. Without the cluster library the pins are simply drawn one by one.
+        const CLUSTER_FROM = 60;
+        const RECORDS_SHOWN = 20;
+        let recordsShowAll = false, recordsOnlyMine = false;
+        function makePinGroup(count) {
+            if (count < CLUSTER_FROM || typeof L.markerClusterGroup !== "function") return null;
+            return L.markerClusterGroup({ maxClusterRadius: 50, disableClusteringAtZoom: 18, showCoverageOnHover: false, spiderfyOnMaxZoom: true, chunkedLoading: true });
+        }
         let currentLat = null, currentLng = null, currentAddress = "";
         let savedLocations = [], pendingLocations = [], allProjects = [], currentProjectName = null;
         let loadedProjects = new Set();
@@ -1421,7 +1458,7 @@
             uploadBtn.querySelector("span").textContent = closed ? "PROJECT CLOSED" : (n ? `UPLOAD (${n})` : "UPLOAD");
             strip.classList.toggle("hidden", n === 0 && !offline);
             strip.classList.toggle("lt-sync--offline", offline);
-            document.getElementById("sync-status-icon").className = offline ? "fas fa-wifi-slash" : "fas fa-cloud-arrow-up";
+            document.getElementById("sync-status-icon").className = offline ? "fas fa-wifi" : "fas fa-cloud-arrow-up"   /* fa-wifi-slash is not in this Font Awesome build */;
             document.getElementById("sync-status-text").textContent = offline
                 ? (n ? `No connection - ${records} kept on this phone, sent as soon as you are back online` : "No connection - records you save stay on this phone until it is back")
                 : (isUploading ? `Sending ${records}...` : `${records} waiting on this phone`);
@@ -1918,6 +1955,7 @@
                     initMap();
                     // Start from this project's own records (never the previous project's), then load.
                     savedLocations = [];
+                    recordsShowAll = false;
                     loadPendingLocations(p);
                     renderPinHint();
                     updateClosedProjectState();
@@ -2001,11 +2039,13 @@
                 if (ui.dashboardSummaryTable) ui.dashboardSummaryTable.innerHTML = "";
                 const summary = {};
                 addMainCoordinateToGroup(dashboardMarkers, projectName, true);
+                const dashCluster = makePinGroup(data.length);
+                if (dashCluster) dashCluster.addTo(dashboardMarkers);
                 data.forEach(loc => {
                     if (loc.Latitude && loc.Longitude) {
                         const marker = L.marker([loc.Latitude, loc.Longitude], { icon: getMarkerIcon('#007AFF') });
                         marker.bindPopup(buildPinPopup(loc, projectName));
-                        marker.addTo(dashboardMarkers);
+                        marker.addTo(dashCluster || dashboardMarkers);
                         summary[loc.EmployeeID] = (summary[loc.EmployeeID] || 0) + 1;
                     }
                 });
@@ -2121,7 +2161,7 @@
             document.getElementById("lat").textContent = lat.toFixed(6);
             document.getElementById("lng").textContent = lng.toFixed(6);
             if (!selectionMarker) {
-                selectionMarker = L.marker([lat, lng], { icon: getMarkerIcon('darkgray'), zIndexOffset: 2500 }).addTo(map);
+                selectionMarker = L.marker([lat, lng], { icon: getMarkerIcon('#1a237e'), zIndexOffset: 2500, title: "Your pin" }).addTo(map);
             } else { selectionMarker.setLatLng([lat, lng]); }
             updateAddress(lat, lng);
         }
@@ -2167,12 +2207,31 @@
                 }
             } else if (document.getElementById("eid-pin-count")) document.getElementById("eid-pin-count").classList.add("hidden");
             
+            // Saved pins (blue) cluster in big projects; waiting pins (grey) always stay visible on their own.
+            const savedCount = all.filter(l => !l.isPending).length;
+            const pinCluster = makePinGroup(savedCount);
+            if (pinCluster) pinCluster.addTo(permanentMarkers);
+
+            // The list shows the newest RECORDS_SHOWN rows (all waiting rows always), "Mine" narrows it to the typed Employee ID.
+            const filterBox = document.getElementById("records-filter");
+            filterBox.hidden = currentEID === "";
+            const onlyMine = recordsOnlyMine && currentEID !== "";
+            document.getElementById("records-filter-mine").setAttribute("aria-pressed", String(onlyMine));
+            document.getElementById("records-filter-all").setAttribute("aria-pressed", String(!onlyMine));
+            const listed = onlyMine ? all.filter(l => l.EmployeeID === currentEID) : all;
+            const visible = recordsShowAll ? listed : listed.filter((l, i) => i < RECORDS_SHOWN || l.isPending);
+            const moreBox = document.getElementById("records-more");
+            moreBox.hidden = listed.length <= RECORDS_SHOWN;
+            document.getElementById("records-more-btn").textContent = recordsShowAll ? "Show fewer" : `Show all ${listed.length} records`;
+            document.getElementById("records-note").textContent = listed.length > visible.length ? `Newest ${visible.length} of ${listed.length}` : "";
+
             all.forEach((loc, i) => {
                 const isP = loc.isPending, isMe = currentEID !== "" && loc.EmployeeID === currentEID;
                 const outOfRadius = loc.OutOfRadius === true;
                 // Blue = saved in the Sheet, grey = waiting to upload on this device.
                 let markerColor = isP ? 'darkgray' : '#007AFF';
-                const marker = L.marker([loc.Latitude, loc.Longitude], { icon: getMarkerIcon(markerColor), zIndexOffset: isMe ? 2000 : (isP ? 1000 : 0) }).addTo(permanentMarkers);
+                const marker = L.marker([loc.Latitude, loc.Longitude], { icon: getMarkerIcon(markerColor), zIndexOffset: isMe ? 2000 : (isP ? 1000 : 0) }).addTo(isP || !pinCluster ? permanentMarkers : pinCluster);
+                if (!visible.includes(loc)) return;
                 const row = document.createElement("tr");
                 row.className = outOfRadius ? "bg-red-50/60" : (isMe ? "bg-blue-50/50" : (isP ? "bg-red-50/20" : "hover:bg-slate-50 transition-colors"));
                 const ts = new Date(loc.Timestamp).toLocaleString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
@@ -2195,6 +2254,7 @@
                 ui.savedTable.appendChild(row);
             });
             if (!all.length) ui.savedTable.innerHTML = '<tr class="lt-empty-row"><td colspan="5">No records in this project yet - your first pin will appear here.</td></tr>';
+            else if (!visible.length) ui.savedTable.innerHTML = `<tr class="lt-empty-row"><td colspan="5">No records for ${escapeHtml(currentEID)} yet.</td></tr>`;
             renderSyncStatus();
         }
 
@@ -2465,6 +2525,9 @@
             }
 
             document.getElementById("sync-retry-btn").onclick = () => uploadPending();
+            document.getElementById("records-more-btn").onclick = () => { recordsShowAll = !recordsShowAll; renderTable(); };
+            document.getElementById("records-filter-mine").onclick = () => { recordsOnlyMine = true; recordsShowAll = false; renderTable(); };
+            document.getElementById("records-filter-all").onclick = () => { recordsOnlyMine = false; recordsShowAll = false; renderTable(); };
             // Back online: send what is waiting without anyone having to notice.
             window.addEventListener("online", () => {
                 renderSyncStatus();

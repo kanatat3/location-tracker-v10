@@ -116,6 +116,47 @@ test.describe("field worker", () => {
     await noErrors(page);
   });
 
+  test("big project: clustered pins, a short list, Mine filter", async ({ page }) => {
+    // 150 saved records from 5 people around the main coordinate
+    db.rows.Beta = Array.from({ length: 150 }, (_, i) => ({ EmployeeID: ["861", "781", "864", "902", "915"][i % 5], SurveyID: String(1000 + i),
+      Latitude: 13.7465 + (i % 15) * 0.0015, Longitude: 100.5348 + Math.floor(i / 15) * 0.0015,
+      Timestamp: new Date(Date.UTC(2026, 8, 1) + i * 3600e3).toISOString(), OutOfRadius: false, DistanceKm: 0, RadiusKm: 10, RadiusKms: [3, 5, 10], ID: i + 2 }));
+    await page.reload();
+    await openProject(page, "Beta");
+    await expect(page.locator("#total-pin-count")).toHaveText("TOTAL 150");
+    // the map groups the pins instead of drawing 150 of them
+    await expect(page.locator("#map .marker-cluster").first()).toBeVisible();
+    expect(await page.locator("#map .leaflet-marker-pane img").count()).toBeLessThan(150);
+    // the list shows the newest 20
+    await expect(page.locator("#savedLocationsTableBody tr")).toHaveCount(20);
+    await expect(page.locator("#savedLocationsTableBody tr").first()).toContainText("1149");
+    await expect(page.locator("#records-note")).toHaveText("Newest 20 of 150");
+    await page.click("#records-more-btn");
+    await expect(page.locator("#savedLocationsTableBody tr")).toHaveCount(150);
+    await expect(page.locator("#records-more-btn")).toHaveText("Show fewer");
+    await page.click("#records-more-btn");
+    await expect(page.locator("#savedLocationsTableBody tr")).toHaveCount(20);
+    // Mine narrows the list to the typed Employee ID
+    await expect(page.locator("#records-filter")).toBeHidden();
+    await page.fill("#employeeIdInput", "902");
+    await expect(page.locator("#records-filter")).toBeVisible();
+    await page.click("#records-filter-mine");
+    await expect(page.locator("#records-filter-mine")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#savedLocationsTableBody tr")).toHaveCount(20);
+    await expect(page.locator("#records-note")).toHaveText("Newest 20 of 30");
+    expect(await page.locator("#savedLocationsTableBody tr td:nth-child(2)").allInnerTexts()).toEqual(Array(20).fill("902"));
+    await page.click("#records-filter-all");
+    await expect(page.locator("#records-note")).toHaveText("Newest 20 of 150");
+    // a waiting record is always listed and never hidden in a cluster
+    await page.locator("#map").click({ position: { x: 60, y: 60 } });
+    await page.fill("#surveyIdInput", "S-W1");
+    await page.click("#saveButton");
+    await expect(page.locator("#savedLocationsTableBody tr", { hasText: "S-W1" })).toContainText("⏳");
+    expect(await page.locator("#map .leaflet-marker-pane img[src*='grey']").count()).toBeGreaterThanOrEqual(1);
+    await checkA11y(page, "big project pin screen");
+    await noErrors(page);
+  });
+
   test("no signal: the record waits on the device and goes out later", async ({ page }) => {
     await openProject(page, "Beta");
     await page.locator("#map").click({ position: { x: 100, y: 100 } });
@@ -211,6 +252,17 @@ test.describe("admin", () => {
     const saved = db.posts.find(p => p.action === "updateProjectConfig");
     expect(saved.config).toMatchObject({ baseLat: 13.9, baseLng: 100.6, radiusKms: [3, 5, 10], isClosed: false });
     await expect(page.locator("#admin-project-list .project-admin-item", { hasText: "Alpha" }).locator(".lt-chip", { hasText: "3, 5, 10 km" })).toBeVisible();
+    await noErrors(page);
+  });
+
+  test("analytics groups a big project's pins", async ({ page }) => {
+    db.rows.Beta = Array.from({ length: 120 }, (_, i) => ({ EmployeeID: "861", SurveyID: String(i), Latitude: 13.7465 + (i % 12) * 0.001, Longitude: 100.5348 + Math.floor(i / 12) * 0.001,
+      Timestamp: new Date(Date.UTC(2026, 8, 1) + i * 3600e3).toISOString(), OutOfRadius: false, ID: i + 2 }));
+    await page.click("#goto-dashboards-btn");
+    await page.selectOption("#dashboard-project-selector", "Beta");
+    await expect(page.locator("#kpi-total-checkins")).toHaveText("120");
+    await expect(page.locator("#dashboard-map .marker-cluster").first()).toBeVisible();
+    await expect(page.locator("#dashboard-map .lt-building-marker")).toHaveCount(1);
     await noErrors(page);
   });
 
