@@ -31,6 +31,11 @@ test.describe("field worker", () => {
 
   test("project list: open projects, closed ones stay shut", async ({ page }) => {
     await expect(page.locator(".figma-project-card")).toHaveCount(3);
+    expect(await page.locator(".figma-project-card").first().evaluate(el => el.tagName)).toBe("BUTTON");
+    await page.locator(".figma-project-card").first().focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#tracker-view")).toBeVisible();
+    await page.click("#home-button");
     await expect(page.locator(".figma-project-card", { hasText: "Gamma" }).locator(".lt-closed-tag")).toHaveText(/closed/i);
     await checkA11y(page, "project list");
     await page.locator(".figma-project-card", { hasText: "Gamma" }).click();
@@ -42,8 +47,15 @@ test.describe("field worker", () => {
   });
 
   test("pin, upload in one press, report a record", async ({ page }) => {
+    await openProject(page, "Alpha");
+    await expect(page.locator("#savedLocationsTableBody .lt-empty-row")).toContainText(/no records in this project yet/i);
+    await expect(page.locator("#pin-hint")).toBeVisible();
+    await page.click("#uploadButton");
+    await expect(toast(page)).toContainText(/tap the map to set the location/i);
+    await page.click("#home-button");
     await openProject(page, "Beta");
     await expect(page.locator("#total-pin-count")).toHaveText("TOTAL 3");
+    await expect(page.locator("#sync-status")).toBeHidden();
     await expect(page.locator("#map .lt-building-marker")).toHaveCount(1);
     await expect(page.locator("#map .leaflet-overlay-pane path")).toHaveCount(0);   // radius circles are for the admin only
     await checkA11y(page, "pin screen");
@@ -55,6 +67,9 @@ test.describe("field worker", () => {
 
     await page.locator("#map").click({ position: { x: 120, y: 120 } });
     await expect(page.locator("#lat")).not.toHaveText("--.------");
+    await expect(page.locator("#pin-hint")).toBeHidden();
+    await page.click("#uploadButton");
+    await expect(toast(page)).toContainText(/enter employee id and survey id/i);
     await page.fill("#employeeIdInput", "0861");
     await page.fill("#surveyIdInput", "S-101");
     await page.click("#uploadButton");
@@ -82,8 +97,15 @@ test.describe("field worker", () => {
     await expect(page.locator("#reportModal")).toBeVisible();
     await expect(page.locator("#report-record")).toContainText("S-102");
     await checkA11y(page, "report window");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#reportModal")).toBeHidden();
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.classList.contains("lt-flag-btn"))).toBe(true);
+    await page.locator("#savedLocationsTableBody tr", { hasText: "S-102" }).locator(".lt-flag-btn").click();
+    await expect(page.locator("#reportModal")).toBeVisible();
+    expect(await page.evaluate(() => document.getElementById("reportModal").contains(document.activeElement))).toBe(true);
     await page.click("#report-send");
     await expect(toast(page)).toContainText(/choose what/i);
+    await expect(toast(page)).toBeVisible();   // the toast shows above the open dialog
     await page.check('input[name="report-request"][value="wrong_survey"]');
     await page.fill("#report-note", "should be 108");
     await page.click("#report-send");
@@ -101,14 +123,30 @@ test.describe("field worker", () => {
     db.offline = true;
     await page.click("#uploadButton");
     await expect(toast(page)).toContainText(/upload failed/i, { timeout: 15000 });
+    await expect(toast(page)).toContainText(/kept on this phone/i);
     await expect(page.locator("#savedLocationsTableBody tr", { hasText: "S-201" })).toContainText("⏳");
+    // the honest counter stays until the queue is empty
+    await expect(page.locator("#sync-status")).toBeVisible();
+    await expect(page.locator("#sync-status")).toContainText(/1 record waiting on this phone/i);
+    await expect(page.locator("#uploadButton")).toContainText("UPLOAD (1)");
+    await expect(page.locator("#sync-retry-btn")).toBeVisible();
+    await page.waitForTimeout(4500);
+    await expect(page.locator("#sync-status")).toBeVisible();          // long after the toast is gone
     db.offline = false;
     await page.reload();
     await openProject(page, "Beta");
     await expect(page.locator("#savedLocationsTableBody tr", { hasText: "S-201" })).toContainText("⏳");
-    await page.click("#uploadButton");
+    await expect(page.locator("#sync-status")).toContainText(/1 record waiting/i);
+    // the phone reports "no connection": the strip says so
+    await page.evaluate(() => { Object.defineProperty(navigator, "onLine", { get: () => false, configurable: true }); window.dispatchEvent(new Event("offline")); });
+    await expect(page.locator("#sync-status")).toContainText(/no connection/i);
+    await expect(page.locator("#sync-retry-btn")).toBeHidden();
+    // back online: the record goes out without a press
+    await page.evaluate(() => { Object.defineProperty(navigator, "onLine", { get: () => true, configurable: true }); window.dispatchEvent(new Event("online")); });
     await expect.poll(() => db.rows.Beta.some(r => r.SurveyID === "S-201"), { timeout: 15000 }).toBe(true);
     await expect(page.locator("#savedLocationsTableBody tr", { hasText: "S-201" })).not.toContainText("⏳");
+    await expect(page.locator("#sync-status")).toBeHidden();
+    await expect(page.locator("#uploadButton")).toHaveText(/^\s*UPLOAD\s*$/);
     await noErrors(page);
   });
 
@@ -116,6 +154,10 @@ test.describe("field worker", () => {
     await page.click("#manage-projects-btn");
     await expect(page.locator("#passwordModal")).toBeVisible();
     await expect(page.locator("input[type=password]")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#passwordModal")).toBeHidden();
+    await page.click("#manage-projects-btn");
+    await expect(page.locator("#passwordModal")).toBeVisible();
     await checkA11y(page, "sign-in window");
     await page.evaluate(() => { window.__gisToken = "tok-denied"; });
     await page.click("#fake-google-btn");

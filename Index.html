@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker V12.5 (12.10.2026)</title>
+    <title>Location Tracker V12.6 (12.10.2026)</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -208,7 +208,7 @@
         }
         .lt-text-btn {
             min-height: 40px; padding: 0 4px; border: 0; background: none;
-            color: var(--primary-blue); font-size: 15px; font-weight: 700;
+            color: var(--primary-hover); font-size: 15px; font-weight: 700;
             display: inline-flex; align-items: center; gap: 6px;
         }
         .lt-text-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -258,6 +258,7 @@
 
         #project-list.figma-project-list { display: grid; gap: 10px; }
         .figma-project-card {
+            width: 100%; font: inherit; text-align: left; appearance: none;
             min-height: 64px; padding: 12px 16px 12px 12px;
             display: flex; align-items: center; gap: 14px;
             border: 1.5px solid var(--line); border-radius: var(--r-field);
@@ -322,7 +323,7 @@
         #locationSearchInput::placeholder { color: var(--placeholder); font-weight: 500; }
         #searchLocationButton {
             flex: 0 0 auto; min-height: 34px; padding: 0 12px; border: 0; border-radius: 17px;
-            background: var(--primary-blue); color: #fff;
+            background: var(--primary-hover); color: #fff;
             font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
         }
         #search-suggestions {
@@ -522,6 +523,41 @@
         .lt-badge { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 7px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 12px; font-weight: 800; margin-left: auto; }
         .lt-badge:empty { display: none; }
 
+        /* Toast and spinner live in the top layer (popover) so they show above open dialogs */
+        #messageBox[popover] { inset: auto; left: 50%; margin: 0; width: max-content; overflow: visible; color: inherit; }
+        #messageBox:popover-open { display: block; }
+        #messageBox[data-type="warning"] { border-color: #FEDF89; background: #FFFAEB; }
+        #messageBox[data-type="error"] { border-color: #FECDCA; background: #FFF5F4; }
+        #loadingSpinner[popover] { inset: 0; width: auto; height: auto; margin: 0; padding: 0; border: 0; max-width: none; max-height: none; color: inherit; overflow: visible; }
+        #loadingSpinner:popover-open { display: flex; }
+
+        /* Records waiting on this device / no connection */
+        .lt-sync {
+            display: flex; align-items: center; gap: 10px;
+            margin-top: 10px; padding: 10px 12px 10px 14px;
+            border-radius: 14px; font-size: 13px; font-weight: 600; line-height: 1.35;
+            background: var(--blue-tint); color: #0057B8;
+        }
+        .lt-sync i { flex: 0 0 auto; font-size: 15px; }
+        .lt-sync span { flex: 1 1 auto; min-width: 0; }
+        .lt-sync--offline { background: #FFFAEB; color: #93370D; }
+        .lt-sync-retry {
+            flex: 0 0 auto; min-height: 36px; padding: 0 14px; border: 0; border-radius: 10px;
+            background: var(--primary-hover); color: #fff; font-size: 13px; font-weight: 800; cursor: pointer;
+        }
+        .lt-sync-retry:hover { background: var(--primary-deep); }
+        .lt-sync-retry[hidden] { display: none; }
+
+        /* First-run hint on the pin screen */
+        .lt-hint {
+            display: flex; align-items: center; gap: 10px;
+            margin: 0 0 12px; padding: 10px 14px; border-radius: 14px;
+            background: var(--fill); color: var(--ink-2); font-size: 14px; font-weight: 600; line-height: 1.4;
+        }
+        .lt-hint i { color: var(--primary-hover); }
+        .lt-top .lt-hint { margin-bottom: 8px; padding: 8px 12px; font-size: 13px; }
+        .lt-empty-row td { padding: 20px 16px !important; text-align: center; color: var(--muted); font-weight: 500; font-size: 14px; line-height: 1.45; }
+
         .project-admin-item.dragging { opacity: 0.55; background-color: var(--primary-light); border: 2px dashed var(--primary-blue); z-index: 1000; }
 
         .lt-select {
@@ -543,11 +579,16 @@
         .lt-empty p { margin: 0; font-size: 14px; font-weight: 600; color: var(--muted); }
 
         /* ---------- Modals: bottom sheet on phones, dialog on larger screens ---------- */
+        /* Modals are native <dialog>s: focus trap, Escape and an inert page come from the browser */
         .modal-overlay {
             position: fixed; inset: 0; z-index: var(--z-modal);
+            width: 100%; height: 100%; max-width: none; max-height: none;
+            margin: 0; padding: 0; border: 0; color: inherit;
             display: none; align-items: flex-end; justify-content: center;
             background: rgba(11, 18, 32, 0.5);
         }
+        .modal-overlay[open] { display: flex; }
+        .modal-overlay::backdrop { background: transparent; }
         .lt-modal {
             position: relative; width: 100%; max-width: 520px;
             padding: 10px 22px calc(24px + env(safe-area-inset-bottom));
@@ -556,7 +597,7 @@
             box-shadow: 0 -12px 40px rgba(11, 18, 32, 0.2);
             text-align: center;
         }
-        .modal-overlay[style*="flex"] .lt-modal { animation: lt-rise 0.35s var(--ease-out); }
+        .modal-overlay[open] .lt-modal { animation: lt-rise 0.35s var(--ease-out); }
         .lt-modal-grabber { width: 40px; height: 5px; border-radius: 3px; background: #D5DAE1; margin: 0 auto 16px; }
         .lt-modal-close { position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--fill); color: var(--ink-2); cursor: pointer; }
         .lt-modal-close:hover { background: var(--fill-hover); }
@@ -806,7 +847,7 @@
                     <button type="submit" class="btn lt-primary lt-primary--compact">Add</button>
                 </form>
                 <div id="admin-project-list"></div>
-                <button id="save-project-order-btn" class="hidden btn lt-dark-btn uppercase">Confirm New Sequence</button>
+                <button id="save-project-order-btn" class="hidden btn lt-dark-btn uppercase">Save order</button>
             </div>
         </div>
 
@@ -860,7 +901,7 @@
                 <div id="map-container">
                     <div id="map"></div>
                     <div id="searchBox" class="search-container">
-                        <div id="toggleSearchBtn"><i class="fas fa-magnifying-glass"></i></div>
+                        <div id="toggleSearchBtn" role="button" tabindex="0" aria-label="Search the map" aria-expanded="false"><i class="fas fa-magnifying-glass" aria-hidden="true"></i></div>
                         <div class="search-input-wrapper relative">
                             <input id="locationSearchInput" type="text" placeholder="Search address or history..." autocomplete="off">
                             <button id="searchLocationButton">Find</button>
@@ -886,6 +927,7 @@
                         <span aria-hidden="true"></span>
                     </header>
 
+                    <p id="pin-hint" class="lt-hint"><i class="fas fa-hand-pointer" aria-hidden="true"></i><span>Tap the map, or press the locate button, to set your location</span></p>
                     <div id="address-display" class="lt-address hidden">
                         <div class="lt-address-row">
                             <i class="fas fa-map-pin"></i>
@@ -901,7 +943,7 @@
                             </div>
                             <div class="lt-input-wrap">
                                 <input id="employeeIdInput" type="text" class="input-field lt-input lt-input--lock" placeholder="ID" autocomplete="off">
-                                <button id="lockEmployeeIdBtn" class="lt-lock" title="Toggle Lock"><i id="lockIcon" class="fas fa-lock-open text-xs"></i></button>
+                                <button id="lockEmployeeIdBtn" type="button" class="lt-lock" title="Keep this Employee ID for the next pins" aria-pressed="false"><i id="lockIcon" class="fas fa-lock-open text-xs"></i></button>
                             </div>
                         </div>
                         <div>
@@ -914,12 +956,17 @@
                         <button id="uploadButton" class="btn lt-primary" title="Save this record and upload now"><i class="fas fa-cloud-arrow-up"></i><span>UPLOAD</span></button>
                         <button id="saveButton" class="btn lt-save" title="Save on this device only"><i class="fas fa-circle-check"></i><span>Save</span></button>
                     </div>
+                    <div id="sync-status" class="lt-sync hidden" role="status" aria-live="polite">
+                        <i id="sync-status-icon" class="fas fa-cloud-arrow-up" aria-hidden="true"></i>
+                        <span id="sync-status-text"></span>
+                        <button type="button" id="sync-retry-btn" class="lt-sync-retry">Retry</button>
+                    </div>
                     </div>
 
                     <div>
                         <div class="lt-section-head">
                             <div class="lt-section-titlewrap">
-                                <h4 class="lt-section-title">Recent Sessions</h4>
+                                <h4 class="lt-section-title">Records</h4>
                                 <span id="total-pin-count" class="lt-count">TOTAL 0</span>
                             </div>
                             <button id="exportCsvButton" class="btn lt-text-btn"><i class="fas fa-file-csv mr-1"></i><span>Export CSV</span></button>
@@ -939,7 +986,7 @@
     </div>
 
     <!-- Modals -->
-    <div id="confirmationModal" class="modal-overlay">
+    <dialog id="confirmationModal" class="modal-overlay" aria-labelledby="modalTitle">
         <div class="lt-modal">
             <div class="lt-modal-grabber" aria-hidden="true"></div>
             <div class="lt-modal-icon lt-modal-icon--danger"><i class="fas fa-trash-can"></i></div>
@@ -950,23 +997,23 @@
                 <button id="cancelActionButton" class="btn lt-secondary uppercase">Cancel</button>
             </div>
         </div>
-    </div>
+    </dialog>
 
-    <div id="passwordModal" class="modal-overlay">
+    <dialog id="passwordModal" class="modal-overlay" aria-labelledby="password-modal-title">
         <div class="lt-modal">
             <div class="lt-modal-grabber" aria-hidden="true"></div>
             <button type="button" id="close-password-modal" class="lt-modal-close" title="Close">
                 <i class="fas fa-times text-lg"></i>
             </button>
             <div class="lt-modal-icon"><i class="fas fa-unlock-keyhole"></i></div>
-            <h4 class="lt-modal-title">Unlock Console</h4>
+            <h4 id="password-modal-title" class="lt-modal-title">Admin sign-in</h4>
             <p class="lt-modal-text">Sign in with an allowed Google account</p>
             <div id="google-signin-button" class="lt-google-signin"></div>
             <p id="google-signin-note" class="lt-signin-note"></p>
         </div>
-    </div>
+    </dialog>
 
-    <div id="projectConfigModal" class="modal-overlay">
+    <dialog id="projectConfigModal" class="modal-overlay" aria-label="Project settings" aria-describedby="project-config-title">
         <div class="lt-modal lt-modal--wide">
             <div class="lt-modal-grabber" aria-hidden="true"></div>
             <button type="button" id="project-config-close" class="lt-modal-close" title="Close"><i class="fas fa-times text-lg"></i></button>
@@ -1001,9 +1048,9 @@
                 <button id="project-config-save" type="button" class="btn lt-primary uppercase">Save changes</button>
             </div>
         </div>
-    </div>
+    </dialog>
 
-    <div id="adminMapPickerModal" class="modal-overlay">
+    <dialog id="adminMapPickerModal" class="modal-overlay" aria-label="Pick main coordinate">
         <div class="lt-modal lt-modal--wide">
             <div class="lt-modal-grabber" aria-hidden="true"></div>
             <button type="button" id="admin-map-picker-close" class="lt-modal-close" title="Close"><i class="fas fa-times text-lg"></i></button>
@@ -1025,7 +1072,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    </dialog>
     <datalist id="radius-presets">
         <option value="5"></option>
         <option value="10"></option>
@@ -1033,12 +1080,12 @@
         <option value="3, 5, 10"></option>
     </datalist>
 
-    <div id="reportModal" class="modal-overlay">
+    <dialog id="reportModal" class="modal-overlay" aria-labelledby="report-modal-title">
         <div class="lt-modal lt-modal--wide">
             <div class="lt-modal-grabber" aria-hidden="true"></div>
             <button type="button" id="report-close" class="lt-modal-close" title="Close"><i class="fas fa-times text-lg"></i></button>
             <p class="lt-config-eyebrow">Report to admin</p>
-            <h4 class="lt-modal-title lt-config-name">What should be done with this record?</h4>
+            <h4 id="report-modal-title" class="lt-modal-title lt-config-name">What should be done with this record?</h4>
             <form id="report-form" class="lt-config-body">
                 <div id="report-record" class="lt-report-record"></div>
                 <div class="lt-config-body" style="margin-top: 0;" role="radiogroup" aria-label="Request">
@@ -1055,12 +1102,13 @@
                 <button type="submit" id="report-send" class="btn lt-primary uppercase"><i class="fas fa-paper-plane"></i><span>Send to admin</span></button>
             </form>
         </div>
-    </div>
+    </dialog>
 
-    <div id="renameModal" class="modal-overlay">
+        <dialog id="renameModal" class="modal-overlay" aria-labelledby="rename-modal-title">
         <div class="lt-modal">
             <div class="lt-modal-grabber" aria-hidden="true"></div>
-            <h4 class="lt-modal-title">Rename Project</h4>
+            <button type="button" id="rename-close" class="lt-modal-close" title="Close"><i class="fas fa-times text-lg"></i></button>
+            <h4 id="rename-modal-title" class="lt-modal-title">Rename Project</h4>
             <form id="rename-form" class="lt-modal-form">
                 <input id="rename-input" type="text" class="input-field lt-input text-center" required autocomplete="off">
                 <div class="lt-modal-actions">
@@ -1069,21 +1117,22 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
-    <div id="customizeLabelsModal" class="modal-overlay">
+        <dialog id="customizeLabelsModal" class="modal-overlay" aria-labelledby="labels-modal-title">
         <div class="lt-modal">
             <div class="lt-modal-grabber" aria-hidden="true"></div>
-            <h4 class="lt-modal-title">Customize Fields</h4>
+            <button type="button" id="labels-close" class="lt-modal-close" title="Close"><i class="fas fa-times text-lg"></i></button>
+            <h4 id="labels-modal-title" class="lt-modal-title">Field labels</h4>
             <form id="customize-labels-form" class="lt-modal-form">
                 <div><label class="lt-label mb-1.5" for="custom-employee-label">Primary Label</label><input id="custom-employee-label" type="text" class="input-field lt-input" placeholder="Default: Employee ID"></div>
                 <div><label class="lt-label mb-1.5" for="custom-survey-label">Secondary Label</label><input id="custom-survey-label" type="text" class="input-field lt-input" placeholder="Default: Survey ID"></div>
                 <div class="lt-modal-stack"><button type="submit" class="btn lt-primary uppercase">Save Changes</button><button type="button" id="cancel-customize-btn" class="btn lt-secondary uppercase">Cancel</button></div>
             </form>
         </div>
-    </div>
+    </dialog>
 
-    <div id="loadingSpinner" class="lt-spinner fixed inset-0 z-[10000] flex items-center justify-center hidden">
+    <div id="loadingSpinner" popover="manual" class="lt-spinner fixed inset-0 z-[10000] flex items-center justify-center hidden" role="status" aria-live="polite">
         <div class="lt-spinner-card">
             <div id="spinner-animation" class="relative w-14 h-14">
                 <div class="absolute inset-0 border-[5px] border-slate-100 rounded-full"></div>
@@ -1095,7 +1144,7 @@
             <span id="loading-spinner-text" class="font-black text-primary-blue text-[10px] uppercase tracking-[0.4em]">Loading</span>
         </div>
     </div>
-    <div id="messageBox" class="fixed top-10 left-1/2 -translate-x-1/2 z-[10001] px-10 py-4 rounded-[2rem] shadow-2xl font-black transition-all transform opacity-0 pointer-events-none bg-white/90 backdrop-blur-lg border border-slate-50"></div>
+    <div id="messageBox" popover="manual" role="status" aria-live="polite" class="fixed top-10 left-1/2 -translate-x-1/2 z-[10001] px-10 py-4 rounded-[2rem] shadow-2xl font-black transition-all transform opacity-0 pointer-events-none bg-white/90 backdrop-blur-lg border border-slate-50"></div>
 
     <!-- Company icons on the project list (display only): a project whose name contains a company
          keyword shows that company's website icon instead of the folder icon. The icon is fetched from
@@ -1204,13 +1253,37 @@
         let confirmActionCallback = null;
         let ui = {};
 
+        // Modals are native <dialog>s; these keep every call site on one path and return focus to the opener.
+        const modalOpeners = new WeakMap();
+        function openModal(id) {
+            const dialog = document.getElementById(id);
+            if (!dialog || dialog.open) return;
+            modalOpeners.set(dialog, document.activeElement);
+            if (dialog.showModal) dialog.showModal(); else dialog.setAttribute("open", "");
+        }
+        function closeModal(id) {
+            const dialog = document.getElementById(id);
+            if (!dialog || !dialog.open) return;
+            if (dialog.close) dialog.close(); else dialog.removeAttribute("open");
+        }
+
+        let toastToken = 0;
         function showMessage(msg, type = "info") {
             const msgBox = document.getElementById("messageBox");
             if (!msgBox) return;
-            const icon = type === 'success' ? 'check-circle text-emerald-500' : (type === 'error' ? 'triangle-exclamation text-rose-500' : 'circle-info text-blue-500');
-            msgBox.innerHTML = `<div class="flex items-center gap-4"><i class="fas fa-${icon}"></i><span class="text-[11px] font-black uppercase text-slate-800">${msg}</span></div>`;
+            const icons = { success: 'check-circle text-emerald-500', error: 'triangle-exclamation text-rose-500', warning: 'triangle-exclamation text-amber-500' };
+            const icon = icons[type] || 'circle-info text-blue-500';
+            msgBox.dataset.type = type;
+            msgBox.innerHTML = `<div class="flex items-center gap-4"><i class="fas fa-${icon}" aria-hidden="true"></i><span class="text-[11px] font-black uppercase text-slate-800">${msg}</span></div>`;
+            const token = ++toastToken;
+            // The toast sits in the top layer so it is readable above an open dialog.
+            if (msgBox.showPopover && !msgBox.matches(":popover-open")) { try { msgBox.showPopover(); } catch (e) {} }
             msgBox.style.opacity = "1"; msgBox.style.transform = "translateX(-50%) translateY(0)";
-            setTimeout(() => { msgBox.style.opacity = "0"; msgBox.style.transform = "translateX(-50%) translateY(-20px)"; }, 3500);
+            setTimeout(() => {
+                if (token !== toastToken) return;
+                msgBox.style.opacity = "0"; msgBox.style.transform = "translateX(-50%) translateY(-20px)";
+                setTimeout(() => { if (token === toastToken && msgBox.hidePopover && msgBox.matches(":popover-open")) { try { msgBox.hidePopover(); } catch (e) {} } }, 300);
+            }, 3500);
         }
 
         function escapeHtml(value) {
@@ -1331,7 +1404,33 @@
                 btn.classList.toggle("opacity-40", closed);
                 btn.classList.toggle("pointer-events-none", closed);
             });
-            uploadBtn.querySelector("span").textContent = closed ? "PROJECT CLOSED" : "UPLOAD";
+            renderSyncStatus();
+        }
+
+        // The honest counter: how many records are still on this device, and whether there is a connection.
+        // Shown under the buttons until the queue is empty; the UPLOAD label carries the count too.
+        let isUploading = false;
+        function renderSyncStatus() {
+            const strip = document.getElementById("sync-status");
+            const uploadBtn = document.getElementById("uploadButton");
+            if (!strip || !uploadBtn) return;
+            const n = pendingLocations.length;
+            const offline = navigator.onLine === false;
+            const closed = !!currentProjectName && getProjectConfig(currentProjectName).isClosed;
+            const records = n === 1 ? "1 record" : `${n} records`;
+            uploadBtn.querySelector("span").textContent = closed ? "PROJECT CLOSED" : (n ? `UPLOAD (${n})` : "UPLOAD");
+            strip.classList.toggle("hidden", n === 0 && !offline);
+            strip.classList.toggle("lt-sync--offline", offline);
+            document.getElementById("sync-status-icon").className = offline ? "fas fa-wifi-slash" : "fas fa-cloud-arrow-up";
+            document.getElementById("sync-status-text").textContent = offline
+                ? (n ? `No connection - ${records} kept on this phone, sent as soon as you are back online` : "No connection - records you save stay on this phone until it is back")
+                : (isUploading ? `Sending ${records}...` : `${records} waiting on this phone`);
+            document.getElementById("sync-retry-btn").hidden = !(n && !offline && !isUploading && !closed);
+        }
+
+        function renderPinHint() {
+            const hint = document.getElementById("pin-hint");
+            if (hint) hint.classList.toggle("hidden", currentLat !== null);
         }
 
         // Records waiting to upload are kept per project on this device, so they survive a reload
@@ -1356,7 +1455,7 @@
             modal.querySelector('[data-config-field="baseLng"]').value = config.baseLng ?? '';
             modal.querySelector('[data-config-field="radiusKm"]').value = config.radiusKms.join(', ');
             modal.querySelector('[data-config-field="isClosed"]').checked = config.isClosed;
-            modal.style.display = 'flex';
+            openModal(modal.id);
         };
 
         async function saveProjectConfig() {
@@ -1379,12 +1478,12 @@
                 const result = await res.json();
                 if (result.success) {
                     applyRemoteProjectConfigs(result.data);
-                    modal.style.display = "none";
+                    closeModal(modal.id);
                     renderProjects(allProjects);
                     renderAdminProjectList(allProjects);
                     showMessage("Settings saved", "success");
                 } else {
-                    if (result.authRequired) modal.style.display = "none";
+                    if (result.authRequired) closeModal(modal.id);
                     if (!handleAdminAuthRequired(result)) showMessage(result.message || "Could not save settings", "error");
                 }
             } catch (e) {
@@ -1415,7 +1514,7 @@
             const latText = configModal.querySelector('[data-config-field="baseLat"]').value, lngText = configModal.querySelector('[data-config-field="baseLng"]').value;
             document.getElementById("admin-map-picker-project").textContent = projectConfigModalProjectName || "";
             document.getElementById("adminMapSearchInput").value = "";
-            document.getElementById("adminMapPickerModal").style.display = "flex";
+            openModal("adminMapPickerModal");
             if (!adminPickerMap) {
                 adminPickerMap = L.map("admin-map-picker-map", { zoomControl: true, maxZoom: MAP_MAX_ZOOM }).setView([13.75, 100.5], 6);
                 L.tileLayer(MAP_TILES, MAP_TILE_OPTIONS).addTo(adminPickerMap);
@@ -1441,7 +1540,7 @@
             const configModal = document.getElementById("projectConfigModal");
             configModal.querySelector('[data-config-field="baseLat"]').value = lat.toFixed(6);
             configModal.querySelector('[data-config-field="baseLng"]').value = lng.toFixed(6);
-            document.getElementById("adminMapPickerModal").style.display = "none";
+            closeModal("adminMapPickerModal");
         }
 
         async function searchAdminMap() {
@@ -1473,7 +1572,7 @@
         function openGoogleSignIn(note) {
             const noteEl = document.getElementById("google-signin-note");
             noteEl.textContent = note || "";
-            document.getElementById("passwordModal").style.display = "flex";
+            openModal("passwordModal");
             if (!GOOGLE_CLIENT_ID) { noteEl.textContent = "Google sign-in is not set up yet."; return; }
             if (!window.google || !google.accounts || !google.accounts.id) {
                 noteEl.textContent = "Google sign-in is not available. Check the internet connection and try again.";
@@ -1501,7 +1600,7 @@
                     localStorage.setItem("admin_email", result.email || "");
                     isAdminAuthenticated = true;
                     renderAdminAccount();
-                    document.getElementById("passwordModal").style.display = "none";
+                    closeModal("passwordModal");
                     window.showView("admin-menu-view");
                     loadRequests(false);
                 } else {
@@ -1535,7 +1634,7 @@
                 `<span><b>Coordinate:</b> ${Number(loc.Latitude).toFixed(6)}, ${Number(loc.Longitude).toFixed(6)}</span>`;
             document.querySelectorAll('input[name="report-request"]').forEach(r => { r.checked = false; });
             document.getElementById("report-note").value = "";
-            document.getElementById("reportModal").style.display = "flex";
+            openModal("reportModal");
         }
 
         async function sendReport(e) {
@@ -1555,7 +1654,7 @@
                 }) });
                 const result = await res.json();
                 if (result.success) {
-                    document.getElementById("reportModal").style.display = "none";
+                    closeModal("reportModal");
                     showMessage("Sent to the admin", "success");
                 } else showMessage(result.message || "Could not send", "error");
             } catch (err) {
@@ -1624,7 +1723,7 @@
             if (titleEl) titleEl.textContent = title;
             if (msgEl) msgEl.innerHTML = message;
             confirmActionCallback = onConfirm;
-            if (modal) modal.style.display = "flex";
+            if (modal) openModal(modal.id);
         }
 
         window.showView = function(viewId) {
@@ -1645,6 +1744,8 @@
             if (input) input.disabled = locked;
             const icon = document.getElementById("lockIcon");
             if (icon) icon.className = locked ? "fas fa-lock text-primary-blue" : "fas fa-lock-open text-slate-300";
+            const lockBtn = document.getElementById("lockEmployeeIdBtn");
+            if (lockBtn) lockBtn.setAttribute("aria-pressed", String(!!locked));
         }
 
         window.renameProjectPrompt = function(oldName) {
@@ -1652,13 +1753,13 @@
             const input = document.getElementById("rename-input");
             if (!modal || !input) return;
             input.value = oldName;
-            modal.style.display = "flex";
+            openModal(modal.id);
             const form = document.getElementById("rename-form");
             form.onsubmit = async (e) => {
                 e.preventDefault();
                 const newName = input.value.trim();
-                if (!newName || newName === oldName) { modal.style.display = "none"; return; }
-                modal.style.display = "none";
+                if (!newName || newName === oldName) { closeModal(modal.id); return; }
+                closeModal(modal.id);
                 ui.spinner.classList.remove("hidden");
                 try {
                     const res = await fetch(WEB_APP_URL, { 
@@ -1676,7 +1777,7 @@
 
         window.deleteProjectPrompt = function(name) {
             showConfirmation("Confirm Project Deletion", `Are you sure you want to delete "${name}"? This project will be hidden for all users immediately.`, async () => {
-                document.getElementById("confirmationModal").style.display = "none";
+                closeModal("confirmationModal");
                 const trimmedName = String(name).trim();
                 sessionHiddenProjects.push(trimmedName);
                 
@@ -1784,7 +1885,7 @@
                 if (btn && !silent) showMessage("Projects updated", "success");
             } catch(e) { 
                 console.error(e); 
-                if(!allProjects.length) showMessage("Connection Error", "error"); 
+                if(!allProjects.length) showMessage("Couldn't load projects - check the connection", "error"); 
             } finally {
                 if (btn) setTimeout(() => btn.classList.remove("animate-spin", "text-primary-blue"), 500);
             }
@@ -1803,9 +1904,11 @@
             }
             const visibleProjects = list.slice(0, visibleProjectLimit);
             visibleProjects.forEach(p => {
-                const card = document.createElement("div");
+                const card = document.createElement("button");
+                card.type = "button";
                 const closed = getProjectConfig(p).isClosed;
                 card.className = "figma-project-card" + (closed ? " is-closed" : "");
+                if (closed) card.setAttribute("aria-label", `${p}, closed`);
                 card.innerHTML = `<i class="far fa-folder"></i><span>${p}</span>` + (closed ? '<em class="lt-closed-tag">Closed</em>' : '');
                 card.onclick = () => {
                     if (getProjectConfig(p).isClosed) return showMessage("Project closed", "warning");
@@ -1816,6 +1919,7 @@
                     // Start from this project's own records (never the previous project's), then load.
                     savedLocations = [];
                     loadPendingLocations(p);
+                    renderPinHint();
                     updateClosedProjectState();
                     renderTable();
                     const config = getProjectConfig(p);
@@ -1991,7 +2095,7 @@
 
             } catch(e) { 
                 console.error(e);
-                if (!savedLocations.length) showMessage("Sync failed", "error");
+                if (!savedLocations.length) showMessage("Couldn't load records - check the connection", "error");
             } finally {
                 if (ui.spinner) ui.spinner.classList.add("hidden");
             }
@@ -2013,6 +2117,7 @@
         // FIXED DISPLAY: INITIAL PIN MUST BE RED
         function updateDisplay(lat, lng) {
             currentLat = lat; currentLng = lng;
+            renderPinHint();
             document.getElementById("lat").textContent = lat.toFixed(6);
             document.getElementById("lng").textContent = lng.toFixed(6);
             if (!selectionMarker) {
@@ -2089,6 +2194,8 @@
                 row.onclick = () => { map.setView([loc.Latitude, loc.Longitude], 18); };
                 ui.savedTable.appendChild(row);
             });
+            if (!all.length) ui.savedTable.innerHTML = '<tr class="lt-empty-row"><td colspan="5">No records in this project yet - your first pin will appear here.</td></tr>';
+            renderSyncStatus();
         }
 
         window.onload = () => {
@@ -2108,6 +2215,25 @@
             }
             renderAdminAccount();
             updateLabels();   // cached labels show at once; the server copy arrives with the project list
+            document.querySelectorAll("dialog.modal-overlay").forEach(dialog => {
+                dialog.addEventListener("close", () => {
+                    const opener = modalOpeners.get(dialog);
+                    if (opener && opener.focus && document.contains(opener)) opener.focus();
+                });
+            });
+            const spinnerEl = document.getElementById("loadingSpinner");
+            if (spinnerEl.showPopover) {
+                const syncSpinner = () => {
+                    const hidden = spinnerEl.classList.contains("hidden");
+                    try {
+                        if (!hidden && !spinnerEl.matches(":popover-open")) spinnerEl.showPopover();
+                        if (hidden && spinnerEl.matches(":popover-open")) spinnerEl.hidePopover();
+                    } catch (e) {}
+                };
+                new MutationObserver(syncSpinner).observe(spinnerEl, { attributes: true, attributeFilter: ["class"] });
+                syncSpinner();
+            }
+            renderPinHint();
             
             fetchProjects();
 
@@ -2150,7 +2276,7 @@
                 ui.spinner.classList.add("hidden");
             };
 
-            document.getElementById("close-password-modal").onclick = () => { document.getElementById("passwordModal").style.display = "none"; };
+            document.getElementById("close-password-modal").onclick = () => { closeModal("passwordModal"); };
             document.getElementById("home-button").onclick = () => { ui.employeeId.value = ""; window.showView("project-selection-view"); };
             document.getElementById("refresh-projects-btn").onclick = () => fetchProjects();
             
@@ -2163,19 +2289,19 @@
                 }
             };
 
-            document.getElementById("project-config-close").onclick = () => { document.getElementById("projectConfigModal").style.display = "none"; };
+            document.getElementById("project-config-close").onclick = () => { closeModal("projectConfigModal"); };
             document.getElementById("project-config-save").onclick = () => saveProjectConfig();
             document.getElementById("project-config-pick-map").onclick = () => openAdminMapPicker();
-            document.getElementById("admin-map-picker-close").onclick = () => { document.getElementById("adminMapPickerModal").style.display = "none"; };
+            document.getElementById("admin-map-picker-close").onclick = () => { closeModal("adminMapPickerModal"); };
             document.getElementById("admin-map-picker-apply").onclick = () => applyAdminPickerCoordinate();
             document.getElementById("adminMapSearchButton").onclick = () => searchAdminMap();
             document.getElementById("adminMapSearchInput").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); searchAdminMap(); } });
             document.getElementById("admin-map-use-current").onclick = () => {
-                showMessage("Loading", "info");
+                showMessage("Getting your location...", "info");
                 navigator.geolocation.getCurrentPosition(pos => {
                     setAdminPickerCoordinate(pos.coords.latitude, pos.coords.longitude);
                     showMessage("Complete", "success");
-                }, () => showMessage("GPS Failure", "error"), { enableHighAccuracy: true });
+                }, () => showMessage("Couldn't get your location - check Location permission", "error"), { enableHighAccuracy: true });
             };
             ["admin-map-picker-lat", "admin-map-picker-lng"].forEach(id => {
                 document.getElementById(id).addEventListener("input", () => {
@@ -2191,26 +2317,35 @@
                 showMessage("Signed out", "info");
             };
 
-            document.getElementById("toggleSearchBtn").onclick = () => document.getElementById("searchBox").classList.toggle("expanded");
+            const toggleSearch = () => {
+                const expanded = document.getElementById("searchBox").classList.toggle("expanded");
+                document.getElementById("toggleSearchBtn").setAttribute("aria-expanded", String(expanded));
+                if (expanded) document.getElementById("locationSearchInput").focus();
+            };
+            document.getElementById("toggleSearchBtn").onclick = toggleSearch;
+            document.getElementById("toggleSearchBtn").onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSearch(); } };
             document.getElementById("lockEmployeeIdBtn").onclick = () => window.setEmployeeLock(!isEmployeeIdLocked);
             ui.employeeId.onblur = () => { if (ui.employeeId.value.trim() !== "") window.setEmployeeLock(true); };
             ui.employeeId.addEventListener('keydown', (e) => { if (e.key === 'Enter' && ui.employeeId.value.trim() !== "") { window.setEmployeeLock(true); ui.surveyId.focus(); } });
             ui.employeeId.oninput = () => renderTable();
 
-            document.getElementById("currentLocationButton").onclick = () => { 
-                showMessage("Loading", "info"); 
-                navigator.geolocation.getCurrentPosition(p => { 
-                    updateDisplay(p.coords.latitude, p.coords.longitude); 
-                    map.setView([p.coords.latitude, p.coords.longitude], 18); 
-                    showMessage("Complete", "success"); 
-                }, () => showMessage("GPS Failure", "error"), { enableHighAccuracy: true }); 
+            document.getElementById("currentLocationButton").onclick = () => {
+                showMessage("Getting your location...", "info");
+                navigator.geolocation.getCurrentPosition(p => {
+                    updateDisplay(p.coords.latitude, p.coords.longitude);
+                    map.setView([p.coords.latitude, p.coords.longitude], 18);
+                    showMessage("Location set", "success");
+                }, () => showMessage("Couldn't get your location - check Location permission", "error"), { enableHighAccuracy: true });
             };
             
             // Adds the entry on screen to the records waiting on this device. Returns false (and says why) when it cannot.
             function addPendingRecord() {
                 const eid = ui.employeeId.value.trim(), sid = ui.surveyId.value.trim();
                 if (getProjectConfig(currentProjectName).isClosed) { showMessage("Project closed - no new pins", "warning"); return false; }
-                if (!eid || !sid || currentLat === null) { showMessage("ID or Pin Required", "warning"); return false; }
+                if (currentLat === null) { showMessage("Tap the map to set the location first", "warning"); return false; }
+                if (!eid && !sid) { showMessage(`Enter ${customLabels.employeeId} and ${customLabels.surveyId}`, "warning"); return false; }
+                if (!eid) { showMessage(`Enter ${customLabels.employeeId}`, "warning"); return false; }
+                if (!sid) { showMessage(`Enter ${customLabels.surveyId}`, "warning"); return false; }
                 
                 const all = [...savedLocations, ...pendingLocations];
                 // Check for duplicate ID combination
@@ -2250,7 +2385,15 @@
                 const typed = ui.surveyId.value.trim() !== "";
                 if (getProjectConfig(currentProjectName).isClosed) return showMessage("Project closed - no new pins", "warning");
                 if ((typed || !pendingLocations.length) && !addPendingRecord()) return;
-                
+                await uploadPending();
+            };
+
+            // Sends every record waiting on this device. A record leaves the list only when the server confirmed it.
+            async function uploadPending() {
+                if (isUploading || !pendingLocations.length || !currentProjectName) return;
+                isUploading = true;
+                renderSyncStatus();
+                try {
                 // Reset Spinner to Loading
                 const spinnerAnim = document.getElementById("spinner-animation");
                 const spinnerSuccess = document.getElementById("spinner-success");
@@ -2291,7 +2434,8 @@
                         ui.spinner.classList.add("hidden");
                         renderTable();
                         const reason = (results.find(r => r.success !== true && r.message) || {}).message;
-                        showMessage(reason ? `Upload failed (${failed.length}) - ${reason}` : `Upload failed (${failed.length}) - press Upload again`, "error");
+                        const kept = failed.length === 1 ? "1 record is" : `${failed.length} records are`;
+                        showMessage(reason ? `Upload failed - ${reason}` : `Upload failed - ${kept} kept on this phone. Press Retry when you have signal`, "error");
                         if (reason && /closed/i.test(reason)) fetchProjects(true);   // pick up the new settings without hiding this message
                         if (failed.length < sending.length) refreshData(false);
                         return;
@@ -2312,9 +2456,21 @@
                 } catch (e) {
                     console.error(e);
                     ui.spinner.classList.add("hidden");
-                    showMessage("Upload failed", "error");
+                    showMessage("Upload failed - your records are kept on this phone", "error");
                 }
-            };
+                } finally {
+                    isUploading = false;
+                    renderSyncStatus();
+                }
+            }
+
+            document.getElementById("sync-retry-btn").onclick = () => uploadPending();
+            // Back online: send what is waiting without anyone having to notice.
+            window.addEventListener("online", () => {
+                renderSyncStatus();
+                if (pendingLocations.length && currentProjectName && !getProjectConfig(currentProjectName).isClosed && map) uploadPending();
+            });
+            window.addEventListener("offline", renderSyncStatus);
 
             document.getElementById("add-project-form").onsubmit = async (e) => {
                 e.preventDefault();
@@ -2350,7 +2506,9 @@
                 link.click();
             };
 
-            document.getElementById("cancel-rename-btn").onclick = () => document.getElementById("renameModal").style.display = "none";
+            document.getElementById("cancel-rename-btn").onclick = () => closeModal("renameModal");
+            document.getElementById("rename-close").onclick = () => closeModal("renameModal");
+            document.getElementById("labels-close").onclick = () => closeModal("customizeLabelsModal");
             document.getElementById("menu-back-to-selection-btn").onclick = () => window.showView("project-selection-view");
             document.getElementById("goto-manage-projects-btn").onclick = () => window.showView("admin-view");
             document.getElementById("back-to-menu-btn").onclick = () => window.showView("admin-menu-view");
@@ -2358,9 +2516,9 @@
             document.getElementById("goto-dashboards-btn").onclick = () => { window.showView("dashboard-view"); ui.dashboardProjectSelector.innerHTML = '<option value="">-- Choose Project --</option>' + allProjects.map(p => `<option value="${p}">${p}</option>`).join(''); };
             document.getElementById("dashboard-project-selector").onchange = (e) => updateDashboard(e.target.value);
             document.getElementById("confirmActionButton").onclick = () => confirmActionCallback && confirmActionCallback();
-            document.getElementById("cancelActionButton").onclick = () => document.getElementById("confirmationModal").style.display = "none";
-            document.getElementById("customizeLabelsBtn").onclick = () => { document.getElementById("custom-employee-label").value = customLabels.employeeId; document.getElementById("custom-survey-label").value = customLabels.surveyId; document.getElementById("customizeLabelsModal").style.display = "flex"; };
-            document.getElementById("cancel-customize-btn").onclick = () => document.getElementById("customizeLabelsModal").style.display = "none";
+            document.getElementById("cancelActionButton").onclick = () => closeModal("confirmationModal");
+            document.getElementById("customizeLabelsBtn").onclick = () => { document.getElementById("custom-employee-label").value = customLabels.employeeId; document.getElementById("custom-survey-label").value = customLabels.surveyId; openModal("customizeLabelsModal"); };
+            document.getElementById("cancel-customize-btn").onclick = () => closeModal("customizeLabelsModal");
             document.getElementById("customize-labels-form").onsubmit = async (e) => {
                 e.preventDefault();
                 const employeeId = document.getElementById("custom-employee-label").value.trim() || 'Employee ID';
@@ -2373,10 +2531,10 @@
                         customLabels = result.labels || { employeeId, surveyId };
                         localStorage.setItem('customLabels', JSON.stringify(customLabels));
                         updateLabels();
-                        document.getElementById("customizeLabelsModal").style.display = "none";
+                        closeModal("customizeLabelsModal");
                         showMessage("Labels saved for everyone", "success");
                     } else {
-                        if (result.authRequired) document.getElementById("customizeLabelsModal").style.display = "none";
+                        if (result.authRequired) closeModal("customizeLabelsModal");
                         if (!handleAdminAuthRequired(result)) showMessage(result.message || "Could not save labels", "error");
                     }
                 } catch (err) { showMessage("Could not save labels - check the connection", "error"); }
@@ -2384,7 +2542,7 @@
             };
             document.getElementById("goto-requests-btn").onclick = () => { window.showView("requests-view"); loadRequests(true); };
             document.getElementById("requests-back-to-menu-btn").onclick = () => window.showView("admin-menu-view");
-            document.getElementById("report-close").onclick = () => { document.getElementById("reportModal").style.display = "none"; };
+            document.getElementById("report-close").onclick = () => { closeModal("reportModal"); };
             document.getElementById("report-form").onsubmit = sendReport;
             
             const sIn = document.getElementById("locationSearchInput"), sBox = document.getElementById("search-suggestions");
