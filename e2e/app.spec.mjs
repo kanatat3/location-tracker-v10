@@ -109,11 +109,26 @@ test.describe("field worker", () => {
     await page.locator("#savedLocationsTableBody tr", { hasText: "S-102" }).locator(".lt-flag-btn").click();
     await expect(page.locator("#reportModal")).toBeVisible();
     expect(await page.evaluate(() => document.getElementById("reportModal").contains(document.activeElement))).toBe(true);
-    await page.click("#report-send");
-    await expect(toast(page)).toContainText(/choose what/i);
-    await expect(toast(page)).toBeVisible();   // the toast shows above the open dialog
+    // Send stays off until the form is complete and says why; a fix request needs the correct value
+    await expect(page.locator("#report-send")).toBeDisabled();
+    await expect(page.locator("#report-reason")).toContainText(/choose what should be done/i);
+    await page.check('input[name="report-request"][value="delete"]');
+    await expect(page.locator("#report-send")).toBeEnabled();
+    await expect(page.locator("#report-send")).toContainText(/send delete request/i);
     await page.check('input[name="report-request"][value="wrong_survey"]');
+    await expect(page.locator("#report-send")).toBeDisabled();
+    await expect(page.locator("#report-reason")).toContainText(/write the correct survey id/i);
+    await expect(page.locator("#report-note-hint")).toContainText(/required/i);
+    await checkA11y(page, "report window, send off with a reason");
     await page.fill("#report-note", "should be 108");
+    await expect(page.locator("#report-send")).toContainText(/send fix request/i);
+    // a failed send is said inside the window and nothing is lost
+    db.offline = true;
+    await page.click("#report-send");
+    await expect(page.locator("#report-reason")).toContainText(/could not send/i);
+    await expect(page.locator("#reportModal")).toBeVisible();
+    await expect(page.locator("#report-note")).toHaveValue("should be 108");
+    db.offline = false;
     await page.click("#report-send");
     await expect(page.locator("#reportModal")).toBeHidden();
     await expect(toast(page)).toContainText(/sent to the admin/i);
@@ -200,11 +215,12 @@ test.describe("field worker", () => {
     // an exact Thai name that only Nominatim knows
     await input.fill("สยามพารากอน");
     await expect(options.first()).toContainText("สยามพารากอน");
-    // misspelt: the sound-alike spelling is found and Find takes the first result
+    // misspelt: the sound-alike spelling is found and Enter takes the first result (there is no Find button: results come as you type)
     await input.fill("สยามพารากอล");
     await expect(page.locator("#search-status")).toContainText(/no exact match/i);
     await expect(options.first()).toContainText("สยามพารากอน");
-    await page.click("#searchLocationButton");
+    await expect(page.locator("#searchLocationButton")).toHaveCount(0);
+    await input.press("Enter");
     await expect(page.locator("#lat")).toHaveText("13.746100");
 
     // a pasted coordinate or Google Maps link goes straight there
@@ -214,7 +230,14 @@ test.describe("field worker", () => {
     await expect(page.locator("#lat")).toHaveText("13.756300");
     await expect(page.locator("#lng")).toHaveText("100.501800");
     await input.fill("https://www.google.com/maps/place/x/@13.7465,100.5348,17z");
-    await page.click("#searchLocationButton");
+    await input.press("Enter");
+
+    // same name in two places: the one nearest the map comes first; the list keeps its rounded corners
+    await input.fill("7-11 ลาดพร้าว");
+    await expect(options.first()).toContainText("ลาดพร้าว 101");
+    const corners = await page.evaluate(() => { const box = getComputedStyle(document.getElementById("search-suggestions")), list = getComputedStyle(document.getElementById("search-listbox")); return [box.overflow, list.overflowY, box.borderTopRightRadius]; });
+    expect(corners).toEqual(["hidden", "auto", "16px"]);
+    await input.press("Escape");
     await expect(page.locator("#lat")).toHaveText("13.746500");
 
     // nothing found says so, Esc closes the list

@@ -12,6 +12,8 @@ export const GEO = {
   photon: {
     "เซนทรัลเวิล": [feature("เซ็นทรัลเวิลด์", 13.7468, 100.5393), feature("เซ็นทรัลเวิลด์สแควร์", 13.7470, 100.5400)],
     "เซ็นทรัลเวิลด์": [feature("เซ็นทรัลเวิลด์", 13.7468, 100.5393)],
+    // two branches with the same kind of name: Photon lists the far one (Chiang Mai) first
+    "7-11 ลาดพร้าว": [feature("7-11 ลาดพร้าว ซอย 1 เชียงใหม่", 18.79, 98.98), feature("7-11 ลาดพร้าว 101", 13.79, 100.61)],
     "evil": [feature('<img src=x onerror="window.__xss=1">Evil Mall', 13.75, 100.5)],
     "เชียงใหม่": [feature("เชียงใหม่", 18.7883, 98.9853, { district: "", state: "จังหวัดเชียงใหม่", extent: [98.9, 18.85, 99.05, 18.7] })],
   },
