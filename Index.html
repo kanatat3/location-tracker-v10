@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker V12.11 (14.10.2026)</title>
+    <title>Location Tracker V12.12 (14.10.2026)</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -570,6 +570,28 @@
         .lt-records-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
         .lt-records-note { font-size: 12px; font-weight: 600; color: var(--muted); }
 
+        /* Requests: filter by project + order */
+        .lt-request-tools { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+        .lt-request-tools label { display: grid; gap: 4px; flex: 1 1 180px; min-width: 0; }
+        .lt-request-tools .lt-select { min-height: 44px; }
+        /* Move a project up / down: works with a keyboard and on a touch screen, unlike dragging */
+        #admin-project-list .lt-move { display: inline-flex; flex-direction: column; gap: 2px; }
+        #admin-project-list .lt-move button { width: 34px; height: 24px; border-radius: 8px; font-size: 11px; }
+        /* long coordinates shrink with … instead of running under the buttons on a phone */
+        #admin-project-list .lt-project-meta { min-width: 0; }
+        #admin-project-list .lt-chip { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+        #admin-project-list .lt-move button:disabled { opacity: 0.35; cursor: default; }
+        /* Admins page */
+        .lt-admin-list { display: grid; gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
+        .lt-admin-row { display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 16px; border: 1.5px solid var(--line); border-radius: var(--r-field); background: #fff; }
+        .lt-admin-row-main { flex: 1 1 auto; min-width: 0; }
+        .lt-admin-row-email { margin: 0; font-size: 15px; font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+        .lt-admin-row-note { margin: 2px 0 0; font-size: 12px; font-weight: 500; color: var(--muted); overflow-wrap: anywhere; }
+        .lt-admin-row button { flex: 0 0 auto; min-height: 40px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--fill); color: var(--ink-2); font-size: 13px; font-weight: 700; cursor: pointer; }
+        .lt-admin-row button:hover { background: var(--danger); color: #fff; }
+        .lt-admin-note { margin: 16px 0 0; padding: 12px 14px; border-radius: 14px; background: #FFFAEB; color: #93370D; font-size: 13px; font-weight: 500; line-height: 1.5; }
+        .lt-admin-note a { color: inherit; font-weight: 700; }
+
         .project-admin-item.dragging { opacity: 0.55; background-color: var(--primary-light); border: 2px dashed var(--primary-blue); z-index: 1000; }
 
         .lt-select {
@@ -834,6 +856,10 @@
                         <div class="text-left"><p class="lt-row-title">Requests</p><p class="lt-row-sub uppercase">From the field</p></div>
                         <span id="requests-badge" class="lt-badge"></span>
                     </button>
+                    <button id="goto-admins-btn" class="btn lt-row-btn">
+                        <span class="lt-row-icon"><i class="fas fa-user-shield"></i></span>
+                        <div class="text-left"><p class="lt-row-title">Admins</p><p class="lt-row-sub uppercase">Who can sign in here</p></div>
+                    </button>
                     <button id="customizeLabelsBtn" class="btn lt-row-btn">
                         <span class="lt-row-icon"><i class="fas fa-sliders"></i></span>
                         <div class="text-left"><p class="lt-row-title">Field labels</p><p class="lt-row-sub uppercase">Employee ID / Survey ID</p></div>
@@ -856,11 +882,33 @@
                     <button id="requests-back-to-menu-btn" class="btn lt-link uppercase">Close</button>
                 </div>
                 <p class="lt-config-help" style="margin: 0 0 16px;">Records that field workers flagged. Fix the record in the project or the Sheet, then press Done.</p>
+                <div class="lt-request-tools">
+                    <label><span class="lt-label">Project</span><select id="requests-project" class="input-field lt-select"><option value="">All projects</option></select></label>
+                    <label><span class="lt-label">Order</span><select id="requests-order" class="input-field lt-select"><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
+                </div>
                 <div id="requests-list" class="lt-request-list"></div>
                 <div id="requests-empty" class="lt-empty">
                     <div class="lt-empty-icon"><i class="fas fa-flag"></i></div>
                     <p>No open requests</p>
                 </div>
+            </div>
+        </div>
+
+        <!-- View: Admins (who can sign in to the Admin Console) -->
+        <div id="admins-view" class="app-view">
+            <div class="main-card lt-page">
+                <div class="lt-page-head">
+                    <h2 class="lt-page-title">Admins</h2>
+                    <button id="admins-back-to-menu-btn" class="btn lt-link uppercase">Close</button>
+                </div>
+                <p class="lt-config-help" style="margin: 0 0 16px;">These Google accounts can sign in to the Admin Console. Adding or removing an email takes effect at once.</p>
+                <form id="add-admin-form" class="lt-add-form">
+                    <label for="new-admin-email" class="sr-only">Google email of the new admin</label>
+                    <input id="new-admin-email" type="email" inputmode="email" class="input-field" placeholder="name@gmail.com" autocomplete="off" required>
+                    <button type="submit" class="btn lt-primary lt-primary--compact">Add</button>
+                </form>
+                <ul id="admins-list" class="lt-admin-list"></ul>
+                <p class="lt-admin-note"><b>One more step for a new admin:</b> while the Google sign-in app is in testing, the same email must also be added as a test user in Google Cloud &rarr; Google Auth Platform &rarr; Audience &rarr; Test users (project "Location Tracker"). Without it Google stops them before they reach this app.</p>
             </div>
         </div>
 
@@ -906,7 +954,7 @@
                     <div id="dashboard-map-container" class="lt-dash-map"><div id="dashboard-map" class="h-full w-full"></div></div>
 
                     <div>
-                        <h4 class="lt-section-title">Records by Staff ID</h4>
+                        <h3 class="lt-section-title">Records by Staff ID</h3>
                         <div class="table-scroll lt-table">
                             <table>
                                 <thead>
@@ -1751,15 +1799,64 @@
             btn.disabled = false;
         }
 
+        // ----- Admin: who can sign in -----
+        async function adminsRequest(body) {
+            ui.spinner.classList.remove("hidden");
+            try {
+                const res = await fetch(WEB_APP_URL, { method: "POST", headers: POST_HEADERS, body: JSON.stringify({ ...body, session: getAdminSession() }) });
+                const result = await res.json();
+                if (result.success) { renderAdmins(result.data, result.me); return result; }
+                if (!handleAdminAuthRequired(result)) showMessage(result.message || "Could not update the admin list", "error");
+            } catch (e) {
+                showMessage("Could not reach the server - check the connection", "error");
+            } finally {
+                ui.spinner.classList.add("hidden");
+            }
+            return null;
+        }
+
+        function renderAdmins(list, me) {
+            const box = document.getElementById("admins-list");
+            box.innerHTML = "";
+            (list || []).forEach(a => {
+                const li = document.createElement("li");
+                li.className = "lt-admin-row";
+                const tag = a.owner ? " (owner)" : (a.email === me ? " (you)" : "");
+                li.innerHTML = `<div class="lt-admin-row-main"><p class="lt-admin-row-email">${escapeHtml(a.email)}${tag}</p>${a.note ? `<p class="lt-admin-row-note">${escapeHtml(a.note)}</p>` : ''}</div>`;
+                if (!a.owner && a.email !== me) {
+                    const remove = document.createElement("button");
+                    remove.type = "button";
+                    remove.textContent = "Remove";
+                    remove.setAttribute("aria-label", `Remove admin ${a.email}`);
+                    remove.onclick = () => showConfirmation("Remove admin", `${escapeHtml(a.email)} will no longer be able to sign in to the Admin Console.`, async () => {
+                        closeModal("confirmationModal");
+                        if (await adminsRequest({ action: "removeAdmin", email: a.email })) showMessage("Admin removed", "success");
+                    });
+                    li.appendChild(remove);
+                }
+                box.appendChild(li);
+            });
+        }
+
         // ----- Admin: requests from the field -----
         function renderRequests(list) {
             openRequests = Array.isArray(list) ? list : [];
             const badge = document.getElementById("requests-badge");
             badge.textContent = openRequests.length ? String(openRequests.length) : "";
+            // project filter: the projects that have open requests (keeps the current choice if still there)
+            const projectSel = document.getElementById("requests-project");
+            const chosen = projectSel.value;
+            const names = [...new Set(openRequests.map(r => r.Project))].sort((a, b) => a.localeCompare(b));
+            projectSel.innerHTML = '<option value="">All projects</option>' + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)} (${openRequests.filter(r => r.Project === n).length})</option>`).join("");
+            projectSel.value = names.includes(chosen) ? chosen : "";
+            const newestFirst = document.getElementById("requests-order").value !== "oldest";
+            const shown = openRequests
+                .filter(r => !projectSel.value || r.Project === projectSel.value)
+                .sort((a, b) => (new Date(b.Timestamp) - new Date(a.Timestamp)) * (newestFirst ? 1 : -1));
             const box = document.getElementById("requests-list");
-            document.getElementById("requests-empty").classList.toggle("hidden", openRequests.length > 0);
+            document.getElementById("requests-empty").classList.toggle("hidden", shown.length > 0);
             box.innerHTML = "";
-            openRequests.forEach(r => {
+            shown.forEach(r => {
                 const card = document.createElement("article");
                 card.className = "lt-request";
                 card.dataset.id = r.ID;
@@ -1767,7 +1864,7 @@
                 const fmt = d => isNaN(d) ? '-' : d.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
                 card.innerHTML = `
                     <div class="lt-request-head">
-                        <div class="min-w-0"><h4 class="lt-request-title">${escapeHtml(r.RequestText || r.Request)}</h4><p class="lt-request-meta">${escapeHtml(r.Project)}</p></div>
+                        <div class="min-w-0"><h3 class="lt-request-title">${escapeHtml(r.RequestText || r.Request)}</h3><p class="lt-request-meta">${escapeHtml(r.Project)}</p></div>
                         <span class="lt-chip">${escapeHtml(fmt(when))}</span>
                     </div>
                     <p class="lt-request-meta"><b>${escapeHtml(customLabels.employeeId)}:</b> ${escapeHtml(r.EmployeeID || '-')} &nbsp; <b>${escapeHtml(customLabels.surveyId)}:</b> ${escapeHtml(r.SurveyID || '-')}<br>
@@ -2042,9 +2139,22 @@
                     config.hasBase ? `<em class="lt-chip"><i class="fas fa-building mr-1"></i>${config.baseLat.toFixed(4)}, ${config.baseLng.toFixed(4)}</em>` : '',
                     config.radiusKms.length ? `<em class="lt-chip"><i class="fas fa-circle-dot mr-1"></i>${config.radiusKms.join(', ')} km</em>` : ''
                 ].join('');
-                row.innerHTML = `<div class="flex items-center gap-3 pointer-events-none min-w-0"><i class="fas fa-grip-vertical text-slate-200"></i><i class="fas fa-folder text-primary-blue"></i><div class="min-w-0"><span class="font-bold text-slate-800 text-sm">${p}</span>${chips ? `<div class="lt-project-meta">${chips}</div>` : ''}</div></div>`;
+                row.innerHTML = `<div class="flex items-center gap-3 pointer-events-none min-w-0"><i class="fas fa-grip-vertical text-slate-200" aria-hidden="true"></i><i class="fas fa-folder text-primary-blue"></i><div class="min-w-0"><span class="font-bold text-slate-800 text-sm">${p}</span>${chips ? `<div class="lt-project-meta">${chips}</div>` : ''}</div></div>`;
                 const acts = document.createElement("div");
                 acts.className = "flex gap-2 relative z-20 shrink-0 ml-2";
+                const move = document.createElement("div");
+                move.className = "lt-move";
+                [["up", -1, "fa-chevron-up"], ["down", 1, "fa-chevron-down"]].forEach(([word, step, icon]) => {
+                    const b = document.createElement("button");
+                    b.type = "button";
+                    b.className = `lt-move-${word}`;
+                    b.title = `Move ${word}`;
+                    b.setAttribute("aria-label", `Move ${p} ${word}`);
+                    b.innerHTML = `<i class="fas ${icon}" aria-hidden="true"></i>`;
+                    b.onclick = (e) => { e.stopPropagation(); moveProjectRow(row, step, word); };
+                    move.appendChild(b);
+                });
+                acts.appendChild(move);
                 const settings = document.createElement("button");
                 settings.className = "w-10 h-10 bg-slate-50 text-slate-400 rounded-xl hover:bg-primary-blue hover:text-white transition-all flex items-center justify-center";
                 settings.title = "Project settings";
@@ -2067,9 +2177,31 @@
                 acts.appendChild(ren); acts.appendChild(del);
                 row.appendChild(acts);
                 row.addEventListener('dragstart', () => { setTimeout(() => row.classList.add('dragging'), 0); });
-                row.addEventListener('dragend', () => { row.classList.remove('dragging'); document.getElementById('save-project-order-btn').classList.remove('hidden'); });
+                row.addEventListener('dragend', () => { row.classList.remove('dragging'); refreshMoveButtons(); document.getElementById('save-project-order-btn').classList.remove('hidden'); });
                 adminList.appendChild(row);
             });
+            refreshMoveButtons();
+        }
+
+        function refreshMoveButtons() {
+            const rows = [...document.querySelectorAll("#admin-project-list .project-admin-item")];
+            rows.forEach((r, i) => {
+                const up = r.querySelector(".lt-move-up"), down = r.querySelector(".lt-move-down");
+                if (up) up.disabled = i === 0;
+                if (down) down.disabled = i === rows.length - 1;
+            });
+        }
+
+        // Moves a project one place; the new order is saved with "Save order" like a drag.
+        function moveProjectRow(row, step, word) {
+            const list = row.parentElement;
+            if (step < 0 && row.previousElementSibling) list.insertBefore(row, row.previousElementSibling);
+            else if (step > 0 && row.nextElementSibling) list.insertBefore(row.nextElementSibling, row);
+            else return;
+            refreshMoveButtons();
+            document.getElementById("save-project-order-btn").classList.remove("hidden");
+            const again = row.querySelector(`.lt-move-${word}`);
+            (again && !again.disabled ? again : row.querySelector(`.lt-move-${word === "up" ? "down" : "up"}`)).focus();
         }
 
         async function updateDashboard(projectName) {
@@ -2648,6 +2780,17 @@
                 ui.spinner.classList.add("hidden");
             };
             document.getElementById("goto-requests-btn").onclick = () => { window.showView("requests-view"); loadRequests(true); };
+            document.getElementById("requests-project").onchange = () => renderRequests(openRequests);
+            document.getElementById("requests-order").onchange = () => renderRequests(openRequests);
+            document.getElementById("goto-admins-btn").onclick = () => { window.showView("admins-view"); document.getElementById("admins-list").innerHTML = ""; adminsRequest({ action: "getAdmins" }); };
+            document.getElementById("admins-back-to-menu-btn").onclick = () => window.showView("admin-menu-view");
+            document.getElementById("add-admin-form").onsubmit = async (e) => {
+                e.preventDefault();
+                const input = document.getElementById("new-admin-email");
+                const email = input.value.trim().toLowerCase();
+                if (!email) return;
+                if (await adminsRequest({ action: "addAdmin", email })) { input.value = ""; showMessage(`${email} added - also add them as a test user in Google Cloud`, "success"); }
+            };
             document.getElementById("requests-back-to-menu-btn").onclick = () => window.showView("admin-menu-view");
             document.getElementById("report-close").onclick = () => { closeModal("reportModal"); };
             document.getElementById("report-form").onsubmit = sendReport;

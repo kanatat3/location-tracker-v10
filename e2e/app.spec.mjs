@@ -336,19 +336,75 @@ test.describe("admin", () => {
     await noErrors(page);
   });
 
+  test("admins page: list, add, remove", async ({ page }) => {
+    await page.click("#goto-admins-btn");
+    await expect(page.locator("#admins-view")).toBeVisible();
+    await expect(page.locator(".lt-admin-row")).toHaveCount(2);
+    await expect(page.locator(".lt-admin-row", { hasText: "owner@example.com" })).toContainText("(owner)");
+    await expect(page.locator(".lt-admin-row", { hasText: "admin@example.com" })).toContainText("(you)");
+    await expect(page.locator(".lt-admin-row button")).toHaveCount(0);          // nobody can remove the owner or themselves
+    await expect(page.locator(".lt-admin-note")).toContainText(/test user/i);
+    await checkA11y(page, "admins page");
+    await page.fill("#new-admin-email", "not-an-email");
+    await page.click("#add-admin-form button[type=submit]");
+    expect(db.posts.filter(p => p.action === "addAdmin")).toHaveLength(0);      // the browser asks for a real email first
+    await page.fill("#new-admin-email", "Friend@Gmail.com");
+    await page.click("#add-admin-form button[type=submit]");
+    await expect(page.locator(".lt-admin-row", { hasText: "friend@gmail.com" })).toBeVisible();
+    expect(db.posts.find(p => p.action === "addAdmin")).toMatchObject({ email: "friend@gmail.com", session: "sess-1" });
+    await expect(page.locator("#new-admin-email")).toHaveValue("");
+    await page.fill("#new-admin-email", "friend@gmail.com");
+    await page.click("#add-admin-form button[type=submit]");
+    await expect(toast(page)).toContainText(/already an admin/i);
+    await page.locator(".lt-admin-row", { hasText: "friend@gmail.com" }).getByRole("button", { name: /remove admin/i }).click();
+    await expect(page.locator("#confirmationModal")).toBeVisible();
+    await page.click("#confirmActionButton");
+    await expect(page.locator(".lt-admin-row", { hasText: "friend@gmail.com" })).toHaveCount(0);
+    expect(db.admins.map(a => a.email)).toEqual(["owner@example.com", "admin@example.com"]);
+    await noErrors(page);
+  });
+
+  test("manage projects: move up / down without dragging", async ({ page }) => {
+    await page.click("#goto-manage-projects-btn");
+    const names = () => page.locator("#admin-project-list .project-admin-item").evaluateAll(rows => rows.map(r => r.dataset.projectName));
+    expect(await names()).toEqual(["Alpha", "Beta", "Gamma"]);
+    await expect(page.getByRole("button", { name: "Move Alpha up" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Move Gamma down" })).toBeDisabled();
+    await page.getByRole("button", { name: "Move Gamma up" }).focus();
+    await page.keyboard.press("Enter");
+    expect(await names()).toEqual(["Alpha", "Gamma", "Beta"]);
+    expect(await page.evaluate(() => document.activeElement.getAttribute("aria-label"))).toBe("Move Gamma up");   // focus follows the row
+    await page.keyboard.press("Enter");
+    expect(await names()).toEqual(["Gamma", "Alpha", "Beta"]);
+    await expect(page.locator("#save-project-order-btn")).toBeVisible();
+    await page.click("#save-project-order-btn");
+    await expect.poll(() => db.posts.filter(p => p.action === "reorderProjects").length).toBe(1);
+    expect(db.posts.find(p => p.action === "reorderProjects")).toMatchObject({ projectOrder: ["Gamma", "Alpha", "Beta"], session: "sess-1" });
+    await noErrors(page);
+  });
+
   test("requests from the field and shared labels", async ({ page }) => {
-    db.reports.push({ ID: 2, Timestamp: new Date().toISOString(), Project: "Beta", EmployeeID: "861", SurveyID: "001", Latitude: 13.7465, Longitude: 100.5348, RecordTimestamp: new Date().toISOString(), Request: "delete", RequestText: "Delete this record", Note: "pressed twice", ReportedBy: "861", status: "open" });
+    db.reports.push({ ID: 2, Timestamp: new Date(Date.now() - 3600e3).toISOString(), Project: "Beta", EmployeeID: "861", SurveyID: "001", Latitude: 13.7465, Longitude: 100.5348, RecordTimestamp: new Date().toISOString(), Request: "delete", RequestText: "Delete this record", Note: "pressed twice", ReportedBy: "861", status: "open" });
+    db.reports.push({ ID: 3, Timestamp: new Date().toISOString(), Project: "Alpha", EmployeeID: "781", SurveyID: "009", Latitude: 13.7465, Longitude: 100.5348, RecordTimestamp: new Date().toISOString(), Request: "wrong_location", RequestText: "Wrong location", Note: "", ReportedBy: "781", status: "open" });
     await page.click("#menu-back-to-selection-btn");
     await page.click("#manage-projects-btn");
-    await expect(page.locator("#requests-badge")).toHaveText("1");
+    await expect(page.locator("#requests-badge")).toHaveText("2");
     await page.click("#goto-requests-btn");
     await expect(page.locator("#requests-view")).toBeVisible();
+    await expect(page.locator(".lt-request")).toHaveCount(2);
+    await expect(page.locator(".lt-request").first()).toContainText(/Wrong location/);       // newest first
+    await page.selectOption("#requests-order", "oldest");
+    await expect(page.locator(".lt-request").first()).toContainText(/Delete this record/);
+    await expect(page.locator("#requests-project option")).toHaveText(["All projects", "Alpha (1)", "Beta (1)"]);
+    await page.selectOption("#requests-project", "Beta");
     await expect(page.locator(".lt-request")).toHaveCount(1);
     await expect(page.locator(".lt-request")).toContainText(/Delete this record/);
     await checkA11y(page, "requests");
     await page.click(".lt-request-done");
-    await expect(page.locator(".lt-request")).toHaveCount(0);
-    await expect(page.locator("#requests-empty")).toBeVisible();
+    await expect(page.locator(".lt-request")).toHaveCount(1);                                 // the Beta one is done; filter falls back to all
+    await expect(page.locator("#requests-project")).toHaveValue("");
+    await expect(page.locator(".lt-request")).toContainText(/Wrong location/);
+    await expect(page.locator("#requests-badge")).toHaveText("1");
     expect(db.posts.find(p => p.action === "resolveReport")).toMatchObject({ id: 2, session: "sess-1" });
 
     await page.click("#requests-back-to-menu-btn");

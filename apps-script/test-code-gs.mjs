@@ -92,6 +92,7 @@ function load(props = {}, { clientId = CLIENT_ID } = {}) {
     Session: { getEffectiveUser: () => ({ getEmail: () => OWNER }) },
     Utilities: {
       getUuid: () => crypto.randomUUID(),
+      formatDate: (d) => new Date(d).toISOString().slice(0, 10),
       computeHmacSha256Signature: (value, key) => Array.from(crypto.createHmac("sha256", key).update(value).digest()).map(b => (b > 127 ? b - 256 : b)),
       base64EncodeWebSafe: d => webSafe(typeof d === "string" ? Buffer.from(d, "utf8") : Buffer.from(d.map(b => b & 255))),
       base64DecodeWebSafe: t => Array.from(Buffer.from(String(t).replace(/-/g, "+").replace(/_/g, "/"), "base64")),
@@ -116,7 +117,7 @@ function check(name, cond, extra = "") { if (cond) pass++; else { fail++; consol
 // --- basic flow
 {
   const { ss, get, post, slackCalls } = load();
-  check("version", get({ action: "version" }).data.version === "v12.3");
+  check("version", get({ action: "version" }).data.version === "v12.4");
   check("addProject", post({ action: "addProject", projectName: "  Alpha  " }).success);
   check("addProject trims name", !!ss.getSheetByName("Alpha"));
   check("duplicate project rejected", post({ action: "addProject", projectName: "Alpha" }).success === false);
@@ -349,6 +350,30 @@ const OUTSIDE = { lat: 13.9000, lng: 100.5018 };                // ~16 km away
   const all = get({ action: "getReports", status: "all" }).data;
   check("closed report keeps who closed it and when", all.length === 2 && all[0].status === "done" && all[0].ResolvedBy === OWNER && all[0].ResolvedAt !== "", JSON.stringify(all[0]));
   check("getReports defaults to open ones", get({ action: "getReports" }).data.length === 1);
+}
+
+// --- admins: the AllowedEmails tab, managed from the app
+{
+  const { ss, rawPost, login, session } = load();
+  const tab = ss.getSheetByName("AllowedEmails");
+  check("admin list needs sign-in", rawPost({ action: "getAdmins" }).authRequired === true && rawPost({ action: "addAdmin", email: "x@y.com" }).authRequired === true && rawPost({ action: "removeAdmin", email: OWNER }).authRequired === true);
+  let r = rawPost({ action: "getAdmins", session });
+  check("admin list shows the owner and who is asking", r.success && r.data.length === 1 && r.data[0].email === OWNER && r.data[0].owner === true && r.me === OWNER, JSON.stringify(r));
+  for (const bad of ["", "nobody", "a@b", "a b@c.com", "x@y.com, z@w.com", "<x@y.com>"]) {
+    check(`refuses bad email "${bad}"`, rawPost({ action: "addAdmin", email: bad, session }).success === false);
+  }
+  r = rawPost({ action: "addAdmin", email: "  Friend@Gmail.com ", session });
+  check("adds an admin (stored lower-case, with a note)", r.success && r.data.length === 2 && r.data[1].email === "friend@gmail.com" && r.data[1].owner === false && /added by owner@example\.com/.test(tab.rows[2][1]), JSON.stringify(r));
+  check("no duplicate admin", rawPost({ action: "addAdmin", email: "FRIEND@gmail.com", session }).success === false && tab.rows.length === 3);
+  const friend = login("friend@gmail.com");
+  check("the new admin can sign in at once", friend.success === true && typeof friend.session === "string");
+  check("cannot remove yourself", rawPost({ action: "removeAdmin", email: "friend@gmail.com", session: friend.session }).success === false);
+  check("the owner cannot be removed", /owner/i.test(rawPost({ action: "removeAdmin", email: OWNER, session: friend.session }).message || ""));
+  check("removing someone who is not an admin is refused", rawPost({ action: "removeAdmin", email: "ghost@x.com", session }).success === false);
+  tab.appendRow(["friend@gmail.com", "duplicate typed in the Sheet"]);
+  r = rawPost({ action: "removeAdmin", email: "Friend@gmail.com", session });
+  check("removing an admin clears every copy of that email", r.success && r.data.length === 1 && tab.rows.length === 2, JSON.stringify(tab.rows));
+  check("a removed admin is signed out at once", rawPost({ action: "addProject", projectName: "X", session: friend.session }).authRequired === true && login("friend@gmail.com").success === false);
 }
 
 // --- Slack destinations and failures

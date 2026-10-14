@@ -23,7 +23,7 @@
  * No passwords or webhook URLs live in this file on purpose.
  * API is the same as the V6 backend (LT 2.4.2026.15.19) so existing front ends keep working.
  */
-const BACKEND_VERSION = "v12.3";
+const BACKEND_VERSION = "v12.4";
 const PROJECT_CONFIG_SHEET_NAME = "ProjectConfigs";
 const ALLOWED_EMAILS_SHEET_NAME = "AllowedEmails";
 const REPORTS_SHEET_NAME = "Reports";
@@ -33,7 +33,7 @@ const REPORT_REQUESTS = { delete: "Delete this record", wrong_employee: "Wrong E
 const REPORT_HEADERS = ["Timestamp", "Project", "EmployeeID", "SurveyID", "Latitude", "Longitude", "RecordTimestamp", "Request", "Note", "ReportedBy", "Status", "ResolvedAt", "ResolvedBy"];
 const DEFAULT_LABELS = { employeeId: "Employee ID", surveyId: "Survey ID" };
 // Actions that change projects or saved rows: only for a signed-in, allowed Google account.
-const ADMIN_ACTIONS = ["updateProjectConfig", "addProject", "renameProject", "deleteProject", "hideProject", "reorderProjects", "update", "delete", "resolveReport", "updateLabels"];
+const ADMIN_ACTIONS = ["updateProjectConfig", "addProject", "renameProject", "deleteProject", "hideProject", "reorderProjects", "update", "delete", "resolveReport", "updateLabels", "getAdmins", "addAdmin", "removeAdmin"];
 const SESSION_DAYS = 30;
 const DATA_HEADERS = [
   "EmployeeID",
@@ -219,6 +219,38 @@ function doPost(e) {
           Logger.log("Slack report failed: " + slackError);
         }
         return createJsonResponse({ success: true, message: "Sent to the admin.", id: sheet.getLastRow(), slackSent: slackSent });
+      }
+
+      // Admin list = the AllowedEmails tab. Signed-in admins can see, add and remove admins from the app.
+      case "getAdmins": {
+        return createJsonResponse({ success: true, data: getAdmins_(), me: getSessionEmail_(request.session) });
+      }
+
+      case "addAdmin": {
+        const email = String(request.email || "").trim().toLowerCase();
+        if (!/^[^\s@,;<>]+@[^\s@,;<>]+\.[a-z]{2,}$/.test(email)) throw new Error("Enter a valid email address.");
+        if (isEmailAllowed_(email)) throw new Error(email + " is already an admin.");
+        const note = String(request.note || "").trim().slice(0, 80);
+        const me = getSessionEmail_(request.session);
+        getAllowedEmailsSheet_().appendRow([email, note || ("added by " + me + " on " + Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd"))]);
+        return createJsonResponse({ success: true, data: getAdmins_(), me: me });
+      }
+
+      case "removeAdmin": {
+        const email = String(request.email || "").trim().toLowerCase();
+        const me = getSessionEmail_(request.session);
+        if (email === me) throw new Error("You cannot remove yourself. Ask another admin to do it.");
+        const owner = String(Session.getEffectiveUser().getEmail() || "").trim().toLowerCase();
+        if (owner && email === owner) throw new Error("The owner of the backend cannot be removed.");
+        const sheet = getAllowedEmailsSheet_();
+        const values = sheet.getDataRange().getValues();
+        let removed = false;
+        // delete from the bottom so row numbers stay valid; removes duplicates of the same email too
+        for (let i = values.length - 1; i >= 1; i--) {
+          if (String(values[i][0] || "").trim().toLowerCase() === email) { sheet.deleteRow(i + 1); removed = true; }
+        }
+        if (!removed) throw new Error(email + " is not an admin.");
+        return createJsonResponse({ success: true, data: getAdmins_(), me: me });
       }
 
       case "resolveReport": {
@@ -440,6 +472,16 @@ function getAllowedEmailsSheet_() {
     if (owner) sheet.appendRow([owner, "owner (added automatically)"]);
   }
   return sheet;
+}
+
+function getAdmins_() {
+  const values = getAllowedEmailsSheet_().getDataRange().getValues();
+  const owner = String(Session.getEffectiveUser().getEmail() || "").trim().toLowerCase();
+  const seen = {};
+  return values.slice(1)
+    .map(function(row) { return { email: String(row[0] || "").trim().toLowerCase(), note: String(row[1] || "").trim() }; })
+    .filter(function(a) { if (!a.email || seen[a.email]) return false; seen[a.email] = true; return true; })
+    .map(function(a) { a.owner = a.email === owner; return a; });
 }
 
 function isEmailAllowed_(email) {

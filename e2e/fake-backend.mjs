@@ -22,6 +22,7 @@ export function createDb() {
         Timestamp: new Date(Date.UTC(2026, 8, 29, 2 + i, 15)).toISOString(), OutOfRadius: false, DistanceKm: 0, RadiusKm: 10, RadiusKms: [3, 5, 10], ID: i + 2 })),
     },
     reports: [],
+    admins: [{ email: "owner@example.com", note: "owner (added automatically)", owner: true }, { email: "admin@example.com", note: "", owner: false }],
     posts: [],
   };
 }
@@ -77,6 +78,21 @@ function handle(db, method, url, body) {
           Request: b.request, RequestText: REQUESTS[b.request], Note: b.note || "", ReportedBy: b.reportedBy || "", status: "open" });
         return json({ success: true, message: "Sent to the admin.", id: db.reports.length + 1, slackSent: false });
       }
+      case "getAdmins":
+        if (!admin()) return refused;
+        return json({ success: true, data: db.admins, me: "admin@example.com" });
+      case "addAdmin": {
+        if (!admin()) return refused;
+        const email = String(b.email || "").trim().toLowerCase();
+        if (!/^[^\s@,;<>]+@[^\s@,;<>]+\.[a-z]{2,}$/.test(email)) return json({ success: false, message: "Enter a valid email address." });
+        if (db.admins.some(a => a.email === email)) return json({ success: false, message: email + " is already an admin." });
+        db.admins.push({ email, note: "added by admin@example.com", owner: false });
+        return json({ success: true, data: db.admins, me: "admin@example.com" });
+      }
+      case "removeAdmin":
+        if (!admin()) return refused;
+        db.admins = db.admins.filter(a => a.email !== b.email);
+        return json({ success: true, data: db.admins, me: "admin@example.com" });
       case "resolveReport":
         if (!admin()) return refused;
         db.reports = db.reports.map(r => r.ID === b.id ? { ...r, status: "done" } : r); return json({ success: true, data: db.reports.filter(r => r.status === "open") });
