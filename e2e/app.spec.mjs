@@ -144,6 +144,33 @@ test.describe("field worker", () => {
     await noErrors(page);
   });
 
+  test("map tiles: real tiles up to zoom 22, failed tiles are fetched again", async ({ page }) => {
+    // a 1x1 png stands in for every Google tile; the first request for each tile fails once
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+    const seen = new Map(), zooms = new Set();
+    await page.route(/google\.com\/vt\/lyrs=m/, route => {
+      // Google tile URLs carry x/y/z after "lyrs=m&" with no "?", so read them by pattern
+      const url = route.request().url();
+      const part = k => (url.match(new RegExp("[&?]" + k + "=([0-9]+)")) || [])[1];
+      const key = ["x", "y", "z"].map(part).join("/");
+      zooms.add(Number(part("z")));
+      const n = (seen.get(key) || 0) + 1; seen.set(key, n);
+      if (n === 1) return route.abort("connectionreset");
+      return route.fulfill({ status: 200, contentType: "image/png", body: png });
+    });
+    await page.reload();
+    await openProject(page, "Beta");
+    await page.evaluate(() => map.setView([13.790167, 100.562522], 22, { animate: false }));
+    await page.waitForTimeout(2500);
+    expect(await page.evaluate(() => map.getZoom())).toBe(22);
+    expect(zooms.has(22)).toBe(true);                       // drawn from zoom-22 tiles, not stretched zoom-20 ones
+    const tiles = await page.evaluate(() => [...document.querySelectorAll("#map .leaflet-tile")].filter(t => t.src.includes("z=22")).map(t => ({ ok: t.classList.contains("leaflet-tile-loaded") && t.naturalWidth > 0, src: t.src })));
+    expect(tiles.length).toBeGreaterThan(0);
+    expect(tiles.every(t => t.ok)).toBe(true);              // every failed tile came back on the retry
+    expect([...seen.values()].some(n => n >= 2)).toBe(true);
+    await noErrors(page);
+  });
+
   test("big project: every pin on the map, a short list, Mine filter", async ({ page }) => {
     // 150 saved records from 5 people around the main coordinate
     db.rows.Beta = Array.from({ length: 150 }, (_, i) => ({ EmployeeID: ["861", "781", "864", "902", "915"][i % 5], SurveyID: String(1000 + i),

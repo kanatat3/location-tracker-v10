@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker V12.10 (14.10.2026)</title>
+    <title>Location Tracker V12.11 (14.10.2026)</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -1288,10 +1288,27 @@
     <script>
         const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxwXRe_J--t6D-cSPNxbLJlp-krPKPeMlmnkVaoFwNeQtcq7kfPwU955YCo3JUm0fUWaA/exec';
         
-        // Google tiles stop at zoom 20; the last two levels stretch them so a single building can be aimed at.
+        // Google serves real tiles up to zoom 22, so every level is drawn at its own size: place names keep their
+        // normal text size however far you zoom in (stretched zoom-20 tiles made the names grow).
+        // Tiles are fetched once a zoom gesture ends, not for every in-between level, so fewer half-loaded levels
+        // overlap (that overlap is what cut place names in half while zooming).
         const MAP_TILES = 'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
         const MAP_MAX_ZOOM = 22;
-        const MAP_TILE_OPTIONS = { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], maxZoom: MAP_MAX_ZOOM, maxNativeZoom: 20 };
+        const MAP_TILE_OPTIONS = { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], maxZoom: MAP_MAX_ZOOM, maxNativeZoom: MAP_MAX_ZOOM, updateWhenZooming: false, keepBuffer: 3 };
+        // A tile that fails to load is asked for again from another Google server (twice at most);
+        // otherwise the previous zoom level shows through that square with its place names at the wrong size.
+        function addMapTiles(targetMap) {
+            const layer = L.tileLayer(MAP_TILES, MAP_TILE_OPTIONS).addTo(targetMap);
+            layer.on("tileerror", (e) => {
+                const img = e.tile;
+                const tries = Number(img.dataset.retries || 0);
+                if (tries >= 2) return;
+                img.dataset.retries = String(tries + 1);
+                const next = MAP_TILE_OPTIONS.subdomains[(tries + 1 + e.coords.x + e.coords.y) % MAP_TILE_OPTIONS.subdomains.length];
+                setTimeout(() => { img.src = img.src.replace(/\/\/mt\d\./, "//" + next + "."); }, 400 * (tries + 1));
+            });
+            return layer;
+        }
         let map, dashboardMap, permanentMarkers = L.featureGroup(), dashboardMarkers = L.featureGroup();
         const RECORDS_SHOWN = 20;
         let recordsShowAll = false, recordsOnlyMine = false;
@@ -1588,7 +1605,7 @@
             openModal("adminMapPickerModal");
             if (!adminPickerMap) {
                 adminPickerMap = L.map("admin-map-picker-map", { zoomControl: true, maxZoom: MAP_MAX_ZOOM }).setView([13.75, 100.5], 6);
-                L.tileLayer(MAP_TILES, MAP_TILE_OPTIONS).addTo(adminPickerMap);
+                addMapTiles(adminPickerMap);
                 adminPickerMap.on("click", (e) => setAdminPickerCoordinate(e.latlng.lat, e.latlng.lng, false));
             }
             setTimeout(() => {
@@ -1910,7 +1927,7 @@
         function initDashboardMap() {
             if (!dashboardMap) {
                 dashboardMap = L.map("dashboard-map", { zoomControl: true, maxZoom: MAP_MAX_ZOOM }).setView([13.75, 100.5], 6);
-                L.tileLayer(MAP_TILES, MAP_TILE_OPTIONS).addTo(dashboardMap);
+                addMapTiles(dashboardMap);
                 dashboardMarkers.addTo(dashboardMap);
             }
         }
@@ -2215,7 +2232,7 @@
         function initMap() {
             if (!map) {
                 map = L.map("map", { zoomControl: false, maxZoom: MAP_MAX_ZOOM }).setView([13.75, 100.5], 13);
-                L.tileLayer(MAP_TILES, MAP_TILE_OPTIONS).addTo(map);
+                addMapTiles(map);
                 permanentMarkers.addTo(map);
                 map.on("click", (e) => updateDisplay(e.latlng.lat, e.latlng.lng));
                 if (window.ResizeObserver) new ResizeObserver(updateFloatHeight).observe(document.getElementById("tracker-top"));
