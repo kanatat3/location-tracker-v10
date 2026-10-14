@@ -11,7 +11,7 @@ const src = fs.readFileSync(path.join(here, "Code.gs"), "utf8");
 
 function makeSheet(name) {
   const s = {
-    name, hidden: false, rows: [], formats: {},
+    name, hidden: false, rows: [], formats: {}, formatRows: {},
     getName: () => s.name, setName: n => { s.name = n; },
     isSheetHidden: () => s.hidden, hideSheet: () => { s.hidden = true; },
     appendRow: r => { s.rows.push([...r]); },
@@ -20,7 +20,7 @@ function makeSheet(name) {
     deleteRow: i => { s.rows.splice(i - 1, 1); },
     getDataRange: () => rangeOf(s, 1, 1, s.rows.length, s.getLastColumn()),
     getRange: (a, b, c, d) => {
-      if (typeof a === "string") return { setNumberFormat: f => { s.formats[a] = f; } };
+      if (typeof a === "string") return { setNumberFormat: f => { s.formats[a] = f; s.formatRows[a] = s.rows.length; } };   // formatRows = rows that existed when it was set
       return rangeOf(s, a, b, c ?? 1, d ?? 1);
     },
   };
@@ -117,7 +117,7 @@ function check(name, cond, extra = "") { if (cond) pass++; else { fail++; consol
 // --- basic flow
 {
   const { ss, get, post, slackCalls } = load();
-  check("version", get({ action: "version" }).data.version === "v12.4");
+  check("version", get({ action: "version" }).data.version === "v12.5");
   check("addProject", post({ action: "addProject", projectName: "  Alpha  " }).success);
   check("addProject trims name", !!ss.getSheetByName("Alpha"));
   check("duplicate project rejected", post({ action: "addProject", projectName: "Alpha" }).success === false);
@@ -135,6 +135,8 @@ function check(name, cond, extra = "") { if (cond) pass++; else { fail++; consol
   check("timestamp round-trips", rows[0].Timestamp === "2026-09-21T03:00:00.000Z", rows[0].Timestamp);
   check("maps link", rows[0].GoogleMapsLink === "https://www.google.com/maps?q=13.7,100.5");
   check("row ID = sheet row", rows[0].ID === 2);
+  { const tab = ss.getSheetByName("Alpha");
+    check("date column formatted after the new row exists (no US date on the last row)", tab.formats["C2:C"] === "dd/MM/yyyy, HH:mm:ss" && tab.formatRows["C2:C"] === tab.rows.length, JSON.stringify(tab.formatRows)); }
   check("add to missing project fails", post({ action: "add", project: "Nope", data: {} }).success === false);
   check("add into ProjectConfigs refused", post({ action: "add", project: "ProjectConfigs", data: {} }).success === false);
   check("Thai d/m/y timestamp parsed", (() => { post({ action: "add", project: "Beta", data: { name: "1", surveyId: "2", lat: 1, lng: 2, timestamp: "21/09/2026, 10:05:00" } }); const t = get({ action: "getData", project: "Beta" }).data[0].Timestamp; return /^2026-09-21T/.test(t); })());
@@ -337,6 +339,8 @@ const OUTSIDE = { lat: 13.9000, lng: 100.5018 };                // ~16 km away
 
   const sent = rawPost({ action: "reportRecord", project: "Site", record, request: "delete", note: "pressed twice", reportedBy: "0861" });
   check("worker report stored without sign-in", sent.success && sent.id === 2 && sent.slackSent === true, JSON.stringify(sent));
+  { const tab = ss.getSheetByName("Reports");
+    check("report dates read day/month/year, including the new row", ["A2:A", "G2:G", "L2:L"].every(r => tab.formats[r] === "dd/MM/yyyy, HH:mm:ss" && tab.formatRows[r] === tab.rows.length), JSON.stringify(tab.formatRows)); }
   check("Slack told what the worker wants", slackCalls.length === 1 && /Request: Delete this record/.test(slackCalls[0].text) && /Project: Site/.test(slackCalls[0].text) && /Survey ID: 007/.test(slackCalls[0].text) && /Note: pressed twice/.test(slackCalls[0].text), JSON.stringify(slackCalls));
   check("Reports tab is reserved, not a project", !get({ action: "getProjects" }).data.includes("Reports") && rawPost({ action: "add", project: "Reports", data: { name: "1", surveyId: "1", lat: 1, lng: 1 } }).success === false);
   rawPost({ action: "reportRecord", project: "Site", record: { ...record, SurveyID: "008" }, request: "wrong_location", reportedBy: "0861" });

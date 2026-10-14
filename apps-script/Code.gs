@@ -23,7 +23,7 @@
  * No passwords or webhook URLs live in this file on purpose.
  * API is the same as the V6 backend (LT 2.4.2026.15.19) so existing front ends keep working.
  */
-const BACKEND_VERSION = "v12.4";
+const BACKEND_VERSION = "v12.5";
 const PROJECT_CONFIG_SHEET_NAME = "ProjectConfigs";
 const ALLOWED_EMAILS_SHEET_NAME = "AllowedEmails";
 const REPORTS_SHEET_NAME = "Reports";
@@ -212,6 +212,7 @@ function doPost(e) {
         const sheet = getReportsSheet_();
         sheet.appendRow([new Date(), project, "'" + String(record.EmployeeID), "'" + String(record.SurveyID || ""), lat, lng,
           parseClientTimestamp_(record.Timestamp) || "", requestKey, note, "'" + reportedBy, "open", "", ""]);
+        formatReportColumns_(sheet);
         let slackSent = false;
         try {
           slackSent = sendSlackAlert_(buildReportMessage_(project, record, requestKey, note, reportedBy, lat, lng), project, record);
@@ -338,6 +339,9 @@ function doPost(e) {
           data.slackMessage = alert.outOfRadius ? buildSlackAnomalyMessage_(request.project, data, lat, lng, alert) : "";
         }
         sheet.appendRow(buildDataRow_(data, savedTimestamp));
+        // A row appended past the end of the grid has no format and shows the file's US date (10/14/2026),
+        // so the columns are formatted again now that the new row exists.
+        formatDataColumns_(sheet);
 
         let slackSent = false;
         if (alert && alert.outOfRadius) {
@@ -607,6 +611,11 @@ function formatDataColumns_(sheet) {
   sheet.getRange("A2:A").setNumberFormat("@");
   sheet.getRange("B2:B").setNumberFormat("@");
   sheet.getRange("C2:C").setNumberFormat("dd/MM/yyyy, HH:mm:ss");
+}
+
+// Reports tab: Timestamp (A), RecordTimestamp (G) and ResolvedAt (L) read day/month/year like the data tabs.
+function formatReportColumns_(sheet) {
+  ["A2:A", "G2:G", "L2:L"].forEach((range) => sheet.getRange(range).setNumberFormat("dd/MM/yyyy, HH:mm:ss"));
 }
 
 function ensureProjectDataHeaders_(sheet) {
