@@ -116,6 +116,30 @@ test.describe("field worker", () => {
     await noErrors(page);
   });
 
+  test("company logo sits in front of the project name", async ({ page }) => {
+    const name = "DOW Thailand Group Community Acceptance Survey 2026";
+    db.projects.push(name); db.rows[name] = [];
+    await page.route("**/www.google.com/s2/favicons**", route => route.abort());   // offline icon: the initials badge stays
+    await page.reload();
+    const card = page.locator(".figma-project-card", { hasText: "DOW Thailand" });
+    await expect(card.locator(".lt-brand-badge")).toHaveText("DOW");
+    await card.click();
+    await expect(page.locator("#tracker-title")).toHaveText(name);
+    await expect(page.locator("#tracker-brand .lt-brand-badge")).toHaveText("DOW");
+    // logo and name share one line; the name is cut with … on a phone, never pushed off the panel
+    const box = await page.evaluate(() => {
+      const b = document.querySelector("#tracker-brand .lt-brand-badge").getBoundingClientRect(), t = document.getElementById("tracker-title").getBoundingClientRect(), head = document.querySelector(".lt-sheet-head").getBoundingClientRect();
+      return { sameLine: Math.abs((b.top + b.bottom) / 2 - (t.top + t.bottom) / 2) < 6, before: b.right <= t.left + 1, inside: t.right <= head.right && b.left >= head.left };
+    });
+    expect(box).toEqual({ sameLine: true, before: true, inside: true });
+    await checkA11y(page, "pin screen with company logo");
+    // a project without a company keyword shows no logo
+    await page.click("#home-button");
+    await openProject(page, "Alpha");
+    await expect(page.locator("#tracker-brand .lt-brand-badge")).toHaveCount(0);
+    await noErrors(page);
+  });
+
   test("big project: every pin on the map, a short list, Mine filter", async ({ page }) => {
     // 150 saved records from 5 people around the main coordinate
     db.rows.Beta = Array.from({ length: 150 }, (_, i) => ({ EmployeeID: ["861", "781", "864", "902", "915"][i % 5], SurveyID: String(1000 + i),

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker V12.8 (12.10.2026)</title>
+    <title>Location Tracker V12.9 (14.10.2026)</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -735,6 +735,20 @@
         #project-selection-view .figma-project-card:nth-child(5n+4) { background: #ECE5FF; }
         #project-selection-view .figma-project-card:nth-child(5n+5) { background: #FFE3EE; }
         #project-selection-view .figma-project-card i { color: #fff; }
+        /* Company logo in front of the project name on the pin screen (same badge as the project list) */
+        .lt-title-wrap { display: flex; align-items: center; justify-content: center; gap: 10px; min-width: 0; }
+        .lt-title-wrap .lt-sheet-title { min-width: 0; }
+        .lt-title-brand:empty { display: none; }
+        .lt-title-brand .lt-brand-badge {
+            width: 36px; height: 36px; border-radius: 50%; flex: 0 0 auto;
+            display: grid; place-items: center; overflow: hidden;
+            color: #fff; font-size: 11.5px; font-weight: 800; letter-spacing: 0.02em; line-height: 1;
+            box-shadow: 0 0 0 1px rgba(11, 18, 32, 0.08), 0 2px 6px rgba(11, 18, 32, 0.08);
+        }
+        .lt-title-brand .lt-brand-badge--long { font-size: 9.5px; letter-spacing: 0; }
+        .lt-title-brand .lt-brand-badge img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+        .lt-top .lt-title-wrap { gap: 8px; }
+        .lt-top .lt-title-brand .lt-brand-badge { width: 30px; height: 30px; }
         #project-selection-view .figma-project-card .lt-brand-badge {
             width: 40px; height: 40px; border-radius: 50%; flex: 0 0 auto;
             display: grid; place-items: center; overflow: hidden;
@@ -935,7 +949,10 @@
                     <div id="tracker-top" class="lt-top">
                     <header class="lt-sheet-head">
                         <button id="home-button" class="btn lt-circle-btn" title="Back to projects"><i class="fas fa-house"></i></button>
-                        <h3 id="tracker-title" class="lt-sheet-title">Project Name</h3>
+                        <div class="lt-title-wrap">
+                            <span id="tracker-brand" class="lt-title-brand" aria-hidden="true"></span>
+                            <h3 id="tracker-title" class="lt-sheet-title">Project Name</h3>
+                        </div>
                         <span aria-hidden="true"></span>
                     </header>
 
@@ -1202,17 +1219,25 @@
             badge.style.background = "#fff";
             badge.classList.add("lt-brand-badge--img");
         }
+        const brandFor = name => BRAND_BADGES.find(b => b.match.some(k => hit(name, k)));
+        // Builds the round company badge: initials first, the website icon once it has loaded and is big enough.
+        function makeBadge(brand) {
+            const badge = document.createElement("span");
+            badge.className = "lt-brand-badge" + (brand.label.length > 3 ? " lt-brand-badge--long" : "");
+            badge.setAttribute("aria-hidden", "true");
+            fillBadge(badge, brand);
+            return badge;
+        }
         function decorate(card) {
             if (card.dataset.brandChecked) return;
             card.dataset.brandChecked = "1";
             const name = card.querySelector("span")?.textContent || "";
-            const brand = BRAND_BADGES.find(b => b.match.some(k => hit(name, k)));
+            const brand = brandFor(name);
             const icon = card.querySelector("i");
             if (!brand || !icon) return;
-            const badge = document.createElement("span");
-            badge.className = "lt-brand-badge" + (brand.label.length > 3 ? " lt-brand-badge--long" : "");
-            badge.setAttribute("aria-hidden", "true");
-            icon.replaceWith(badge);
+            icon.replaceWith(makeBadge(brand));
+        }
+        function fillBadge(badge, brand) {
             const src = iconUrl(brand);
             const state = src ? iconState[src] : "bad";
             if (state === "ok") return showIcon(badge, brand);
@@ -1226,12 +1251,30 @@
             probe.onerror = () => { iconState[src] = "bad"; };
             probe.src = src;
         }
+        // The pin screen shows the same badge in front of the project name; it follows every change of the title.
+        function decorateTitle() {
+            const title = document.getElementById("tracker-title");
+            const slot = document.getElementById("tracker-brand");
+            if (!title || !slot) return;
+            const name = title.textContent || "";
+            if (slot.dataset.forName === name) return;
+            slot.dataset.forName = name;
+            slot.textContent = "";
+            const brand = brandFor(name);
+            if (brand) slot.appendChild(makeBadge(brand));
+        }
         function start() {
             const list = document.getElementById("project-list");
-            if (!list) return;
-            const run = () => list.querySelectorAll(".figma-project-card").forEach(decorate);
-            new MutationObserver(run).observe(list, { childList: true });
-            run();
+            if (list) {
+                const run = () => list.querySelectorAll(".figma-project-card").forEach(decorate);
+                new MutationObserver(run).observe(list, { childList: true });
+                run();
+            }
+            const title = document.getElementById("tracker-title");
+            if (title) {
+                new MutationObserver(decorateTitle).observe(title, { childList: true, characterData: true, subtree: true });
+                decorateTitle();
+            }
         }
         if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
     })();
