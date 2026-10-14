@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker V12.13 (14.10.2026)</title>
+    <title>Location Tracker V12.14 (14.10.2026)</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -323,17 +323,13 @@
         .search-container.expanded .search-input-wrapper { opacity: 1; }
         #locationSearchInput { flex: 1 1 auto; min-width: 0; background: transparent; border: 0; outline: none; font-size: 15px; font-weight: 600; color: var(--ink); padding: 6px 2px; }
         #locationSearchInput::placeholder { color: var(--placeholder); font-weight: 500; }
-        #searchLocationButton {
-            flex: 0 0 auto; min-height: 34px; padding: 0 12px; border: 0; border-radius: 17px;
-            background: var(--primary-hover); color: #fff;
-            font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
-        }
         #search-suggestions {
             position: absolute; top: calc(100% + 8px); left: 0; width: 100%;
             background: #fff; border-radius: var(--r-field);
             box-shadow: 0 14px 34px rgba(11, 18, 32, 0.18);
-            max-height: 260px; overflow-y: auto; z-index: 2000;
+            overflow: hidden; z-index: 2000;   /* the list scrolls inside, so the scrollbar never squares a corner */
         }
+        #search-listbox { max-height: 260px; overflow-y: auto; }
         .suggestion-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
         .suggestion-item:hover, .suggestion-item[aria-selected="true"] { background: var(--blue-tint); }
         .suggestion-name { font-size: 14px; font-weight: 800; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -563,6 +559,13 @@
         }
         .lt-hint i { color: var(--primary-hover); }
         .lt-top .lt-hint { margin-bottom: 8px; padding: 8px 12px; font-size: 13px; }
+        /* Why Upload / Save are switched off right now (empty = nothing to say) */
+        .lt-reason { margin: -16px 0 20px; font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--ink-2); }
+        .lt-reason:empty { display: none; }
+        .lt-reason--modal { margin: 0; }
+        .lt-primary:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+        .lt-reason i { margin-right: 6px; color: var(--muted); }
+        .lt-actions .btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
         .lt-empty-row td { padding: 20px 16px !important; text-align: center; color: var(--muted); font-weight: 500; font-size: 14px; line-height: 1.45; }
 
         /* Records list: newest first, a short list by default */
@@ -698,6 +701,7 @@
             .lt-top .lt-actions { gap: 8px; margin-bottom: 0; }
             .lt-top .lt-primary, .lt-top .lt-save { min-height: 52px; border-radius: 16px; }
             .lt-top .lt-primary { font-size: 15px; }
+            .lt-top .lt-reason { margin: 6px 2px 0; font-size: 12px; }
         }
 
         /* ---------- Larger screens: the layout grows with the screen ---------- */
@@ -986,8 +990,7 @@
                         <div id="toggleSearchBtn" role="button" tabindex="0" aria-label="Search the map" aria-expanded="false"><i class="fas fa-magnifying-glass" aria-hidden="true"></i></div>
                         <div class="search-input-wrapper">
                             <input id="locationSearchInput" type="text" placeholder="Search place, address or coordinate..." autocomplete="off"
-                                role="combobox" aria-label="Search place, address or coordinate" aria-autocomplete="list" aria-expanded="false" aria-controls="search-listbox">
-                            <button id="searchLocationButton">Find</button>
+                                role="combobox" aria-label="Search place, address or coordinate" aria-autocomplete="list" aria-expanded="false" aria-controls="search-listbox" enterkeyhint="search">
                             <div id="search-suggestions" class="hidden"><div id="search-status" role="status" aria-live="polite"></div><div id="search-listbox" role="listbox" aria-label="Search results"></div></div>
                         </div>
                     </div>
@@ -1039,9 +1042,10 @@
                     </div>
 
                     <div id="normalActionButtons" class="lt-actions">
-                        <button id="uploadButton" class="btn lt-primary" title="Save this record and upload now"><i class="fas fa-cloud-arrow-up"></i><span>UPLOAD</span></button>
-                        <button id="saveButton" class="btn lt-save" title="Save on this device only, send later"><i class="fas fa-floppy-disk" aria-hidden="true"></i><span>Save</span><small>this phone</small></button>
+                        <button id="uploadButton" class="btn lt-primary" title="Save this record and upload now" aria-describedby="action-reason"><i class="fas fa-cloud-arrow-up" aria-hidden="true"></i><span>UPLOAD</span></button>
+                        <button id="saveButton" class="btn lt-save" title="Save on this device only, send later" aria-describedby="action-reason"><i class="fas fa-floppy-disk" aria-hidden="true"></i><span>Save</span><small>this phone</small></button>
                     </div>
+                    <p id="action-reason" class="lt-reason" role="status" aria-live="polite"></p>
                     <div id="sync-status" class="lt-sync hidden" role="status" aria-live="polite">
                         <i id="sync-status-icon" class="fas fa-cloud-arrow-up" aria-hidden="true"></i>
                         <span id="sync-status-text"></span>
@@ -1192,10 +1196,11 @@
                     <label class="lt-choice"><input type="radio" name="report-request" value="other">Other</label>
                 </div>
                 <div>
-                    <label class="lt-label" for="report-note" style="margin-bottom: 6px;">Note for the admin <em style="font-style: normal; font-weight: 500;">(what it should be)</em></label>
-                    <textarea id="report-note" class="lt-textarea" maxlength="500" placeholder="e.g. Survey ID should be 108"></textarea>
+                    <label class="lt-label" for="report-note" style="margin-bottom: 6px;">Note for the admin <em id="report-note-hint" style="font-style: normal; font-weight: 500;">(optional)</em></label>
+                    <textarea id="report-note" class="lt-textarea" maxlength="500" placeholder="Anything the admin should know"></textarea>
                 </div>
-                <button type="submit" id="report-send" class="btn lt-primary uppercase"><i class="fas fa-paper-plane"></i><span>Send to admin</span></button>
+                <p id="report-reason" class="lt-reason lt-reason--modal" role="status" aria-live="polite"></p>
+                <button type="submit" id="report-send" class="btn lt-primary uppercase" aria-describedby="report-reason"><i class="fas fa-paper-plane" aria-hidden="true"></i><span>Send to admin</span></button>
             </form>
         </div>
     </dialog>
@@ -1537,16 +1542,49 @@
             return lines.join('<br>');
         }
 
-        // A closed project takes no new pins: both buttons go quiet and say why.
-        function updateClosedProjectState() {
+        // A closed project takes no new pins: both buttons go quiet and say why (see renderActionState).
+        function updateClosedProjectState() { renderSyncStatus(); }
+
+        // What is wrong with the entry on screen, before anyone presses a button. null = ready to save.
+        function entryProblem() {
+            const eid = ui.employeeId.value.trim(), sid = ui.surveyId.value.trim();
+            const missing = [];
+            if (currentLat === null) missing.push("set the location on the map");
+            if (!eid) missing.push(`enter ${customLabels.employeeId}`);
+            if (!sid) missing.push(`enter ${customLabels.surveyId}`);
+            if (missing.length) return { missing };
+            const all = [...savedLocations, ...pendingLocations];
+            if (all.some(l => l.EmployeeID === eid && l.SurveyID === sid)) return { blocked: `${customLabels.surveyId} ${sid} is already recorded for ${eid}` };
+            if (all.some(l => l.Latitude === currentLat && l.Longitude === currentLng)) return { blocked: "This spot is already pinned - move the pin" };
+            return null;
+        }
+
+        // Upload / Save only switch on when they can work, and the line under them says why not.
+        // Upload counts the pins it will send: the waiting ones plus the entry on screen when it is complete.
+        function renderActionState() {
+            const up = document.getElementById("uploadButton"), save = document.getElementById("saveButton"), reason = document.getElementById("action-reason");
+            if (!up || !save || !reason || !ui || !ui.employeeId) return;
             const closed = !!currentProjectName && getProjectConfig(currentProjectName).isClosed;
-            const uploadBtn = document.getElementById("uploadButton"), saveBtn = document.getElementById("saveButton");
-            [uploadBtn, saveBtn].forEach(btn => {
-                btn.disabled = closed;
-                btn.classList.toggle("opacity-40", closed);
-                btn.classList.toggle("pointer-events-none", closed);
-            });
-            renderSyncStatus();
+            const n = pendingLocations.length;
+            const typed = ui.surveyId.value.trim() !== "";
+            const problem = entryProblem();
+            const pins = n + (problem ? 0 : 1);
+            let upOk, saveOk, why = "";
+            if (closed) { upOk = saveOk = false; why = "This project is closed - no new pins"; }
+            else {
+                saveOk = !problem;
+                upOk = !isUploading && (!problem || (n > 0 && !typed));   // a half-typed entry is never dropped silently
+                if (problem) {
+                    const todo = problem.blocked || problem.missing.join(", ");
+                    why = (n > 0 && !typed && !problem.blocked ? "To add a pin: " : "To save: ") + todo;
+                }
+            }
+            up.disabled = !upOk; save.disabled = !saveOk;
+            up.querySelector("span").textContent = closed ? "PROJECT CLOSED" : isUploading ? "SENDING..." : pins ? `UPLOAD ${pins} ${pins === 1 ? "PIN" : "PINS"}` : "UPLOAD";
+            if (reason.dataset.text !== why) {
+                reason.dataset.text = why;
+                reason.innerHTML = why ? `<i class="fas fa-circle-info" aria-hidden="true"></i>${escapeHtml(why)}` : "";
+            }
         }
 
         // The honest counter: how many records are still on this device, and whether there is a connection.
@@ -1560,7 +1598,7 @@
             const offline = navigator.onLine === false;
             const closed = !!currentProjectName && getProjectConfig(currentProjectName).isClosed;
             const records = n === 1 ? "1 record" : `${n} records`;
-            uploadBtn.querySelector("span").textContent = closed ? "PROJECT CLOSED" : (n ? `UPLOAD (${n})` : "UPLOAD");
+            renderActionState();
             strip.classList.toggle("hidden", n === 0 && !offline);
             strip.classList.toggle("lt-sync--offline", offline);
             document.getElementById("sync-status-icon").className = offline ? "fas fa-wifi" : "fas fa-cloud-arrow-up"   /* fa-wifi-slash is not in this Font Awesome build */;
@@ -1573,6 +1611,7 @@
         function renderPinHint() {
             const hint = document.getElementById("pin-hint");
             if (hint) hint.classList.toggle("hidden", currentLat !== null);
+            renderActionState();
         }
 
         // Records waiting to upload are kept per project on this device, so they survive a reload
@@ -1754,7 +1793,7 @@
                 finally { clearTimeout(timer); if (signal) signal.removeEventListener("abort", stop); }
             }
             async function photon(q, center, signal) {
-                let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&bbox=${TH_BBOX}`;
+                let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&bbox=${TH_BBOX}&lang=default`;   // local (Thai) names, whatever the browser language
                 if (center) url += `&lat=${center.lat.toFixed(4)}&lon=${center.lng.toFixed(4)}`;
                 const res = await fetchSoon(url, signal);
                 if (!res.ok) throw new Error("photon " + res.status);
@@ -1774,13 +1813,16 @@
                 return (Array.isArray(data) ? data : []).map(nominatimItem).filter(Boolean);
             }
 
-            // Names that start with / contain what was typed come first; near-duplicates (same name within ~150 m) are dropped.
-            function rank(q, lists) {
+            // Names that start with / contain what was typed come first, and among those the one nearest the map
+            // (seven "7-11 ลาดพร้าว" branches -> the closest). Typo matches keep the service's order: nearness must not
+            // put "คลองเชียงรากใหม่" above "เชียงใหม่". Near-duplicates (same name within ~150 m) are dropped.
+            function rank(q, lists, center) {
                 const nq = norm(q), seen = [];
+                const away = (it) => center ? (it.lat - center.lat) ** 2 + ((it.lng - center.lng) * Math.cos(center.lat * Math.PI / 180)) ** 2 : 0;
                 const all = lists.flat().map((it, i) => {
                     const n = norm(it.name);
-                    return { it, i, score: n === nq ? 0 : n.startsWith(nq) ? 1 : n.includes(nq) || nq.includes(n) ? 2 : 3 };
-                }).sort((a, b) => a.score - b.score || a.i - b.i);
+                    return { it, i, d: away(it), score: n === nq ? 0 : n.startsWith(nq) ? 1 : n.includes(nq) || nq.includes(n) ? 2 : 3 };
+                }).sort((a, b) => a.score - b.score || (a.score < 3 ? a.d - b.d : 0) || a.i - b.i);
                 const out = [];
                 for (const { it } of all) {
                     const n = norm(it.name);
@@ -1798,29 +1840,29 @@
                 if (!q) return { items: [] };
                 const coord = parseCoordinates(q);
                 if (coord) return { items: [coord] };
-                const key = q.toLowerCase();
+                const key = q.toLowerCase() + (center ? `@${center.lat.toFixed(1)},${center.lng.toFixed(1)}` : "");   // the order depends on where the map is
                 if (cache.has(key)) return cache.get(key);
                 let failures = 0;
                 const tryIt = (p) => p.catch(e => { if (e && e.name === "AbortError") throw e; failures++; return []; });
                 let p = await tryIt(photon(q, center, signal));
                 // "ตำบลคลองหนึ่ง ปทุมธานี": look up the first word and keep the hits that sit in the rest (the province / district)
                 const words = q.split(/\s+/);
-                if (words.length > 1 && !strong(q, rank(q, [p]))) {
+                if (words.length > 1 && !strong(q, rank(q, [p], center))) {
                     const rest = words.slice(1).map(norm).filter(Boolean);
                     const head = (await tryIt(photon(words[0], center, signal)))
                         .filter(it => rest.every(w => norm(it.detail + it.name).includes(w)));
                     p = [...head, ...p];
                 }
-                let items = rank(q, [p]);
+                let items = rank(q, [p], center);
                 // Photon first on equal footing: it is the one that forgives typos
-                if (!strong(q, items)) items = rank(q, [p, await tryIt(nominatim(q, center, signal))]);
+                if (!strong(q, items)) items = rank(q, [p, await tryIt(nominatim(q, center, signal))], center);
                 let fuzzy = false;
                 if (!items.length) {
                     const variants = thaiVariants(q);
                     if (variants.length) {
                         const lists = await Promise.all(variants.map(v => tryIt(photon(v, center, signal))));
-                        let found = rank(variants[0], lists);
-                        if (!found.length) found = rank(variants[0], [await tryIt(nominatim(variants[0], center, signal))]);
+                        let found = rank(variants[0], lists, center);
+                        if (!found.length) found = rank(variants[0], [await tryIt(nominatim(variants[0], center, signal))], center);
                         items = found; fuzzy = found.length > 0;
                     }
                 }
@@ -1921,18 +1963,44 @@
                 `<span><b>Coordinate:</b> ${Number(loc.Latitude).toFixed(6)}, ${Number(loc.Longitude).toFixed(6)}</span>`;
             document.querySelectorAll('input[name="report-request"]').forEach(r => { r.checked = false; });
             document.getElementById("report-note").value = "";
+            reportSending = false; reportError = "";
+            renderReportState();
             openModal("reportModal");
+        }
+
+        // Every request except "delete" needs the correct value in the note, so the admin can act on it.
+        // Send stays off (with the reason above it) until the form is complete, and says what it will send.
+        let reportSending = false, reportError = "";
+        function reportNeeds(value) {
+            return {
+                wrong_employee: { hint: `(required - the correct ${customLabels.employeeId})`, placeholder: `e.g. ${customLabels.employeeId} should be 0861`, missing: `Write the correct ${customLabels.employeeId} in the note` },
+                wrong_survey: { hint: `(required - the correct ${customLabels.surveyId})`, placeholder: `e.g. ${customLabels.surveyId} should be 108`, missing: `Write the correct ${customLabels.surveyId} in the note` },
+                wrong_location: { hint: "(required - where it should be)", placeholder: "e.g. the house across the road, next to the 7-11", missing: "Write where the pin should be in the note" },
+                other: { hint: "(required - what should change)", placeholder: "What should the admin change?", missing: "Write what should change in the note" },
+            }[value] || null;
+        }
+        function renderReportState() {
+            const choice = document.querySelector('input[name="report-request"]:checked');
+            const noteEl = document.getElementById("report-note"), btn = document.getElementById("report-send");
+            const need = choice ? reportNeeds(choice.value) : null;
+            document.getElementById("report-note-hint").textContent = need ? need.hint : "(optional)";
+            noteEl.placeholder = need ? need.placeholder : "Anything the admin should know";
+            noteEl.setAttribute("aria-required", String(!!need));
+            const why = !choice ? "Choose what should be done with this record" : (need && !noteEl.value.trim() ? need.missing : "");
+            btn.disabled = reportSending || !!why;
+            btn.querySelector("i").className = reportSending ? "fas fa-spinner fa-spin" : "fas fa-paper-plane";
+            btn.querySelector("span").textContent = reportSending ? "Sending..." : !choice ? "Send to admin" : choice.value === "delete" ? "Send delete request" : "Send fix request";
+            document.getElementById("report-reason").textContent = why || reportError;   // a failed send is said here, next to the button
         }
 
         async function sendReport(e) {
             e.preventDefault();
-            if (!reportTarget) return;
+            if (!reportTarget || reportSending) return;
             const choice = document.querySelector('input[name="report-request"]:checked');
             const note = document.getElementById("report-note").value.trim();
-            if (!choice) return showMessage("Choose what should be done", "warning");
-            if (choice.value === "other" && !note) return showMessage("Please write what should be changed", "warning");
-            const btn = document.getElementById("report-send");
-            btn.disabled = true;
+            if (!choice || (reportNeeds(choice.value) && !note)) { renderReportState(); return; }
+            reportSending = true; reportError = "";
+            renderReportState();
             try {
                 const res = await fetch(WEB_APP_URL, { method: "POST", headers: POST_HEADERS, body: JSON.stringify({
                     action: "reportRecord", project: currentProjectName, request: choice.value, note,
@@ -1943,11 +2011,12 @@
                 if (result.success) {
                     closeModal("reportModal");
                     showMessage("Sent to the admin", "success");
-                } else showMessage(result.message || "Could not send", "error");
+                } else reportError = result.message || "Could not send - try again";
             } catch (err) {
-                showMessage("Could not send - check the connection", "error");
+                reportError = "Could not send - check the connection and try again";
             }
-            btn.disabled = false;
+            reportSending = false;
+            renderReportState();
         }
 
         // ----- Admin: who can sign in -----
@@ -2074,10 +2143,19 @@
             updateLabels();
         };
 
+        // The Employee ID typed on this phone is kept on this phone (cleared when the field is emptied).
+        const EMPLOYEE_ID_KEY = "lt_employee_id";
+        function readEmployeeId() { try { return localStorage.getItem(EMPLOYEE_ID_KEY) || ""; } catch (e) { return ""; } }
+        function rememberEmployeeId() {
+            const value = ui.employeeId ? ui.employeeId.value.trim() : "";
+            try { if (value) localStorage.setItem(EMPLOYEE_ID_KEY, value); else localStorage.removeItem(EMPLOYEE_ID_KEY); } catch (e) {}
+        }
+
         window.setEmployeeLock = function(locked) {
             isEmployeeIdLocked = locked;
             const input = document.getElementById("employeeIdInput");
             if (input) input.disabled = locked;
+            if (locked) rememberEmployeeId();
             const icon = document.getElementById("lockIcon");
             if (icon) icon.className = locked ? "fas fa-lock text-primary-blue" : "fas fa-lock-open text-slate-300";
             const lockBtn = document.getElementById("lockEmployeeIdBtn");
@@ -2534,7 +2612,7 @@
             if (currentEID !== "") {
                 const count = all.filter(l => l.EmployeeID === currentEID).length;
                 if (document.getElementById("eid-pin-count")) {
-                    document.getElementById("eid-pin-count").textContent = `${count} PINS`;
+                    document.getElementById("eid-pin-count").textContent = `${count} ${count === 1 ? "PIN" : "PINS"}`;
                     document.getElementById("eid-pin-count").classList.remove("hidden");
                 }
             } else if (document.getElementById("eid-pin-count")) document.getElementById("eid-pin-count").classList.add("hidden");
@@ -2601,6 +2679,9 @@
                 isAdminAuthenticated = true;
             }
             renderAdminAccount();
+            // The field worker's own Employee ID comes back after a reload, already locked (the lock button still opens it).
+            const savedEmployeeId = readEmployeeId();
+            if (savedEmployeeId) { ui.employeeId.value = savedEmployeeId; window.setEmployeeLock(true); }
             updateLabels();   // cached labels show at once; the server copy arrives with the project list
             document.querySelectorAll("dialog.modal-overlay").forEach(dialog => {
                 dialog.addEventListener("close", () => {
@@ -2664,7 +2745,7 @@
             };
 
             document.getElementById("close-password-modal").onclick = () => { closeModal("passwordModal"); };
-            document.getElementById("home-button").onclick = () => { ui.employeeId.value = ""; window.showView("project-selection-view"); };
+            document.getElementById("home-button").onclick = () => window.showView("project-selection-view");   // the Employee ID stays: same worker, next project
             document.getElementById("refresh-projects-btn").onclick = () => fetchProjects();
             
             document.getElementById("manage-projects-btn").onclick = () => {
@@ -2714,7 +2795,8 @@
             document.getElementById("lockEmployeeIdBtn").onclick = () => window.setEmployeeLock(!isEmployeeIdLocked);
             ui.employeeId.onblur = () => { if (ui.employeeId.value.trim() !== "") window.setEmployeeLock(true); };
             ui.employeeId.addEventListener('keydown', (e) => { if (e.key === 'Enter' && ui.employeeId.value.trim() !== "") { window.setEmployeeLock(true); ui.surveyId.focus(); } });
-            ui.employeeId.oninput = () => renderTable();
+            ui.employeeId.oninput = () => { rememberEmployeeId(); renderTable(); };
+            ui.surveyId.addEventListener("input", renderActionState);
 
             document.getElementById("currentLocationButton").onclick = () => {
                 showMessage("Getting your location...", "info");
@@ -2754,7 +2836,7 @@
                 };
                 pendingLocations.push(record);
                 savePendingLocations();
-                if (!isEmployeeIdLocked) ui.employeeId.value = "";
+                if (!isEmployeeIdLocked) { ui.employeeId.value = ""; rememberEmployeeId(); }
                 ui.surveyId.value = ""; renderTable();
                 return record;
             }
@@ -2945,6 +3027,9 @@
             document.getElementById("requests-back-to-menu-btn").onclick = () => window.showView("admin-menu-view");
             document.getElementById("report-close").onclick = () => { closeModal("reportModal"); };
             document.getElementById("report-form").onsubmit = sendReport;
+            const reportChanged = () => { reportError = ""; renderReportState(); };
+            document.getElementById("report-form").addEventListener("change", reportChanged);
+            document.getElementById("report-note").addEventListener("input", reportChanged);
             
             // Map search box: history (staff / survey IDs) + places (PlaceSearch). Arrow keys move, Enter picks, Esc closes.
             const sIn = document.getElementById("locationSearchInput"), sBox = document.getElementById("search-suggestions");
@@ -3060,7 +3145,6 @@
             });
             sIn.addEventListener("focus", () => { if (sIn.value.trim() && searchOptions.length) { sBox.classList.remove("hidden"); sIn.setAttribute("aria-expanded", "true"); } });
             document.addEventListener("pointerdown", (e) => { if (!document.getElementById("searchBox").contains(e.target)) closeSuggestions(); });
-            document.getElementById("searchLocationButton").onclick = findNow;
         };
     </script>
 </body>
