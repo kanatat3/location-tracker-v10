@@ -129,14 +129,18 @@ test.describe("field worker", () => {
     // logo and name share one line; the name is cut with … on a phone, never pushed off the panel
     const box = await page.evaluate(() => {
       const b = document.querySelector("#tracker-brand .lt-brand-badge").getBoundingClientRect(), t = document.getElementById("tracker-title").getBoundingClientRect(), head = document.querySelector(".lt-sheet-head").getBoundingClientRect();
-      return { sameLine: Math.abs((b.top + b.bottom) / 2 - (t.top + t.bottom) / 2) < 6, before: b.right <= t.left + 1, inside: t.right <= head.right && b.left >= head.left };
+      // the name itself stays in the centre of the header, as it was before the logo
+      return { sameLine: Math.abs((b.top + b.bottom) / 2 - (t.top + t.bottom) / 2) < 6, before: b.right <= t.left + 1, inside: t.right <= head.right && b.left >= head.left,
+        centred: Math.abs((t.left + t.right) / 2 - (head.left + head.right) / 2) <= 2 };
     });
-    expect(box).toEqual({ sameLine: true, before: true, inside: true });
+    expect(box).toEqual({ sameLine: true, before: true, inside: true, centred: true });
     await checkA11y(page, "pin screen with company logo");
     // a project without a company keyword shows no logo
     await page.click("#home-button");
     await openProject(page, "Alpha");
     await expect(page.locator("#tracker-brand .lt-brand-badge")).toHaveCount(0);
+    const plain = await page.evaluate(() => { const t = document.getElementById("tracker-title").getBoundingClientRect(), h = document.querySelector(".lt-sheet-head").getBoundingClientRect(); return Math.abs((t.left + t.right) / 2 - (h.left + h.right) / 2); });
+    expect(plain).toBeLessThanOrEqual(2);
     await noErrors(page);
   });
 
