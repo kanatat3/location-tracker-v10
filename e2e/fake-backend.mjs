@@ -4,6 +4,22 @@ export const BASE = { lat: 13.7465, lng: 100.5348 };          // Beta's main coo
 export const OUTSIDE = { lat: 13.92, lng: 100.5348 };          // ~19 km north of it
 
 const km = (a, b, c, d) => { const r = v => v * Math.PI / 180; const x = Math.sin(r(c - a) / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(r(d - b) / 2) ** 2; return 6371 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)); };
+// Fake place search, shaped like the real answers seen on 2026-10-14: Photon forgives typos but misses
+// some exact Thai names; Nominatim knows exact names but nothing misspelled. Unknown Nominatim queries
+// answer "Somewhere, Bangkok"; "ไม่มีที่นี่" finds nothing anywhere.
+const feature = (name, lat, lng, props = {}) => ({ type: "Feature", geometry: { type: "Point", coordinates: [lng, lat] }, properties: { name, countrycode: "TH", district: "ปทุมวัน", state: "กรุงเทพมหานคร", ...props } });
+export const GEO = {
+  photon: {
+    "เซนทรัลเวิล": [feature("เซ็นทรัลเวิลด์", 13.7468, 100.5393), feature("เซ็นทรัลเวิลด์สแควร์", 13.7470, 100.5400)],
+    "เซ็นทรัลเวิลด์": [feature("เซ็นทรัลเวิลด์", 13.7468, 100.5393)],
+    "evil": [feature('<img src=x onerror="window.__xss=1">Evil Mall', 13.75, 100.5)],
+    "เชียงใหม่": [feature("เชียงใหม่", 18.7883, 98.9853, { district: "", state: "จังหวัดเชียงใหม่", extent: [98.9, 18.85, 99.05, 18.7] })],
+  },
+  nominatim: {
+    "สยามพารากอน": [{ lat: "13.7461", lon: "100.5348", name: "สยามพารากอน", display_name: "สยามพารากอน, 991, ถนนพระรามที่ 1, แขวงปทุมวัน, เขตปทุมวัน, กรุงเทพมหานคร, 10330, ประเทศไทย" }],
+    "สยามพารากอล": [], "เซนทรัลเวิล": [], "ไม่มีที่นี่": [], "evil": [],
+  },
+};
 const REQUESTS = { delete: "Delete this record", wrong_employee: "Wrong Employee ID", wrong_survey: "Wrong Survey ID", wrong_location: "Wrong location", other: "Other" };
 
 export function createDb() {
@@ -118,8 +134,18 @@ export async function installFakeBackend(page, db, options = {}) {
     route.fulfill(handle(db, req.method(), req.url(), req.postData()));
   });
   await page.route("**/nominatim.openstreetmap.org/**", route => {
-    const u = route.request().url();
-    route.fulfill({ status: 200, contentType: "application/json", body: u.includes("/search") ? JSON.stringify([{ lat: "13.9", lon: "100.6", display_name: "Somewhere, Bangkok" }]) : JSON.stringify({ display_name: "88 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110" }) });
+    if (db.geoOffline) return route.abort("internetdisconnected");
+    const u = new URL(route.request().url());
+    if (!u.pathname.includes("/search")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ display_name: "88 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110" }) });
+    const q = u.searchParams.get("q");
+    const hits = q in GEO.nominatim ? GEO.nominatim[q] : [{ lat: "13.9", lon: "100.6", display_name: "Somewhere, Bangkok" }];
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(hits) });
+  });
+  await page.route("**/photon.komoot.io/**", route => {
+    if (db.geoOffline) return route.abort("internetdisconnected");
+    if (db.photonHang) return;   // never answers, like a weak phone signal
+    const q = new URL(route.request().url()).searchParams.get("q");
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ type: "FeatureCollection", features: GEO.photon[q] || [] }) });
   });
   // Google's sign-in script never loads; a stand-in button calls the page's callback with a fake credential.
   await page.route("**/accounts.google.com/**", route => route.abort());
