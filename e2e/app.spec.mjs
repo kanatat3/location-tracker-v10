@@ -227,6 +227,11 @@ test.describe("field worker", () => {
     db.geoOffline = true;
     await input.fill("ร้านกาแฟ");
     await expect(page.locator("#search-status")).toContainText(/search unavailable/i);
+
+    // Photon hangs: after 8 s Nominatim answers instead of "Searching..." forever
+    db.geoOffline = false; db.photonHang = true;
+    await input.fill("ตลาดน้ำ");
+    await expect(options.first()).toContainText("Somewhere", { timeout: 15000 });
     await noErrors(page);
   });
 

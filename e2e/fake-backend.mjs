@@ -143,6 +143,7 @@ export async function installFakeBackend(page, db, options = {}) {
   });
   await page.route("**/photon.komoot.io/**", route => {
     if (db.geoOffline) return route.abort("internetdisconnected");
+    if (db.photonHang) return;   // never answers, like a weak phone signal
     const q = new URL(route.request().url()).searchParams.get("q");
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ type: "FeatureCollection", features: GEO.photon[q] || [] }) });
   });

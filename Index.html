@@ -1741,10 +1741,22 @@
                     bounds: bb && bb.every(Number.isFinite) ? [[bb[0], bb[2]], [bb[1], bb[3]]] : null, src: "nominatim" };
             }
 
+            // A map service that hangs (weak phone signal) counts as failed after 8 s instead of "Searching..." forever.
+            // The typed-over search still cancels with an AbortError; the timeout is an ordinary failure.
+            async function fetchSoon(url, signal, ms = 8000) {
+                const ctrl = new AbortController();
+                const stop = () => ctrl.abort();
+                if (signal) { if (signal.aborted) throw new DOMException("aborted", "AbortError"); signal.addEventListener("abort", stop, { once: true }); }
+                let timedOut = false;
+                const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, ms);
+                try { return await fetch(url, { signal: ctrl.signal }); }
+                catch (e) { if (timedOut) throw new Error("timeout"); throw e; }
+                finally { clearTimeout(timer); if (signal) signal.removeEventListener("abort", stop); }
+            }
             async function photon(q, center, signal) {
                 let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&bbox=${TH_BBOX}`;
                 if (center) url += `&lat=${center.lat.toFixed(4)}&lon=${center.lng.toFixed(4)}`;
-                const res = await fetch(url, { signal });
+                const res = await fetchSoon(url, signal);
                 if (!res.ok) throw new Error("photon " + res.status);
                 const data = await res.json();
                 return (data.features || []).map(photonItem).filter(Boolean);
@@ -1756,7 +1768,7 @@
                 nominatimFree = Date.now() + 1100;
                 let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=6&countrycodes=th&accept-language=th`;
                 if (center) url += `&viewbox=${center.lng - 1},${center.lat + 1},${center.lng + 1},${center.lat - 1}`;
-                const res = await fetch(url, { signal });
+                const res = await fetchSoon(url, signal);
                 if (!res.ok) throw new Error("nominatim " + res.status);
                 const data = await res.json();
                 return (Array.isArray(data) ? data : []).map(nominatimItem).filter(Boolean);
