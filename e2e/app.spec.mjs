@@ -171,6 +171,65 @@ test.describe("field worker", () => {
     await noErrors(page);
   });
 
+  test("map search: as you type, typos, keyboard, coordinates, nothing found", async ({ page }) => {
+    await openProject(page, "Beta");
+    await page.click("#toggleSearchBtn");
+    const input = page.locator("#locationSearchInput");
+    const options = page.locator("#search-listbox [role=option]");
+
+    // a typo still finds the place, the list works with the keyboard and passes axe
+    await input.fill("เซนทรัลเวิล");
+    await expect(options.first()).toContainText("เซ็นทรัลเวิลด์");
+    await expect(options.first()).toContainText("ปทุมวัน");
+    await expect(input).toHaveAttribute("aria-expanded", "true");
+    await checkA11y(page, "search suggestions");
+    await input.press("ArrowDown");
+    await expect(page.locator("#search-opt-0")).toHaveAttribute("aria-selected", "true");
+    await expect(input).toHaveAttribute("aria-activedescendant", "search-opt-0");
+    await input.press("Enter");
+    await expect(page.locator("#lat")).toHaveText("13.746800");
+    await expect(page.locator("#search-suggestions")).toBeHidden();
+    await expect(input).toHaveValue("");
+
+    // an exact Thai name that only Nominatim knows
+    await input.fill("สยามพารากอน");
+    await expect(options.first()).toContainText("สยามพารากอน");
+    // misspelt: the sound-alike spelling is found and Find takes the first result
+    await input.fill("สยามพารากอล");
+    await expect(page.locator("#search-status")).toContainText(/no exact match/i);
+    await expect(options.first()).toContainText("สยามพารากอน");
+    await page.click("#searchLocationButton");
+    await expect(page.locator("#lat")).toHaveText("13.746100");
+
+    // a pasted coordinate or Google Maps link goes straight there
+    await input.fill("13.7563, 100.5018");
+    await expect(options.first()).toContainText("13.756300, 100.501800");
+    await input.press("Enter");
+    await expect(page.locator("#lat")).toHaveText("13.756300");
+    await expect(page.locator("#lng")).toHaveText("100.501800");
+    await input.fill("https://www.google.com/maps/place/x/@13.7465,100.5348,17z");
+    await page.click("#searchLocationButton");
+    await expect(page.locator("#lat")).toHaveText("13.746500");
+
+    // nothing found says so, Esc closes the list
+    await input.fill("ไม่มีที่นี่");
+    await expect(page.locator("#search-status")).toContainText(/no places found/i);
+    await input.press("Escape");
+    await expect(page.locator("#search-suggestions")).toBeHidden();
+
+    // names from the map service are shown as text, never run as HTML
+    await input.fill("evil");
+    await expect(options.first()).toContainText("Evil Mall");
+    expect(await page.locator("#search-listbox img").count()).toBe(0);
+    expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+
+    // no connection to the map services
+    db.geoOffline = true;
+    await input.fill("ร้านกาแฟ");
+    await expect(page.locator("#search-status")).toContainText(/search unavailable/i);
+    await noErrors(page);
+  });
+
   test("big project: every pin on the map, a short list, Mine filter", async ({ page }) => {
     // 150 saved records from 5 people around the main coordinate
     db.rows.Beta = Array.from({ length: 150 }, (_, i) => ({ EmployeeID: ["861", "781", "864", "902", "915"][i % 5], SurveyID: String(1000 + i),

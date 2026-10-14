@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker V12.12 (14.10.2026)</title>
+    <title>Location Tracker V12.13 (14.10.2026)</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -335,7 +335,12 @@
             max-height: 260px; overflow-y: auto; z-index: 2000;
         }
         .suggestion-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
-        .suggestion-item:hover { background: #F4F8FF; }
+        .suggestion-item:hover, .suggestion-item[aria-selected="true"] { background: var(--blue-tint); }
+        .suggestion-name { font-size: 14px; font-weight: 800; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .suggestion-detail { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .suggestion-group { padding: 8px 16px 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: var(--fill); }
+        #search-status { padding: 10px 16px; font-size: 13px; color: var(--muted); }
+        #search-status:empty { display: none; }
 
         #currentLocationButton {
             position: absolute; right: 14px; bottom: 44px; z-index: 1002;
@@ -979,10 +984,11 @@
                     <div id="map"></div>
                     <div id="searchBox" class="search-container">
                         <div id="toggleSearchBtn" role="button" tabindex="0" aria-label="Search the map" aria-expanded="false"><i class="fas fa-magnifying-glass" aria-hidden="true"></i></div>
-                        <div class="search-input-wrapper relative">
-                            <input id="locationSearchInput" type="text" placeholder="Search address or history..." autocomplete="off">
+                        <div class="search-input-wrapper">
+                            <input id="locationSearchInput" type="text" placeholder="Search place, address or coordinate..." autocomplete="off"
+                                role="combobox" aria-label="Search place, address or coordinate" aria-autocomplete="list" aria-expanded="false" aria-controls="search-listbox">
                             <button id="searchLocationButton">Find</button>
-                            <div id="search-suggestions" class="hidden"></div>
+                            <div id="search-suggestions" class="hidden"><div id="search-status" role="status" aria-live="polite"></div><div id="search-listbox" role="listbox" aria-label="Search results"></div></div>
                         </div>
                     </div>
                     <button id="currentLocationButton" title="Locate Now"><i class="fas fa-location-crosshairs text-xl"></i></button>
@@ -1679,15 +1685,148 @@
             closeModal("adminMapPickerModal");
         }
 
+        // ---- Place search, Thailand first ----
+        // Photon answers as-you-type and forgives typos ("เซนทรัลเวิล", "Siam Paragn"); Nominatim knows
+        // exact Thai names and addresses that Photon misses ("สยามพารากอน", "ตำบลคลองหนึ่ง ปทุมธานี").
+        // Photon goes first; Nominatim (1 request/second by its policy) only fills in when Photon is weak.
+        // When both find nothing, Thai sound-alike spellings are tried ("สยามพารากอล" -> "สยามพารากอน").
+        const PlaceSearch = (() => {
+            const TH_BBOX = "97.3,5.6,105.7,20.5";
+            const cache = new Map();
+            let nominatimFree = 0;
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+            const norm = (s) => String(s || "").toLowerCase().replace(/^(จังหวัด|อำเภอ|ตำบล|เขต|แขวง)/, "").replace(/[\s\-_.,'"()]/g, "");
+
+            // "13.7466, 100.5393", "13.7466 100.5393" or a Google Maps link (@lat,lng / q=lat,lng / !3dlat!4dlng)
+            function parseCoordinates(q) {
+                const s = String(q).trim();
+                const m = s.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/) ||
+                    s.match(/[@=](-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/) ||
+                    s.match(/^(-?\d{1,2}(?:\.\d+)?)\s*[,\s]\s*(-?\d{1,3}(?:\.\d+)?)$/);
+                if (!m) return null;
+                const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+                if (!(Math.abs(lat) <= 90 && Math.abs(lng) <= 180)) return null;
+                return { name: `${lat.toFixed(6)}, ${lng.toFixed(6)}`, detail: "Coordinate", lat, lng, kind: "coord" };
+            }
+
+            // Thai spellings that sound the same: final consonants น/ล/ร/ญ/ณ, ส/ศ/ษ/ซ, ท/ธ/ถ/ฒ/ฑ, a missing or extra ์ / ็
+            function thaiVariants(q) {
+                const out = new Set();
+                const finals = [[/[ลรญณฬ]$/, "น"], [/[ศษซ]$/, "ส"], [/[ธถฒฑ]$/, "ท"], [/[ฎ]$/, "ด"], [/[ฏ]$/, "ต"], [/[ภ]$/, "พ"], [/[ฆค]$/, "ก"]];
+                for (const [re, to] of finals) if (re.test(q)) out.add(q.replace(re, to));
+                if (/์/.test(q)) out.add(q.replace(/์/g, ""));
+                if (/[ศษ]/.test(q)) out.add(q.replace(/[ศษ]/g, "ส"));
+                if (/^เซน/.test(q)) out.add(q.replace(/^เซน/, "เซ็น"));
+                if (/ะ/.test(q)) out.add(q.replace(/ะ/g, ""));
+                out.delete(q);
+                return [...out].slice(0, 3);
+            }
+
+            function photonItem(f) {
+                const p = f.properties || {}, c = f.geometry && f.geometry.coordinates;
+                if (!c || (p.countrycode && p.countrycode !== "TH")) return null;
+                const name = p.name || [p.street, p.housenumber].filter(Boolean).join(" ");
+                if (!name) return null;
+                const detail = [...new Set([p.street && p.name ? p.street : "", p.district, p.city, p.county, p.state].filter(Boolean))].filter(x => x !== name).slice(0, 3).join(", ");
+                // extent = [west, north, east, south]
+                const bounds = Array.isArray(p.extent) && p.extent.length === 4 ? [[p.extent[3], p.extent[0]], [p.extent[1], p.extent[2]]] : null;
+                return { name, detail, lat: c[1], lng: c[0], bounds, src: "photon" };
+            }
+            function nominatimItem(r) {
+                const parts = String(r.display_name || "").split(",").map(s => s.trim()).filter(s => s && s !== "ประเทศไทย" && s !== "Thailand" && !/^\d{5}$/.test(s));
+                const name = r.name || parts[0];
+                if (!name) return null;
+                const bb = Array.isArray(r.boundingbox) ? r.boundingbox.map(Number) : null;   // [south, north, west, east]
+                return { name, detail: parts.filter(x => x !== name).slice(-3).join(", "), lat: parseFloat(r.lat), lng: parseFloat(r.lon),
+                    bounds: bb && bb.every(Number.isFinite) ? [[bb[0], bb[2]], [bb[1], bb[3]]] : null, src: "nominatim" };
+            }
+
+            async function photon(q, center, signal) {
+                let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&bbox=${TH_BBOX}`;
+                if (center) url += `&lat=${center.lat.toFixed(4)}&lon=${center.lng.toFixed(4)}`;
+                const res = await fetch(url, { signal });
+                if (!res.ok) throw new Error("photon " + res.status);
+                const data = await res.json();
+                return (data.features || []).map(photonItem).filter(Boolean);
+            }
+            async function nominatim(q, center, signal) {
+                const wait = nominatimFree - Date.now();
+                if (wait > 0) await sleep(wait);
+                if (signal && signal.aborted) throw new DOMException("aborted", "AbortError");
+                nominatimFree = Date.now() + 1100;
+                let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=6&countrycodes=th&accept-language=th`;
+                if (center) url += `&viewbox=${center.lng - 1},${center.lat + 1},${center.lng + 1},${center.lat - 1}`;
+                const res = await fetch(url, { signal });
+                if (!res.ok) throw new Error("nominatim " + res.status);
+                const data = await res.json();
+                return (Array.isArray(data) ? data : []).map(nominatimItem).filter(Boolean);
+            }
+
+            // Names that start with / contain what was typed come first; near-duplicates (same name within ~150 m) are dropped.
+            function rank(q, lists) {
+                const nq = norm(q), seen = [];
+                const all = lists.flat().map((it, i) => {
+                    const n = norm(it.name);
+                    return { it, i, score: n === nq ? 0 : n.startsWith(nq) ? 1 : n.includes(nq) || nq.includes(n) ? 2 : 3 };
+                }).sort((a, b) => a.score - b.score || a.i - b.i);
+                const out = [];
+                for (const { it } of all) {
+                    const n = norm(it.name);
+                    if (seen.some(s => s.n === n && Math.abs(s.lat - it.lat) < 0.0015 && Math.abs(s.lng - it.lng) < 0.0015)) continue;
+                    seen.push({ n, lat: it.lat, lng: it.lng });
+                    out.push(it);
+                }
+                return out.slice(0, 6);
+            }
+            const strong = (q, items) => items.length >= 3 && items.some(it => norm(it.name).includes(norm(q)));
+
+            // Returns { items, fuzzy, failed }. fuzzy = the items answer a sound-alike spelling, not the typed text.
+            async function search(query, { center = null, signal } = {}) {
+                const q = String(query || "").trim();
+                if (!q) return { items: [] };
+                const coord = parseCoordinates(q);
+                if (coord) return { items: [coord] };
+                const key = q.toLowerCase();
+                if (cache.has(key)) return cache.get(key);
+                let failures = 0;
+                const tryIt = (p) => p.catch(e => { if (e && e.name === "AbortError") throw e; failures++; return []; });
+                let p = await tryIt(photon(q, center, signal));
+                // "ตำบลคลองหนึ่ง ปทุมธานี": look up the first word and keep the hits that sit in the rest (the province / district)
+                const words = q.split(/\s+/);
+                if (words.length > 1 && !strong(q, rank(q, [p]))) {
+                    const rest = words.slice(1).map(norm).filter(Boolean);
+                    const head = (await tryIt(photon(words[0], center, signal)))
+                        .filter(it => rest.every(w => norm(it.detail + it.name).includes(w)));
+                    p = [...head, ...p];
+                }
+                let items = rank(q, [p]);
+                // Photon first on equal footing: it is the one that forgives typos
+                if (!strong(q, items)) items = rank(q, [p, await tryIt(nominatim(q, center, signal))]);
+                let fuzzy = false;
+                if (!items.length) {
+                    const variants = thaiVariants(q);
+                    if (variants.length) {
+                        const lists = await Promise.all(variants.map(v => tryIt(photon(v, center, signal))));
+                        let found = rank(variants[0], lists);
+                        if (!found.length) found = rank(variants[0], [await tryIt(nominatim(variants[0], center, signal))]);
+                        items = found; fuzzy = found.length > 0;
+                    }
+                }
+                const result = { items, fuzzy, failed: !items.length && failures > 0 };
+                if (!result.failed) { cache.set(key, result); if (cache.size > 200) cache.delete(cache.keys().next().value); }
+                return result;
+            }
+            return { search, parseCoordinates, thaiVariants };
+        })();
+        window.PlaceSearch = PlaceSearch;
+
         async function searchAdminMap() {
             const query = document.getElementById("adminMapSearchInput").value.trim();
             if (!query) return;
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&accept-language=th`);
-                const results = await res.json();
-                if (results.length) setAdminPickerCoordinate(parseFloat(results[0].lat), parseFloat(results[0].lon));
-                else showMessage("Location not found", "warning");
-            } catch (e) { showMessage("Search failed - check the connection", "error"); }
+            const center = adminPickerMap ? adminPickerMap.getCenter() : null;
+            const { items, failed } = await PlaceSearch.search(query, { center });
+            if (items.length) setAdminPickerCoordinate(items[0].lat, items[0].lng);
+            else showMessage(failed ? "Search failed - check the connection" : "Location not found - try a shorter name", failed ? "error" : "warning");
         }
 
         // Admin access = a Google account listed in the AllowedEmails tab of the Sheet.
@@ -2795,63 +2934,121 @@
             document.getElementById("report-close").onclick = () => { closeModal("reportModal"); };
             document.getElementById("report-form").onsubmit = sendReport;
             
+            // Map search box: history (staff / survey IDs) + places (PlaceSearch). Arrow keys move, Enter picks, Esc closes.
             const sIn = document.getElementById("locationSearchInput"), sBox = document.getElementById("search-suggestions");
-            let deb;
-            sIn.addEventListener("input", (e) => {
-                const term = e.target.value.toLowerCase();
-                clearTimeout(deb);
-                if (!term) { sBox.classList.add("hidden"); return; }
-                deb = setTimeout(async () => {
-                    // History search
-                    const historyResults = [...savedLocations, ...pendingLocations].filter(loc => 
-                        loc.EmployeeID.toLowerCase().includes(term) || 
-                        (loc.SurveyID && loc.SurveyID.toLowerCase().includes(term))
-                    ).slice(0, 3);
-
-                    let res = [];
-                    let viewboxParam = "";
-                    if (map) {
-                        const b = map.getBounds();
-                        viewboxParam = `&viewbox=${b.getWest()},${b.getNorth()},${b.getEast()},${b.getSouth()}`;
-                    }
-                    try { const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(term)}&limit=5&accept-language=th${viewboxParam}`); res = await r.json(); } catch(err) {}
-                    
-                    let html = "";
-                    if (historyResults.length > 0) {
-                        html += `<div class="p-2 bg-slate-50 text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">History</div>`;
-                        html += historyResults.map(h => `<div class="suggestion-item" data-lat="${h.Latitude}" data-lng="${h.Longitude}"><div class="text-[10px] font-black text-slate-900 truncate"><i class="fas fa-clock-rotate-left mr-2 text-primary-blue opacity-50"></i>${h.EmployeeID}</div><div class="text-[9px] text-slate-400 truncate">${h.SurveyID || '-'}</div></div>`).join("");
-                    }
-                    if (res.length > 0) {
-                        html += `<div class="p-2 bg-slate-50 text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Locations</div>`;
-                        html += res.map(r => `<div class="suggestion-item" data-lat="${r.lat}" data-lng="${r.lon}"><div class="text-[10px] font-black text-slate-800 truncate">${r.display_name.split(',')[0]}</div><div class="text-[9px] text-slate-400 truncate">${r.display_name}</div></div>`).join("");
-                    }
-
-                    if (html) {
-                        sBox.innerHTML = html;
-                        sBox.classList.remove("hidden");
-                        document.querySelectorAll(".suggestion-item").forEach(item => { 
-                            item.onclick = () => { 
-                                const lat = parseFloat(item.dataset.lat), lng = parseFloat(item.dataset.lng); 
-                                map.setView([lat, lng], 18); updateDisplay(lat, lng); 
-                                sBox.classList.add("hidden"); sIn.value = ""; 
-                            }; 
-                        });
-                    } else sBox.classList.add("hidden");
-                }, 400);
-            });
-            document.getElementById("searchLocationButton").onclick = async () => {
-                const q = sIn.value.trim(); if (!q) return;
-                let viewboxParam = "";
-                if (map) {
-                    const b = map.getBounds();
-                    viewboxParam = `&viewbox=${b.getWest()},${b.getNorth()},${b.getEast()},${b.getSouth()}`;
-                }
-                try {
-                    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1${viewboxParam}`);
-                    const d = await r.json();
-                    if (d.length) { const lat = parseFloat(d[0].lat), lon = parseFloat(d[0].lon); map.setView([lat, lon], 17); updateDisplay(lat, lon); sBox.classList.add("hidden"); }
-                } catch(e) {}
+            const sStatus = document.getElementById("search-status"), sList = document.getElementById("search-listbox");
+            let deb, searchSeq = 0, searchAbort = null, searchOptions = [], searchActive = -1;
+            const closeSuggestions = () => {
+                sBox.classList.add("hidden"); sIn.setAttribute("aria-expanded", "false");
+                sIn.removeAttribute("aria-activedescendant"); searchActive = -1;
             };
+            const setSearchActive = (i) => {
+                searchActive = i;
+                searchOptions.forEach((o, k) => o.el.setAttribute("aria-selected", String(k === i)));
+                if (searchOptions[i]) { sIn.setAttribute("aria-activedescendant", searchOptions[i].el.id); searchOptions[i].el.scrollIntoView({ block: "nearest" }); }
+                else sIn.removeAttribute("aria-activedescendant");
+            };
+            const goToPlace = (it) => {
+                const b = it.bounds;
+                if (b && (Math.abs(b[1][0] - b[0][0]) > 0.004 || Math.abs(b[1][1] - b[0][1]) > 0.004)) map.fitBounds(b, { maxZoom: 18 });
+                else map.setView([it.lat, it.lng], 18);
+                updateDisplay(it.lat, it.lng);
+                closeSuggestions(); sIn.value = ""; sStatus.textContent = "";
+            };
+            const historyMatches = (term) => {
+                const t = term.toLowerCase();
+                return [...savedLocations, ...pendingLocations]
+                    .filter(loc => String(loc.EmployeeID || "").toLowerCase().includes(t) || String(loc.SurveyID || "").toLowerCase().includes(t))
+                    .slice(0, 3)
+                    .map(h => ({ name: String(h.EmployeeID || "-"), detail: String(h.SurveyID || "-"), lat: parseFloat(h.Latitude), lng: parseFloat(h.Longitude) }))
+                    .filter(h => Number.isFinite(h.lat) && Number.isFinite(h.lng));
+            };
+            const renderSuggestions = (history, places, note) => {
+                searchOptions = []; searchActive = -1; sList.innerHTML = "";
+                sIn.removeAttribute("aria-activedescendant");
+                const group = (label, items, iconFor) => {
+                    if (!items.length) return;
+                    const g = document.createElement("div");
+                    g.setAttribute("role", "group"); g.setAttribute("aria-label", label);
+                    const head = document.createElement("div");
+                    head.className = "suggestion-group"; head.setAttribute("aria-hidden", "true"); head.textContent = label;
+                    g.appendChild(head);
+                    items.forEach(it => {
+                        const el = document.createElement("div");
+                        el.className = "suggestion-item"; el.id = "search-opt-" + searchOptions.length;
+                        el.setAttribute("role", "option"); el.setAttribute("aria-selected", "false");
+                        el.innerHTML = `<div class="suggestion-name"><i class="fas fa-${iconFor(it)} mr-2 text-primary-blue opacity-60" aria-hidden="true"></i>${escapeHtml(it.name)}</div>` +
+                            (it.detail ? `<div class="suggestion-detail">${escapeHtml(it.detail)}</div>` : "");
+                        el.addEventListener("mousedown", e => e.preventDefault());   // keep the focus in the input
+                        el.onclick = () => goToPlace(it);
+                        searchOptions.push({ el, it });
+                        g.appendChild(el);
+                    });
+                    sList.appendChild(g);
+                };
+                group("History", history, () => "clock-rotate-left");
+                group("Places", places, it => it.kind === "coord" ? "crosshairs" : "location-dot");
+                sStatus.textContent = note || "";
+                if (searchOptions.length || note) { sBox.classList.remove("hidden"); sIn.setAttribute("aria-expanded", "true"); }
+                else closeSuggestions();
+            };
+            const runPlaceSearch = async (term, seq, history, pickFirst) => {
+                if (searchAbort) searchAbort.abort();
+                const ctrl = searchAbort = new AbortController();
+                let r;
+                try { r = await PlaceSearch.search(term, { center: map ? map.getCenter() : null, signal: ctrl.signal }); }
+                catch (e) { if (e && e.name === "AbortError") return; r = { items: [], failed: true }; }
+                if (seq !== searchSeq) return;
+                const note = r.items.length
+                    ? (r.fuzzy ? `No exact match for "${term}" - similar names:` : "")
+                    : (r.failed ? "Search unavailable - check the connection" : "No places found. Try a shorter name, the district, or paste a coordinate.");
+                renderSuggestions(history, r.items, note);
+                if (pickFirst) {
+                    const first = r.items[0] || history[0];
+                    if (first) goToPlace(first);
+                    else showMessage(r.failed ? "Search failed - check the connection" : "Location not found - try a shorter name", r.failed ? "error" : "warning");
+                }
+            };
+            sIn.addEventListener("input", () => {
+                const term = sIn.value.trim();
+                clearTimeout(deb);
+                if (searchAbort) searchAbort.abort();
+                const seq = ++searchSeq;
+                if (!term) { sStatus.textContent = ""; closeSuggestions(); return; }
+                const history = historyMatches(term);
+                const coord = PlaceSearch.parseCoordinates(term);
+                if (coord || term.length < 2) { renderSuggestions(history, coord ? [coord] : [], ""); return; }
+                renderSuggestions(history, [], "Searching...");
+                deb = setTimeout(() => runPlaceSearch(term, seq, history, false), 350);
+            });
+            const findNow = () => {
+                const term = sIn.value.trim();
+                if (!term) return;
+                clearTimeout(deb);
+                const coord = PlaceSearch.parseCoordinates(term);
+                if (coord) { goToPlace(coord); return; }
+                const seq = ++searchSeq, history = historyMatches(term);
+                renderSuggestions(history, [], "Searching...");
+                runPlaceSearch(term, seq, history, true);
+            };
+            sIn.addEventListener("keydown", (e) => {
+                if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                    if (!searchOptions.length) return;
+                    e.preventDefault();
+                    sBox.classList.remove("hidden"); sIn.setAttribute("aria-expanded", "true");
+                    const n = searchOptions.length;
+                    setSearchActive(e.key === "ArrowDown" ? (searchActive + 1) % n : (searchActive - 1 + n) % n);
+                } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (searchActive >= 0 && searchOptions[searchActive]) goToPlace(searchOptions[searchActive].it);
+                    else findNow();
+                } else if (e.key === "Escape" && !sBox.classList.contains("hidden")) {
+                    e.preventDefault(); e.stopPropagation(); closeSuggestions();
+                }
+            });
+            sIn.addEventListener("focus", () => { if (sIn.value.trim() && searchOptions.length) { sBox.classList.remove("hidden"); sIn.setAttribute("aria-expanded", "true"); } });
+            document.addEventListener("pointerdown", (e) => { if (!document.getElementById("searchBox").contains(e.target)) closeSuggestions(); });
+            document.getElementById("searchLocationButton").onclick = findNow;
         };
     </script>
 </body>
