@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Location Tracker V12.13 (14.10.2026)</title>
+    <title>Location Tracker V12.14 (14.10.2026)</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -563,6 +563,11 @@
         }
         .lt-hint i { color: var(--primary-hover); }
         .lt-top .lt-hint { margin-bottom: 8px; padding: 8px 12px; font-size: 13px; }
+        /* Why Upload / Save are switched off right now (empty = nothing to say) */
+        .lt-reason { margin: -16px 0 20px; font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--ink-2); }
+        .lt-reason:empty { display: none; }
+        .lt-reason i { margin-right: 6px; color: var(--muted); }
+        .lt-actions .btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
         .lt-empty-row td { padding: 20px 16px !important; text-align: center; color: var(--muted); font-weight: 500; font-size: 14px; line-height: 1.45; }
 
         /* Records list: newest first, a short list by default */
@@ -698,6 +703,7 @@
             .lt-top .lt-actions { gap: 8px; margin-bottom: 0; }
             .lt-top .lt-primary, .lt-top .lt-save { min-height: 52px; border-radius: 16px; }
             .lt-top .lt-primary { font-size: 15px; }
+            .lt-top .lt-reason { margin: 6px 2px 0; font-size: 12px; }
         }
 
         /* ---------- Larger screens: the layout grows with the screen ---------- */
@@ -1039,9 +1045,10 @@
                     </div>
 
                     <div id="normalActionButtons" class="lt-actions">
-                        <button id="uploadButton" class="btn lt-primary" title="Save this record and upload now"><i class="fas fa-cloud-arrow-up"></i><span>UPLOAD</span></button>
-                        <button id="saveButton" class="btn lt-save" title="Save on this device only, send later"><i class="fas fa-floppy-disk" aria-hidden="true"></i><span>Save</span><small>this phone</small></button>
+                        <button id="uploadButton" class="btn lt-primary" title="Save this record and upload now" aria-describedby="action-reason"><i class="fas fa-cloud-arrow-up" aria-hidden="true"></i><span>UPLOAD</span></button>
+                        <button id="saveButton" class="btn lt-save" title="Save on this device only, send later" aria-describedby="action-reason"><i class="fas fa-floppy-disk" aria-hidden="true"></i><span>Save</span><small>this phone</small></button>
                     </div>
+                    <p id="action-reason" class="lt-reason" role="status" aria-live="polite"></p>
                     <div id="sync-status" class="lt-sync hidden" role="status" aria-live="polite">
                         <i id="sync-status-icon" class="fas fa-cloud-arrow-up" aria-hidden="true"></i>
                         <span id="sync-status-text"></span>
@@ -1537,16 +1544,49 @@
             return lines.join('<br>');
         }
 
-        // A closed project takes no new pins: both buttons go quiet and say why.
-        function updateClosedProjectState() {
+        // A closed project takes no new pins: both buttons go quiet and say why (see renderActionState).
+        function updateClosedProjectState() { renderSyncStatus(); }
+
+        // What is wrong with the entry on screen, before anyone presses a button. null = ready to save.
+        function entryProblem() {
+            const eid = ui.employeeId.value.trim(), sid = ui.surveyId.value.trim();
+            const missing = [];
+            if (currentLat === null) missing.push("set the location on the map");
+            if (!eid) missing.push(`enter ${customLabels.employeeId}`);
+            if (!sid) missing.push(`enter ${customLabels.surveyId}`);
+            if (missing.length) return { missing };
+            const all = [...savedLocations, ...pendingLocations];
+            if (all.some(l => l.EmployeeID === eid && l.SurveyID === sid)) return { blocked: `${customLabels.surveyId} ${sid} is already recorded for ${eid}` };
+            if (all.some(l => l.Latitude === currentLat && l.Longitude === currentLng)) return { blocked: "This spot is already pinned - move the pin" };
+            return null;
+        }
+
+        // Upload / Save only switch on when they can work, and the line under them says why not.
+        // Upload counts the pins it will send: the waiting ones plus the entry on screen when it is complete.
+        function renderActionState() {
+            const up = document.getElementById("uploadButton"), save = document.getElementById("saveButton"), reason = document.getElementById("action-reason");
+            if (!up || !save || !reason || !ui || !ui.employeeId) return;
             const closed = !!currentProjectName && getProjectConfig(currentProjectName).isClosed;
-            const uploadBtn = document.getElementById("uploadButton"), saveBtn = document.getElementById("saveButton");
-            [uploadBtn, saveBtn].forEach(btn => {
-                btn.disabled = closed;
-                btn.classList.toggle("opacity-40", closed);
-                btn.classList.toggle("pointer-events-none", closed);
-            });
-            renderSyncStatus();
+            const n = pendingLocations.length;
+            const typed = ui.surveyId.value.trim() !== "";
+            const problem = entryProblem();
+            const pins = n + (problem ? 0 : 1);
+            let upOk, saveOk, why = "";
+            if (closed) { upOk = saveOk = false; why = "This project is closed - no new pins"; }
+            else {
+                saveOk = !problem;
+                upOk = !isUploading && (!problem || (n > 0 && !typed));   // a half-typed entry is never dropped silently
+                if (problem) {
+                    const todo = problem.blocked || problem.missing.join(", ");
+                    why = (n > 0 && !typed && !problem.blocked ? "To add a pin: " : "To save: ") + todo;
+                }
+            }
+            up.disabled = !upOk; save.disabled = !saveOk;
+            up.querySelector("span").textContent = closed ? "PROJECT CLOSED" : isUploading ? "SENDING..." : pins ? `UPLOAD ${pins} ${pins === 1 ? "PIN" : "PINS"}` : "UPLOAD";
+            if (reason.dataset.text !== why) {
+                reason.dataset.text = why;
+                reason.innerHTML = why ? `<i class="fas fa-circle-info" aria-hidden="true"></i>${escapeHtml(why)}` : "";
+            }
         }
 
         // The honest counter: how many records are still on this device, and whether there is a connection.
@@ -1560,7 +1600,7 @@
             const offline = navigator.onLine === false;
             const closed = !!currentProjectName && getProjectConfig(currentProjectName).isClosed;
             const records = n === 1 ? "1 record" : `${n} records`;
-            uploadBtn.querySelector("span").textContent = closed ? "PROJECT CLOSED" : (n ? `UPLOAD (${n})` : "UPLOAD");
+            renderActionState();
             strip.classList.toggle("hidden", n === 0 && !offline);
             strip.classList.toggle("lt-sync--offline", offline);
             document.getElementById("sync-status-icon").className = offline ? "fas fa-wifi" : "fas fa-cloud-arrow-up"   /* fa-wifi-slash is not in this Font Awesome build */;
@@ -1573,6 +1613,7 @@
         function renderPinHint() {
             const hint = document.getElementById("pin-hint");
             if (hint) hint.classList.toggle("hidden", currentLat !== null);
+            renderActionState();
         }
 
         // Records waiting to upload are kept per project on this device, so they survive a reload
@@ -2074,10 +2115,19 @@
             updateLabels();
         };
 
+        // The Employee ID typed on this phone is kept on this phone (cleared when the field is emptied).
+        const EMPLOYEE_ID_KEY = "lt_employee_id";
+        function readEmployeeId() { try { return localStorage.getItem(EMPLOYEE_ID_KEY) || ""; } catch (e) { return ""; } }
+        function rememberEmployeeId() {
+            const value = ui.employeeId ? ui.employeeId.value.trim() : "";
+            try { if (value) localStorage.setItem(EMPLOYEE_ID_KEY, value); else localStorage.removeItem(EMPLOYEE_ID_KEY); } catch (e) {}
+        }
+
         window.setEmployeeLock = function(locked) {
             isEmployeeIdLocked = locked;
             const input = document.getElementById("employeeIdInput");
             if (input) input.disabled = locked;
+            if (locked) rememberEmployeeId();
             const icon = document.getElementById("lockIcon");
             if (icon) icon.className = locked ? "fas fa-lock text-primary-blue" : "fas fa-lock-open text-slate-300";
             const lockBtn = document.getElementById("lockEmployeeIdBtn");
@@ -2534,7 +2584,7 @@
             if (currentEID !== "") {
                 const count = all.filter(l => l.EmployeeID === currentEID).length;
                 if (document.getElementById("eid-pin-count")) {
-                    document.getElementById("eid-pin-count").textContent = `${count} PINS`;
+                    document.getElementById("eid-pin-count").textContent = `${count} ${count === 1 ? "PIN" : "PINS"}`;
                     document.getElementById("eid-pin-count").classList.remove("hidden");
                 }
             } else if (document.getElementById("eid-pin-count")) document.getElementById("eid-pin-count").classList.add("hidden");
@@ -2601,6 +2651,9 @@
                 isAdminAuthenticated = true;
             }
             renderAdminAccount();
+            // The field worker's own Employee ID comes back after a reload, already locked (the lock button still opens it).
+            const savedEmployeeId = readEmployeeId();
+            if (savedEmployeeId) { ui.employeeId.value = savedEmployeeId; window.setEmployeeLock(true); }
             updateLabels();   // cached labels show at once; the server copy arrives with the project list
             document.querySelectorAll("dialog.modal-overlay").forEach(dialog => {
                 dialog.addEventListener("close", () => {
@@ -2664,7 +2717,7 @@
             };
 
             document.getElementById("close-password-modal").onclick = () => { closeModal("passwordModal"); };
-            document.getElementById("home-button").onclick = () => { ui.employeeId.value = ""; window.showView("project-selection-view"); };
+            document.getElementById("home-button").onclick = () => window.showView("project-selection-view");   // the Employee ID stays: same worker, next project
             document.getElementById("refresh-projects-btn").onclick = () => fetchProjects();
             
             document.getElementById("manage-projects-btn").onclick = () => {
@@ -2714,7 +2767,8 @@
             document.getElementById("lockEmployeeIdBtn").onclick = () => window.setEmployeeLock(!isEmployeeIdLocked);
             ui.employeeId.onblur = () => { if (ui.employeeId.value.trim() !== "") window.setEmployeeLock(true); };
             ui.employeeId.addEventListener('keydown', (e) => { if (e.key === 'Enter' && ui.employeeId.value.trim() !== "") { window.setEmployeeLock(true); ui.surveyId.focus(); } });
-            ui.employeeId.oninput = () => renderTable();
+            ui.employeeId.oninput = () => { rememberEmployeeId(); renderTable(); };
+            ui.surveyId.addEventListener("input", renderActionState);
 
             document.getElementById("currentLocationButton").onclick = () => {
                 showMessage("Getting your location...", "info");
@@ -2754,7 +2808,7 @@
                 };
                 pendingLocations.push(record);
                 savePendingLocations();
-                if (!isEmployeeIdLocked) ui.employeeId.value = "";
+                if (!isEmployeeIdLocked) { ui.employeeId.value = ""; rememberEmployeeId(); }
                 ui.surveyId.value = ""; renderTable();
                 return record;
             }

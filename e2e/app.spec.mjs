@@ -50,8 +50,10 @@ test.describe("field worker", () => {
     await openProject(page, "Alpha");
     await expect(page.locator("#savedLocationsTableBody .lt-empty-row")).toContainText(/no records in this project yet/i);
     await expect(page.locator("#pin-hint")).toBeVisible();
-    await page.click("#uploadButton");
-    await expect(toast(page)).toContainText(/tap the map to set the location/i);
+    // nothing to send yet: the buttons are off and say why, instead of failing after the press
+    await expect(page.locator("#uploadButton")).toBeDisabled();
+    await expect(page.locator("#saveButton")).toBeDisabled();
+    await expect(page.locator("#action-reason")).toContainText(/set the location on the map/i);
     await page.click("#home-button");
     await openProject(page, "Beta");
     await expect(page.locator("#total-pin-count")).toHaveText("TOTAL 3");
@@ -68,10 +70,14 @@ test.describe("field worker", () => {
     await page.locator("#map").click({ position: { x: 120, y: 120 } });
     await expect(page.locator("#lat")).not.toHaveText("--.------");
     await expect(page.locator("#pin-hint")).toBeHidden();
-    await page.click("#uploadButton");
-    await expect(toast(page)).toContainText(/enter employee id and survey id/i);
+    await expect(page.locator("#uploadButton")).toBeDisabled();
+    await expect(page.locator("#action-reason")).toContainText(/enter employee id, enter survey id/i);
+    await expect(page.locator("#action-reason")).not.toContainText(/location/i);
     await page.fill("#employeeIdInput", "0861");
     await page.fill("#surveyIdInput", "S-101");
+    await expect(page.locator("#uploadButton")).toBeEnabled();
+    await expect(page.locator("#uploadButton")).toContainText("UPLOAD 1 PIN");
+    await expect(page.locator("#action-reason")).toBeHidden();
     await page.click("#uploadButton");
     await expect(page.locator("#loading-spinner-text")).toHaveText(/completed/i, { timeout: 15000 });
     await expect(page.locator("#loadingSpinner")).toBeHidden({ timeout: 15000 });
@@ -276,6 +282,66 @@ test.describe("field worker", () => {
     await noErrors(page);
   });
 
+  test("buttons count the pins, say why they are off, Employee ID is remembered", async ({ page }) => {
+    await openProject(page, "Beta");
+    const up = page.locator("#uploadButton"), save = page.locator("#saveButton"), reason = page.locator("#action-reason"), eid = page.locator("#employeeIdInput");
+    await page.locator("#map").click({ position: { x: 100, y: 100 } });
+    await eid.fill("0861");
+    await eid.press("Enter");                                   // locks it
+    await expect(eid).toBeDisabled();
+
+    // two pins saved on the phone: Upload counts them, Save waits for a new entry
+    await page.fill("#surveyIdInput", "S-1"); await save.click();
+    await page.evaluate(() => updateDisplay(13.75, 100.53));
+    await page.fill("#surveyIdInput", "S-2"); await save.click();
+    await expect(up).toContainText("UPLOAD 2 PINS");
+    await expect(up).toBeEnabled();
+    await expect(save).toBeDisabled();
+    await expect(reason).toContainText(/to add a pin: enter survey id/i);
+
+    // the same spot again: switched off until the pin moves; then the typed entry counts as the third pin
+    await page.fill("#surveyIdInput", "S-3");
+    await expect(reason).toContainText(/already pinned - move the pin/i);
+    await expect(up).toBeDisabled();
+    await expect(save).toBeDisabled();
+    await page.evaluate(() => updateDisplay(13.76, 100.53));
+    await expect(up).toContainText("UPLOAD 3 PINS");
+    await expect(save).toBeEnabled();
+    await expect(reason).toBeHidden();
+
+    // a Survey ID this worker already recorded
+    await page.fill("#surveyIdInput", "S-1");
+    await expect(reason).toContainText("Survey ID S-1 is already recorded for 0861");
+    await expect(up).toBeDisabled();
+    await checkA11y(page, "buttons off with a reason");
+
+    // the admin closes the project while the worker is on it
+    await page.evaluate(() => { projectConfigs.Beta = { ...projectConfigs.Beta, isClosed: true }; updateClosedProjectState(); });
+    await expect(up).toContainText("PROJECT CLOSED");
+    await expect(up).toBeDisabled();
+    await expect(save).toBeDisabled();
+    await expect(reason).toContainText(/project is closed/i);
+
+    // reload: the Employee ID comes back locked; the lock still opens; Home keeps it
+    await page.reload();
+    await openProject(page, "Beta");
+    await expect(eid).toHaveValue("0861");
+    await expect(eid).toBeDisabled();
+    await expect(up).toContainText("UPLOAD 2 PINS");
+    await page.click("#lockEmployeeIdBtn");
+    await expect(eid).toBeEnabled();
+    await eid.fill("0999");
+    await eid.blur();
+    await expect(eid).toBeDisabled();
+    await page.click("#home-button");
+    await openProject(page, "Alpha");
+    await expect(eid).toHaveValue("0999");
+    await page.reload();
+    await openProject(page, "Alpha");
+    await expect(eid).toHaveValue("0999");
+    await noErrors(page);
+  });
+
   test("no signal: the record waits on the device and goes out later", async ({ page }) => {
     await openProject(page, "Beta");
     await page.locator("#map").click({ position: { x: 100, y: 100 } });
@@ -288,7 +354,7 @@ test.describe("field worker", () => {
     // the honest counter stays until the queue is empty
     await expect(page.locator("#sync-status")).toBeVisible();
     await expect(page.locator("#sync-status")).toContainText(/1 record waiting on this phone/i);
-    await expect(page.locator("#uploadButton")).toContainText("UPLOAD (1)");
+    await expect(page.locator("#uploadButton")).toContainText("UPLOAD 1 PIN");
     await expect(page.locator("#sync-retry-btn")).toBeVisible();
     await page.waitForTimeout(4500);
     await expect(page.locator("#sync-status")).toBeVisible();          // long after the toast is gone
